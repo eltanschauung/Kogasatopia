@@ -157,7 +157,7 @@ public void Event_RoundWin(Event event, const char[] name, bool dontBroadcast)
         return;
     }
 
-    if (StartScrambleVote(0, true))
+    if (StartAutoScramble(true))
     {
         g_iRoundsSinceAuto = 0;
     }
@@ -292,6 +292,23 @@ static bool StartScrambleVote(int client, bool suppressFeedback)
         return false;
     }
 
+    return true;
+}
+
+static bool StartAutoScramble(bool suppressFeedback)
+{
+    if (g_bVoteRunning || NativeVotes_IsVoteInProgress() || IsVoteInProgress())
+    {
+        return false;
+    }
+
+    if (!suppressFeedback)
+    {
+        CPrintToChatAll("{blue}[Scramble]{default} Auto scramble triggered.");
+    }
+
+    StartRestartFreezeWindow();
+    ServerCommand("mp_scrambleteams");
     return true;
 }
 

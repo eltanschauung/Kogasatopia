@@ -14,11 +14,13 @@ native int FilterAlerts_MarkAutobalance(int client);
 
 float   g_fImmunityExpiry[MAXPLAYERS + 1];  // GetGameTime() at which immunity expires; 0.0 = not immune
 ConVar  g_hLogEnabled;
+ConVar  g_hDiffThreshold;
 ConVar  g_hMpAutoteamBalance;
 ConVar  g_hMpTeamsUnbalanceLimit;
 int     g_iSavedAutoteamBalance;
 int     g_iSavedUnbalanceLimit;
 char    g_sLogPath[PLATFORM_MAX_PATH];
+Handle  g_hAutoBalanceTimer = INVALID_HANDLE;
 
 public Plugin myinfo =
 {
@@ -42,18 +44,52 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
     g_hLogEnabled = CreateConVar("sm_autobalance_log", "1", "Enable autobalance debug logging.", _, true, 0.0, true, 1.0);
+    g_hDiffThreshold = CreateConVar("sm_autobalance_diff", "1", "Autobalance when team size difference is above this value.", _, true, 1.0, true, 10.0);
     BuildPath(Path_SM, g_sLogPath, sizeof(g_sLogPath), "logs/autobalance.log");
+    LogToFileEx(g_sLogPath, "[autobalance] Plugin started.");
     HookEvent("teamplay_round_win", Event_RoundEnd);
     HookEvent("teamplay_round_stalemate", Event_RoundEnd);
 
     ApplyServerBalanceCvars(true);
+}
 
-    CreateTimer(CHECK_INTERVAL, Timer_Autobalance, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+public void OnMapStart()
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        g_fImmunityExpiry[i] = 0.0;
+    }
+
+    if (g_hAutoBalanceTimer != INVALID_HANDLE)
+    {
+        KillTimer(g_hAutoBalanceTimer);
+        g_hAutoBalanceTimer = INVALID_HANDLE;
+    }
+
+    g_hAutoBalanceTimer = CreateTimer(CHECK_INTERVAL, Timer_Autobalance, _, TIMER_REPEAT);
 }
 
 public void OnPluginEnd()
 {
     ApplyServerBalanceCvars(false);
+
+    if (g_hAutoBalanceTimer != INVALID_HANDLE)
+    {
+        KillTimer(g_hAutoBalanceTimer);
+        g_hAutoBalanceTimer = INVALID_HANDLE;
+    }
+}
+
+public void OnClientPutInServer(int client)
+{
+    if (client <= 0 || client > MaxClients) return;
+    g_fImmunityExpiry[client] = 0.0;
+}
+
+public void OnClientDisconnect(int client)
+{
+    if (client <= 0 || client > MaxClients) return;
+    g_fImmunityExpiry[client] = 0.0;
 }
 
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -79,7 +115,14 @@ public Action Timer_Autobalance(Handle timer)
     int diff    = redCount - blueCount;
     int absDiff = (diff < 0) ? -diff : diff;
 
-    if (absDiff < 2)
+    int diffThreshold = 1;
+    if (g_hDiffThreshold != null)
+    {
+        diffThreshold = g_hDiffThreshold.IntValue;
+        if (diffThreshold < 1) diffThreshold = 1;
+    }
+
+    if (absDiff <= diffThreshold)
     {
         return Plugin_Continue;
     }
@@ -88,7 +131,7 @@ public Action Timer_Autobalance(Handle timer)
     int smallestTeam = (diff > 0) ? TEAM_BLUE : TEAM_RED;
     int biggestCount = (diff > 0) ? redCount   : blueCount;
 
-    bool forceBalance = (absDiff > 2);
+    bool forceBalance = (absDiff > diffThreshold);
 
     char fromTeamName[8];
     char toTeamName[8];
@@ -111,7 +154,7 @@ public Action Timer_Autobalance(Handle timer)
     // ------------------------------------------------------------------
     // Candidate selection.
     //
-    // If forceBalance is active (absDiff > 2), switch immediately:
+    // If forceBalance is active (absDiff > threshold), switch immediately:
     // pick from any human on the oversized team, regardless of alive
     // state or immunity.
     //
@@ -292,24 +335,11 @@ public Action Timer_Autobalance(Handle timer)
         pick, fromTeamChat, toTeamChat
     );
 
-    CreateTimer(0.1, Timer_Respawn, GetClientUserId(pick), TIMER_FLAG_NO_MAPCHANGE);
-
     char teamColorName[16];
     strcopy(teamColorName, sizeof(teamColorName), (smallestTeam == TEAM_RED) ? "{red}Red" : "{blue}Blue");
     CPrintToChatEx(pick, pick, "{lightgreen}[Server]{default} You've been autobalanced to %s{default}!", teamColorName);
 
     return Plugin_Continue;
-}
-
-public Action Timer_Respawn(Handle timer, any userid)
-{
-    int client = GetClientOfUserId(userid);
-    if (client > 0 && IsClientInGame(client))
-    {
-        TF2_RespawnPlayer(client);
-    }
-
-    return Plugin_Stop;
 }
 
 // ---------------------------------------------------------------------------

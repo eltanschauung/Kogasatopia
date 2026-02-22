@@ -1,27 +1,4 @@
 #pragma semicolon 1
-/*
- * =============================================================================
- *  WhaleTracker (modular single-source layout)
- * =============================================================================
- *  This file is the entry point and shared symbol container for WhaleTracker.
- *  The implementation is split into:
- *    - include/whaletracker.inc                 (shared helpers/utilities)
- *    - whaletracker/runtime_whaletracker.sp     (plugin lifecycle/runtime)
- *    - whaletracker/database_whaletracker.sp    (schema/load/save/migrations)
- *    - whaletracker/gameplay_whaletracker.sp    (event/game stat tracking)
- *    - whaletracker/commands_whaletracker.sp    (chat/admin commands)
- *
- *  Compatibility is controlled by convars so one codebase can run on TF2 and
- *  TF2C without maintaining separate plugins. See:
- *    sm_whaletracker_enable_sdkhooks
- *    sm_whaletracker_headshot_mode
- *    sm_whaletracker_enable_matchlogs
- *    sm_whaletracker_public_ip_mode
- *    sm_whaletracker_public_ip
- *    sm_whaletracker_medicdrop_mode
- *    sm_whaletracker_deferred_save_pump
- * =============================================================================
- */
 
 #include <sourcemod>
 #include <tf2>
@@ -54,11 +31,14 @@
 #define WT_MEDICDROP_MODE_SLOT 0
 #define WT_MEDICDROP_MODE_SCAN 1
 
+native int Filters_GetChatName(int client, char[] buffer, int maxlen);
+
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 {
     MarkNativeAsOptional("SDKHook");
     MarkNativeAsOptional("SDKUnhook");
     MarkNativeAsOptional("SteamWorks_GetPublicIP");
+    MarkNativeAsOptional("Filters_GetChatName");
     RegPluginLibrary("whaletracker");
     CreateNative("WhaleTracker_GetCumulativeKills", Native_WhaleTracker_GetCumulativeKills);
     CreateNative("WhaleTracker_AreStatsLoaded", Native_WhaleTracker_AreStatsLoaded);
@@ -219,6 +199,7 @@ int g_SaveQueryUserIds[MAX_CONCURRENT_SAVE_QUERIES];
 bool g_SaveQuerySlotUsed[MAX_CONCURRENT_SAVE_QUERIES];
 
 #include <whaletracker>
+#include "whaletracker/motd_whaletracker.sp"
 #include "whaletracker/runtime_whaletracker.sp"
 #include "whaletracker/database_whaletracker.sp"
 #include "whaletracker/gameplay_whaletracker.sp"
