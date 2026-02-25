@@ -128,6 +128,8 @@ int g_iDamageGate[MAXPLAYERS + 1];
 Database g_hDatabase = null;
 ConVar g_CvarDatabase = null;
 ConVar g_hVisibleMaxPlayers = null;
+ConVar g_hGameName = null;
+ConVar g_hGameUrl = null;
 ConVar g_hDebugMinimalStats = null;
 ConVar g_hEnableSdkHooks = null;
 ConVar g_hHeadshotMode = null;
