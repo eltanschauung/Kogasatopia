@@ -16,6 +16,7 @@
 #define MAX_COMMANDS 64
 #define FILTERS_OUTBOX_CLEANUP_INTERVAL 120
 #define FILTERS_OUTBOX_RETENTION_SECONDS 3600
+#define FILTERS_CHAT_RETENTION_SECONDS 86400
 #define FILTERS_IGNORED_STEAMID64 "76561199812613650" // [U:1:1852347922]
 #define REDLIST_RAPES_THRESHOLD 1
 #define PRENAME_MAX_PATTERN 64
@@ -130,6 +131,7 @@ int g_iHostPort = 27015;
 bool g_bOutboxStampReady = false;
 int g_iPendingSchemaQueries = 0;
 int g_iLastOutboxCleanup = 0;
+int g_iLastChatCleanup = 0;
 
 bool Filters_DebugEnabled()
 {
@@ -787,6 +789,7 @@ public void Filters_OutboxQueryCallback(Database db, DBResultSet results, const 
         Filters_MarkOutboxDelivered(id);
     }
     Filters_MaybeCleanupOutbox();
+    Filters_MaybeCleanupChatHistory();
 }
 
 static void Filters_MarkOutboxDelivered(int rowId)
@@ -828,6 +831,30 @@ static void Filters_MaybeCleanupOutbox()
     char query[128];
     Format(query, sizeof(query),
         "DELETE FROM whaletracker_chat_outbox WHERE created_at < %d",
+        cutoff);
+    g_hFiltersDb.Query(Filters_SimpleSqlCallback, query);
+}
+
+static void Filters_MaybeCleanupChatHistory()
+{
+    if (!g_bDbReady || g_hFiltersDb == null)
+    {
+        return;
+    }
+    int now = GetTime();
+    if (g_iLastChatCleanup != 0 && now - g_iLastChatCleanup < FILTERS_OUTBOX_CLEANUP_INTERVAL)
+    {
+        return;
+    }
+    g_iLastChatCleanup = now;
+    int cutoff = now - FILTERS_CHAT_RETENTION_SECONDS;
+    if (cutoff <= 0)
+    {
+        return;
+    }
+    char query[128];
+    Format(query, sizeof(query),
+        "DELETE FROM whaletracker_chat WHERE created_at < %d",
         cutoff);
     g_hFiltersDb.Query(Filters_SimpleSqlCallback, query);
 }
