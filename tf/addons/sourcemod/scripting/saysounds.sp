@@ -43,7 +43,6 @@
 #define STOCK_CP_SUCCESS "Announcer.Success"
 #define STOCK_CP_FAILURE "Announcer.Failure"
 #define CLIENT_ANNOUNCER_REPLACEMENT_DELAY 0.05
-#define CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY 0.05
 #define MAX_TRACKED_CONTROL_POINTS 8
 #define CONTROL_POINT_UNLOCK_EVENT_DEBOUNCE 0.50
 #define CONTROL_POINT_ENABLED_WARNING_BIT (1 << 5)
@@ -1139,7 +1138,7 @@ public void Event_PointUnlocked(Event event, const char[] name, bool dontBroadca
     if (needsFallback)
     {
         g_bControlPointEnabledReplacementHandled[controlPoint] = true;
-        QueueControlPointEnabledReplacement(controlPoint, 0.0);
+        ReplaceControlPointEnabled(controlPoint);
     }
 }
 
@@ -1416,7 +1415,7 @@ static void MonitorControlPointUnlockCountdowns()
             }
 
             g_iControlPointUnlockArmedMask[controlPoint] &= ~warningBit;
-            QueueControlPointUnlockWarning(controlPoint, warningIndex, unlockTime);
+            ReplaceControlPointUnlockWarning(controlPoint, warningIndex);
             numericWarningQueued = true;
             break;
         }
@@ -1429,7 +1428,7 @@ static void MonitorControlPointUnlockCountdowns()
             g_iControlPointUnlockArmedMask[controlPoint]
                 &= ~CONTROL_POINT_ENABLED_WARNING_BIT;
             g_bControlPointEnabledReplacementHandled[controlPoint] = true;
-            QueueControlPointEnabledReplacement(controlPoint, unlockTime);
+            ReplaceControlPointEnabled(controlPoint);
         }
     }
 }
@@ -1798,43 +1797,6 @@ static void ResetRoundStartSirenTracking()
     g_bTrackedSetupAutoCountdownOriginal = false;
 }
 
-static void QueueControlPointUnlockWarning(
-    int controlPoint,
-    int warningIndex,
-    float unlockTime)
-{
-    DataPack data;
-    CreateDataTimer(
-        CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY,
-        Timer_ReplaceControlPointUnlockWarning,
-        data,
-        TIMER_FLAG_NO_MAPCHANGE
-    );
-    data.WriteCell(controlPoint);
-    data.WriteCell(warningIndex);
-    data.WriteFloat(unlockTime);
-}
-
-public Action Timer_ReplaceControlPointUnlockWarning(Handle timer, DataPack data)
-{
-    data.Reset();
-    int controlPoint = data.ReadCell();
-    int warningIndex = data.ReadCell();
-    float unlockTime = data.ReadFloat();
-
-    if (controlPoint < 0
-        || controlPoint >= MAX_TRACKED_CONTROL_POINTS
-        || warningIndex < 0
-        || warningIndex >= sizeof(gStockCountdownSounds)
-        || FloatAbs(g_fTrackedControlPointUnlockTime[controlPoint] - unlockTime) > 0.01)
-    {
-        return Plugin_Stop;
-    }
-
-    ReplaceControlPointUnlockWarning(controlPoint, warningIndex);
-    return Plugin_Stop;
-}
-
 static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
 {
     char replacement[PLATFORM_MAX_PATH];
@@ -1887,43 +1849,6 @@ static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
         replacement,
         replacementRecipientCount
     );
-}
-
-static void QueueControlPointEnabledReplacement(int controlPoint, float unlockTime)
-{
-    DataPack data;
-    CreateDataTimer(
-        CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY,
-        Timer_ReplaceControlPointEnabled,
-        data,
-        TIMER_FLAG_NO_MAPCHANGE
-    );
-    data.WriteCell(controlPoint);
-    data.WriteFloat(unlockTime);
-}
-
-public Action Timer_ReplaceControlPointEnabled(Handle timer, DataPack data)
-{
-    data.Reset();
-    int controlPoint = data.ReadCell();
-    float unlockTime = data.ReadFloat();
-
-    if (controlPoint < 0
-        || controlPoint >= MAX_TRACKED_CONTROL_POINTS
-        || !g_bControlPointEnabledReplacementHandled[controlPoint])
-    {
-        return Plugin_Stop;
-    }
-
-    float trackedUnlockTime = g_fTrackedControlPointUnlockTime[controlPoint];
-    if (trackedUnlockTime != 0.0
-        && FloatAbs(trackedUnlockTime - unlockTime) > 0.01)
-    {
-        return Plugin_Stop;
-    }
-
-    ReplaceControlPointEnabled(controlPoint);
-    return Plugin_Stop;
 }
 
 static void ReplaceControlPointEnabled(int controlPoint)
