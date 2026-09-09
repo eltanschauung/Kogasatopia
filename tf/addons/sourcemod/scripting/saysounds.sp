@@ -2189,14 +2189,17 @@ Action ChatCommandListener(int client, const char[] command, int argc)
     StripQuotes(message);
     TrimString(message);
 
-    if (message[0] != '!' || !gConfigLoaded)
+    if (!message[0] || !gConfigLoaded)
     {
         return Plugin_Continue;
     }
 
     char payload[256];
     strcopy(payload, sizeof(payload), message);
-    Strings_ShiftLeft(payload, sizeof(payload), 1);
+    if (payload[0] == '!')
+    {
+        Strings_ShiftLeft(payload, sizeof(payload), 1);
+    }
     TrimString(payload);
 
     if (!payload[0])
