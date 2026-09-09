@@ -1803,16 +1803,16 @@ static void QueueControlPointUnlockWarning(
     int warningIndex,
     float unlockTime)
 {
-    DataPack data = new DataPack();
-    data.WriteCell(controlPoint);
-    data.WriteCell(warningIndex);
-    data.WriteFloat(unlockTime);
+    DataPack data;
     CreateDataTimer(
         CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY,
         Timer_ReplaceControlPointUnlockWarning,
         data,
         TIMER_FLAG_NO_MAPCHANGE
     );
+    data.WriteCell(controlPoint);
+    data.WriteCell(warningIndex);
+    data.WriteFloat(unlockTime);
 }
 
 public Action Timer_ReplaceControlPointUnlockWarning(Handle timer, DataPack data)
@@ -1891,15 +1891,15 @@ static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
 
 static void QueueControlPointEnabledReplacement(int controlPoint, float unlockTime)
 {
-    DataPack data = new DataPack();
-    data.WriteCell(controlPoint);
-    data.WriteFloat(unlockTime);
+    DataPack data;
     CreateDataTimer(
         CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY,
         Timer_ReplaceControlPointEnabled,
         data,
         TIMER_FLAG_NO_MAPCHANGE
     );
+    data.WriteCell(controlPoint);
+    data.WriteFloat(unlockTime);
 }
 
 public Action Timer_ReplaceControlPointEnabled(Handle timer, DataPack data)
