@@ -15,9 +15,19 @@ public Plugin myinfo =
 	version = "1.0"
 };
 
+public void OnPluginStart()
+{
+	HookEvent("teamplay_round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+}
+
 public void OnMapStart()
 {
 	PrecacheModel(TOUHOU_CONTROL_POINT_MODEL, true);
+	ReplaceControlPointModels();
+}
+
+public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+{
 	ReplaceControlPointModels();
 }
 
