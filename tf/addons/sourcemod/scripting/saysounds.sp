@@ -36,6 +36,7 @@
 #define ROUND_LOSE_REPLACEMENTS_SECTION "roundlosereplacements"
 #define ANNOUNCER_MISC_REPLACEMENTS_SECTION "replaceannouncermisc"
 #define COUNTDOWN_REPLACEMENTS_SECTION "countdownreplacements"
+#define UNLOCK_REPLACEMENTS_SECTION "unlockreplacements"
 #define STOCK_ROUND_START_SIREN "ambient_mp3/siren.mp3"
 #define STOCK_ROUND_WIN_SOUND "Game.YourTeamWon"
 #define STOCK_ROUND_LOSE_SOUND "Game.YourTeamLost"
@@ -97,6 +98,10 @@ ArrayList gCountdownReplacements;
 ArrayList gCountdownGroups;
 ArrayList gReadyCountdownReplacements;
 ArrayList gReadyCountdownGroups;
+ArrayList gUnlockReplacements;
+ArrayList gUnlockGroups;
+ArrayList gReadyUnlockReplacements;
+ArrayList gReadyUnlockGroups;
 bool gConfigLoaded = false;
 bool gConfigInAPIOnlyGroups = false;
 bool gConfigInPaidSaysoundGroups = false;
@@ -106,6 +111,7 @@ bool gConfigInRoundWinReplacements = false;
 bool gConfigInRoundLoseReplacements = false;
 bool gConfigInAnnouncerMiscReplacements = false;
 bool gConfigInCountdownReplacements = false;
+bool gConfigInUnlockReplacements = false;
 int gConfigSectionDepth = 0;
 int gConfigAPIOnlyGroupsDepth = -1;
 int gConfigPaidSaysoundGroupsDepth = -1;
@@ -115,6 +121,7 @@ int gConfigRoundWinReplacementsDepth = -1;
 int gConfigRoundLoseReplacementsDepth = -1;
 int gConfigAnnouncerMiscReplacementsDepth = -1;
 int gConfigCountdownReplacementsDepth = -1;
+int gConfigUnlockReplacementsDepth = -1;
 float g_fClientVolume[MAXPLAYERS + 1];
 float g_fNextAllowedSound[MAXPLAYERS + 1];
 char g_szDeathSound[MAXPLAYERS + 1][MAX_COMMAND_NAME * 4];
@@ -164,6 +171,7 @@ int g_iNextRoundResultReplacementIndex = -1;
 int g_iActiveRoundResultReplacementIndex = -1;
 int g_iRoundResultSelectionSerial = 0;
 float g_fRoundResultSelectionTime = -9999.0;
+int g_iNextUnlockReplacementIndex = -1;
 
 static const char gStockCountdownSounds[][] =
 {
@@ -249,6 +257,10 @@ public void OnPluginStart()
     gCountdownGroups = new ArrayList(ByteCountToCells(MAX_GROUP_NAME));
     gReadyCountdownReplacements = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
     gReadyCountdownGroups = new ArrayList(ByteCountToCells(MAX_GROUP_NAME));
+    gUnlockReplacements = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+    gUnlockGroups = new ArrayList(ByteCountToCells(MAX_GROUP_NAME));
+    gReadyUnlockReplacements = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+    gReadyUnlockGroups = new ArrayList(ByteCountToCells(MAX_GROUP_NAME));
 
     g_hForce = CreateConVar("saysounds_force", "0", "Force everyone to hear saysounds");
     g_hDefaultDeathSound = CreateConVar("saysounds_default_death_sound", "doh", "Saysound command/group used when a victim has no death sound set and the attacker has no kill sound.");
@@ -412,6 +424,10 @@ public void OnPluginEnd()
     delete gCountdownGroups;
     delete gReadyCountdownReplacements;
     delete gReadyCountdownGroups;
+    delete gUnlockReplacements;
+    delete gUnlockGroups;
+    delete gReadyUnlockReplacements;
+    delete gReadyUnlockGroups;
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -1130,7 +1146,7 @@ public void Event_PointUnlocked(Event event, const char[] name, bool dontBroadca
     }
 
     g_fLastControlPointUnlockEvent[controlPoint] = now;
-    bool needsFallback = gReadyCountdownReplacements.Length > 0
+    bool needsFallback = gReadyUnlockReplacements.Length > 0
         && !g_bControlPointEnabledReplacementHandled[controlPoint];
     g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
     g_bControlPointCountdownSuppressed[controlPoint] = false;
@@ -1314,7 +1330,8 @@ public Action Timer_MonitorCountdowns(Handle timer)
 
 static void MonitorControlPointUnlockCountdowns()
 {
-    if (gReadyCountdownReplacements.Length == 0)
+    if (gReadyCountdownReplacements.Length == 0
+        || gReadyUnlockReplacements.Length == 0)
     {
         RestoreSuppressedControlPointCountdowns();
         ClearControlPointUnlockCountdowns();
@@ -1902,16 +1919,33 @@ static void ReplaceControlPointEnabled(int controlPoint, bool stopStock)
 
     char replacement[PLATFORM_MAX_PATH];
     char groupName[MAX_GROUP_NAME];
-    if (!GetRandomReadyReplacement(
-        gReadyCountdownReplacements,
-        gReadyCountdownGroups,
-        replacement,
-        sizeof(replacement),
-        groupName,
-        sizeof(groupName)))
+    int replacementCount = gReadyUnlockReplacements.Length;
+    if (replacementCount == 0)
     {
         return;
     }
+
+    if (g_iNextUnlockReplacementIndex < 0)
+    {
+        g_iNextUnlockReplacementIndex = GetRandomInt(0, replacementCount - 1);
+    }
+    else if (g_iNextUnlockReplacementIndex >= replacementCount)
+    {
+        g_iNextUnlockReplacementIndex %= replacementCount;
+    }
+
+    int replacementIndex = g_iNextUnlockReplacementIndex;
+    gReadyUnlockReplacements.GetString(
+        replacementIndex,
+        replacement,
+        sizeof(replacement)
+    );
+    gReadyUnlockGroups.GetString(
+        replacementIndex,
+        groupName,
+        sizeof(groupName)
+    );
+    g_iNextUnlockReplacementIndex = (replacementIndex + 1) % replacementCount;
 
     int replacementRecipientCount = 0;
     for (int client = 1; client <= MaxClients; client++)
@@ -1953,9 +1987,11 @@ static void ReplaceControlPointEnabled(int controlPoint, bool stopStock)
     char currentMap[PLATFORM_MAX_PATH];
     GetCurrentMap(currentMap, sizeof(currentMap));
     LogMessage(
-        "[SaySounds:CPUnlock] map %s, point %d, unlocked, replacement %s, custom %d.",
+        "[SaySounds:CPUnlock] map %s, point %d, unlocked, replacement index %d/%d, replacement %s, custom %d.",
         currentMap,
         controlPoint,
+        replacementIndex,
+        replacementCount,
         replacement,
         replacementRecipientCount
     );
@@ -2388,6 +2424,10 @@ void LoadSaySoundConfig()
     gCountdownGroups.Clear();
     gReadyCountdownReplacements.Clear();
     gReadyCountdownGroups.Clear();
+    gUnlockReplacements.Clear();
+    gUnlockGroups.Clear();
+    gReadyUnlockReplacements.Clear();
+    gReadyUnlockGroups.Clear();
     gConfigLoaded = false;
     gConfigInAPIOnlyGroups = false;
     gConfigInPaidSaysoundGroups = false;
@@ -2397,6 +2437,7 @@ void LoadSaySoundConfig()
     gConfigInRoundLoseReplacements = false;
     gConfigInAnnouncerMiscReplacements = false;
     gConfigInCountdownReplacements = false;
+    gConfigInUnlockReplacements = false;
     gConfigSectionDepth = 0;
     gConfigAPIOnlyGroupsDepth = -1;
     gConfigPaidSaysoundGroupsDepth = -1;
@@ -2406,6 +2447,7 @@ void LoadSaySoundConfig()
     gConfigRoundLoseReplacementsDepth = -1;
     gConfigAnnouncerMiscReplacementsDepth = -1;
     gConfigCountdownReplacementsDepth = -1;
+    gConfigUnlockReplacementsDepth = -1;
     EnsureGroupRegistered(DEFAULT_GROUP);
 
     char filePath[PLATFORM_MAX_PATH];
@@ -2512,6 +2554,13 @@ public SMCResult Config_EnterSection(SMCParser parser, const char[] name, bool o
         gConfigInCountdownReplacements = true;
         gConfigCountdownReplacementsDepth = gConfigSectionDepth;
     }
+    else if (StrEqual(sectionName, UNLOCK_REPLACEMENTS_SECTION)
+        || StrEqual(sectionName, "unlock_replacements")
+        || StrEqual(sectionName, "unlock-replacements"))
+    {
+        gConfigInUnlockReplacements = true;
+        gConfigUnlockReplacementsDepth = gConfigSectionDepth;
+    }
 
     return SMCParse_Continue;
 }
@@ -2568,6 +2617,13 @@ public SMCResult Config_LeaveSection(SMCParser parser)
         gConfigCountdownReplacementsDepth = -1;
     }
 
+    if (gConfigInUnlockReplacements
+        && gConfigSectionDepth == gConfigUnlockReplacementsDepth)
+    {
+        gConfigInUnlockReplacements = false;
+        gConfigUnlockReplacementsDepth = -1;
+    }
+
     if (gConfigSectionDepth > 0)
     {
         gConfigSectionDepth--;
@@ -2605,6 +2661,12 @@ public SMCResult Config_KeyValue(SMCParser parser, const char[] key, const char[
     if (gConfigInCountdownReplacements)
     {
         Config_ReplacementSound(value, gCountdownReplacements, gCountdownGroups);
+        return SMCParse_Continue;
+    }
+
+    if (gConfigInUnlockReplacements)
+    {
+        Config_ReplacementSound(value, gUnlockReplacements, gUnlockGroups);
         return SMCParse_Continue;
     }
 
@@ -2859,6 +2921,13 @@ void PrecacheConfiguredSounds()
         gReadyCountdownReplacements,
         gReadyCountdownGroups,
         "Setup countdown"
+    );
+    PrecacheReplacementSounds(
+        gUnlockReplacements,
+        gUnlockGroups,
+        gReadyUnlockReplacements,
+        gReadyUnlockGroups,
+        "Control-point unlock"
     );
 }
 
