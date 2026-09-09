@@ -53,5 +53,11 @@ static void ReplaceControlPointModels()
 		}
 
 		SetEntityModel(entity, TOUHOU_CONTROL_POINT_MODEL);
+
+		SetVariantString("idle");
+		AcceptEntityInput(entity, "SetDefaultAnimation");
+
+		SetVariantString("idle");
+		AcceptEntityInput(entity, "SetAnimation");
 	}
 }
