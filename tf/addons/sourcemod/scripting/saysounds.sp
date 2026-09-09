@@ -46,6 +46,7 @@
 #define CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY 0.05
 #define MAX_TRACKED_CONTROL_POINTS 8
 #define CONTROL_POINT_UNLOCK_EVENT_DEBOUNCE 0.50
+#define CONTROL_POINT_ENABLED_WARNING_BIT (1 << 5)
 #define COUNTDOWN_MONITOR_INTERVAL 0.01
 #define LIVE_COUNTDOWN_SUPPRESS_AT 7.0
 #define ROUND_TIMER_STATE_SETUP 0
@@ -143,6 +144,7 @@ bool g_bTrackedLiveAutoCountdownSuppressed = false;
 float g_fTrackedControlPointUnlockTime[MAX_TRACKED_CONTROL_POINTS];
 int g_iControlPointUnlockArmedMask[MAX_TRACKED_CONTROL_POINTS];
 float g_fLastControlPointUnlockEvent[MAX_TRACKED_CONTROL_POINTS];
+bool g_bControlPointEnabledReplacementHandled[MAX_TRACKED_CONTROL_POINTS];
 int g_iTrackedSetupSirenTimerRef = INVALID_ENT_REFERENCE;
 int g_iTrackedSetupSirenState = -1;
 bool g_bTrackedSetupAutoCountdownOriginal = false;
@@ -1131,15 +1133,14 @@ public void Event_PointUnlocked(Event event, const char[] name, bool dontBroadca
     }
 
     g_fLastControlPointUnlockEvent[controlPoint] = now;
+    bool needsFallback = !g_bControlPointEnabledReplacementHandled[controlPoint];
     g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
     g_iControlPointUnlockArmedMask[controlPoint] = 0;
-
-    CreateTimer(
-        CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY,
-        Timer_ReplaceControlPointUnlocked,
-        controlPoint,
-        TIMER_FLAG_NO_MAPCHANGE
-    );
+    if (needsFallback)
+    {
+        g_bControlPointEnabledReplacementHandled[controlPoint] = true;
+        QueueControlPointEnabledReplacement(controlPoint, 0.0);
+    }
 }
 
 public Action Timer_ReplaceClientCaptureWarning(Handle timer, any capturingTeam)
@@ -1383,12 +1384,15 @@ static void MonitorControlPointUnlockCountdowns()
         {
             g_fTrackedControlPointUnlockTime[controlPoint] = unlockTime;
             g_iControlPointUnlockArmedMask[controlPoint] = 0;
+            g_bControlPointEnabledReplacementHandled[controlPoint] = false;
             if (remaining > 0.0)
             {
                 ArmCountdownWarnings(
                     remaining,
                     g_iControlPointUnlockArmedMask[controlPoint]
                 );
+                g_iControlPointUnlockArmedMask[controlPoint]
+                    |= CONTROL_POINT_ENABLED_WARNING_BIT;
             }
         }
 
@@ -1398,20 +1402,34 @@ static void MonitorControlPointUnlockCountdowns()
             continue;
         }
 
+        bool numericWarningQueued = false;
         for (int warningIndex = 0;
             warningIndex < sizeof(gCountdownSeconds);
             warningIndex++)
         {
             int warningBit = 1 << warningIndex;
+            float fireAt = float(gCountdownSeconds[warningIndex] + 1);
             if ((g_iControlPointUnlockArmedMask[controlPoint] & warningBit) == 0
-                || remaining > float(gCountdownSeconds[warningIndex]))
+                || remaining > fireAt)
             {
                 continue;
             }
 
             g_iControlPointUnlockArmedMask[controlPoint] &= ~warningBit;
             QueueControlPointUnlockWarning(controlPoint, warningIndex, unlockTime);
+            numericWarningQueued = true;
             break;
+        }
+
+        if (!numericWarningQueued
+            && (g_iControlPointUnlockArmedMask[controlPoint]
+                & CONTROL_POINT_ENABLED_WARNING_BIT) != 0
+            && remaining <= 1.0)
+        {
+            g_iControlPointUnlockArmedMask[controlPoint]
+                &= ~CONTROL_POINT_ENABLED_WARNING_BIT;
+            g_bControlPointEnabledReplacementHandled[controlPoint] = true;
+            QueueControlPointEnabledReplacement(controlPoint, unlockTime);
         }
     }
 }
@@ -1871,11 +1889,48 @@ static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
     );
 }
 
-public Action Timer_ReplaceControlPointUnlocked(Handle timer, any controlPoint)
+static void QueueControlPointEnabledReplacement(int controlPoint, float unlockTime)
+{
+    DataPack data = new DataPack();
+    data.WriteCell(controlPoint);
+    data.WriteFloat(unlockTime);
+    CreateDataTimer(
+        CONTROL_POINT_UNLOCK_REPLACEMENT_DELAY,
+        Timer_ReplaceControlPointEnabled,
+        data,
+        TIMER_FLAG_NO_MAPCHANGE
+    );
+}
+
+public Action Timer_ReplaceControlPointEnabled(Handle timer, DataPack data)
+{
+    data.Reset();
+    int controlPoint = data.ReadCell();
+    float unlockTime = data.ReadFloat();
+
+    if (controlPoint < 0
+        || controlPoint >= MAX_TRACKED_CONTROL_POINTS
+        || !g_bControlPointEnabledReplacementHandled[controlPoint])
+    {
+        return Plugin_Stop;
+    }
+
+    float trackedUnlockTime = g_fTrackedControlPointUnlockTime[controlPoint];
+    if (trackedUnlockTime != 0.0
+        && FloatAbs(trackedUnlockTime - unlockTime) > 0.01)
+    {
+        return Plugin_Stop;
+    }
+
+    ReplaceControlPointEnabled(controlPoint);
+    return Plugin_Stop;
+}
+
+static void ReplaceControlPointEnabled(int controlPoint)
 {
     if (controlPoint < 0 || controlPoint >= MAX_TRACKED_CONTROL_POINTS)
     {
-        return Plugin_Stop;
+        return;
     }
 
     char replacement[PLATFORM_MAX_PATH];
@@ -1888,7 +1943,7 @@ public Action Timer_ReplaceControlPointUnlocked(Handle timer, any controlPoint)
         groupName,
         sizeof(groupName)))
     {
-        return Plugin_Stop;
+        return;
     }
 
     int replacementRecipientCount = 0;
@@ -1934,7 +1989,6 @@ public Action Timer_ReplaceControlPointUnlocked(Handle timer, any controlPoint)
         replacement,
         replacementRecipientCount
     );
-    return Plugin_Stop;
 }
 
 static void ReplaceCountdownWarning(int warningIndex, bool finalCountdown)
@@ -2151,6 +2205,7 @@ static void ClearControlPointUnlockCountdowns()
     {
         g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
         g_iControlPointUnlockArmedMask[controlPoint] = 0;
+        g_bControlPointEnabledReplacementHandled[controlPoint] = false;
     }
 }
 
