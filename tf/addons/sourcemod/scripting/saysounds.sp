@@ -1846,7 +1846,7 @@ static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
             continue;
         }
 
-        StopSound(client, SNDCHAN_VOICE_BASE, gStockCountdownSounds[warningIndex]);
+        StopSound(client, SNDCHAN_VOICE, gStockCountdownSounds[warningIndex]);
         EmitSoundToClient(
             client,
             replacement,
