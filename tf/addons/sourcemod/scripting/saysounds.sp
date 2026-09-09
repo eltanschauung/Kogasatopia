@@ -46,6 +46,7 @@
 #define MAX_TRACKED_CONTROL_POINTS 8
 #define CONTROL_POINT_UNLOCK_EVENT_DEBOUNCE 0.50
 #define CONTROL_POINT_ENABLED_WARNING_BIT (1 << 5)
+#define CONTROL_POINT_COUNTDOWN_SUPPRESS_AT 7.0
 #define COUNTDOWN_MONITOR_INTERVAL 0.01
 #define LIVE_COUNTDOWN_SUPPRESS_AT 7.0
 #define ROUND_TIMER_STATE_SETUP 0
@@ -144,6 +145,7 @@ float g_fTrackedControlPointUnlockTime[MAX_TRACKED_CONTROL_POINTS];
 int g_iControlPointUnlockArmedMask[MAX_TRACKED_CONTROL_POINTS];
 float g_fLastControlPointUnlockEvent[MAX_TRACKED_CONTROL_POINTS];
 bool g_bControlPointEnabledReplacementHandled[MAX_TRACKED_CONTROL_POINTS];
+bool g_bControlPointCountdownSuppressed[MAX_TRACKED_CONTROL_POINTS];
 int g_iTrackedSetupSirenTimerRef = INVALID_ENT_REFERENCE;
 int g_iTrackedSetupSirenState = -1;
 bool g_bTrackedSetupAutoCountdownOriginal = false;
@@ -489,6 +491,7 @@ public void OnMapEnd()
     CancelRoundStartSirenTimers();
     ResetSetupCountdownTracking();
     ResetLiveCountdownTracking();
+    RestoreSuppressedControlPointCountdowns();
     ResetControlPointUnlockTracking();
     ResetRoundStartSirenTracking();
     ResetRoundResultPairing();
@@ -1113,11 +1116,6 @@ public void Event_PointStartCapture(Event event, const char[] name, bool dontBro
 
 public void Event_PointUnlocked(Event event, const char[] name, bool dontBroadcast)
 {
-    if (gReadyCountdownReplacements.Length == 0)
-    {
-        return;
-    }
-
     int controlPoint = event.GetInt("cp");
     if (controlPoint < 0 || controlPoint >= MAX_TRACKED_CONTROL_POINTS)
     {
@@ -1132,13 +1130,15 @@ public void Event_PointUnlocked(Event event, const char[] name, bool dontBroadca
     }
 
     g_fLastControlPointUnlockEvent[controlPoint] = now;
-    bool needsFallback = !g_bControlPointEnabledReplacementHandled[controlPoint];
+    bool needsFallback = gReadyCountdownReplacements.Length > 0
+        && !g_bControlPointEnabledReplacementHandled[controlPoint];
     g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
+    g_bControlPointCountdownSuppressed[controlPoint] = false;
     g_iControlPointUnlockArmedMask[controlPoint] = 0;
+    g_bControlPointEnabledReplacementHandled[controlPoint] = false;
     if (needsFallback)
     {
-        g_bControlPointEnabledReplacementHandled[controlPoint] = true;
-        ReplaceControlPointEnabled(controlPoint);
+        ReplaceControlPointEnabled(controlPoint, true);
     }
 }
 
@@ -1316,6 +1316,7 @@ static void MonitorControlPointUnlockCountdowns()
 {
     if (gReadyCountdownReplacements.Length == 0)
     {
+        RestoreSuppressedControlPointCountdowns();
         ClearControlPointUnlockCountdowns();
         return;
     }
@@ -1361,44 +1362,86 @@ static void MonitorControlPointUnlockCountdowns()
         if (controlPoint >= controlPointCount)
         {
             g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
+            g_bControlPointCountdownSuppressed[controlPoint] = false;
             g_iControlPointUnlockArmedMask[controlPoint] = 0;
+            g_bControlPointEnabledReplacementHandled[controlPoint] = false;
             continue;
         }
 
-        float unlockTime = GetEntPropFloat(
+        float networkUnlockTime = GetEntPropFloat(
             objectiveResource,
             Prop_Send,
             "m_flUnlockTimes",
             controlPoint
         );
-        if (unlockTime <= 0.0)
+        float trackedUnlockTime = g_fTrackedControlPointUnlockTime[controlPoint];
+
+        if (networkUnlockTime > 0.0)
+        {
+            if (trackedUnlockTime <= 0.0
+                || FloatAbs(networkUnlockTime - trackedUnlockTime) > 0.01)
+            {
+                trackedUnlockTime = networkUnlockTime;
+                g_fTrackedControlPointUnlockTime[controlPoint] = trackedUnlockTime;
+                g_bControlPointCountdownSuppressed[controlPoint] = false;
+                g_iControlPointUnlockArmedMask[controlPoint] = 0;
+                g_bControlPointEnabledReplacementHandled[controlPoint] = false;
+
+                float initialRemaining = trackedUnlockTime - now;
+                if (initialRemaining > 0.0)
+                {
+                    ArmCountdownWarnings(
+                        initialRemaining,
+                        g_iControlPointUnlockArmedMask[controlPoint]
+                    );
+                    g_iControlPointUnlockArmedMask[controlPoint]
+                        |= CONTROL_POINT_ENABLED_WARNING_BIT;
+                }
+            }
+            else if (g_bControlPointCountdownSuppressed[controlPoint])
+            {
+                // The HUD deadline was republished. Suppress it again below.
+                g_bControlPointCountdownSuppressed[controlPoint] = false;
+            }
+        }
+        else if (trackedUnlockTime <= 0.0
+            || !g_bControlPointCountdownSuppressed[controlPoint])
         {
             g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
+            g_bControlPointCountdownSuppressed[controlPoint] = false;
             g_iControlPointUnlockArmedMask[controlPoint] = 0;
+            g_bControlPointEnabledReplacementHandled[controlPoint] = false;
             continue;
         }
 
-        float remaining = unlockTime - now;
-        if (FloatAbs(unlockTime - g_fTrackedControlPointUnlockTime[controlPoint]) > 0.01)
-        {
-            g_fTrackedControlPointUnlockTime[controlPoint] = unlockTime;
-            g_iControlPointUnlockArmedMask[controlPoint] = 0;
-            g_bControlPointEnabledReplacementHandled[controlPoint] = false;
-            if (remaining > 0.0)
-            {
-                ArmCountdownWarnings(
-                    remaining,
-                    g_iControlPointUnlockArmedMask[controlPoint]
-                );
-                g_iControlPointUnlockArmedMask[controlPoint]
-                    |= CONTROL_POINT_ENABLED_WARNING_BIT;
-            }
-        }
+        float remaining = trackedUnlockTime - now;
 
         if (remaining <= 0.0)
         {
             g_iControlPointUnlockArmedMask[controlPoint] = 0;
             continue;
+        }
+
+        if (!g_bControlPointCountdownSuppressed[controlPoint]
+            && remaining <= CONTROL_POINT_COUNTDOWN_SUPPRESS_AT)
+        {
+            SetEntPropFloat(
+                objectiveResource,
+                Prop_Send,
+                "m_flUnlockTimes",
+                0.0,
+                controlPoint
+            );
+            g_bControlPointCountdownSuppressed[controlPoint] = true;
+
+            char currentMap[PLATFORM_MAX_PATH];
+            GetCurrentMap(currentMap, sizeof(currentMap));
+            LogMessage(
+                "[SaySounds:CPUnlock] map %s, point %d, suppressed client HUD countdown at %.2f seconds.",
+                currentMap,
+                controlPoint,
+                remaining
+            );
         }
 
         bool numericWarningQueued = false;
@@ -1428,7 +1471,7 @@ static void MonitorControlPointUnlockCountdowns()
             g_iControlPointUnlockArmedMask[controlPoint]
                 &= ~CONTROL_POINT_ENABLED_WARNING_BIT;
             g_bControlPointEnabledReplacementHandled[controlPoint] = true;
-            ReplaceControlPointEnabled(controlPoint);
+            ReplaceControlPointEnabled(controlPoint, false);
         }
     }
 }
@@ -1826,7 +1869,6 @@ static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
             continue;
         }
 
-        StopSound(client, SNDCHAN_VOICE, gStockCountdownSounds[warningIndex]);
         EmitSoundToClient(
             client,
             replacement,
@@ -1851,7 +1893,7 @@ static void ReplaceControlPointUnlockWarning(int controlPoint, int warningIndex)
     );
 }
 
-static void ReplaceControlPointEnabled(int controlPoint)
+static void ReplaceControlPointEnabled(int controlPoint, bool stopStock)
 {
     if (controlPoint < 0 || controlPoint >= MAX_TRACKED_CONTROL_POINTS)
     {
@@ -1885,13 +1927,16 @@ static void ReplaceControlPointEnabled(int controlPoint)
             continue;
         }
 
-        for (int i = 0; i < sizeof(gStockControlPointEnabledSounds); i++)
+        if (stopStock)
         {
-            StopSound(
-                client,
-                SNDCHAN_VOICE_BASE,
-                gStockControlPointEnabledSounds[i]
-            );
+            for (int i = 0; i < sizeof(gStockControlPointEnabledSounds); i++)
+            {
+                StopSound(
+                    client,
+                    SNDCHAN_VOICE_BASE,
+                    gStockControlPointEnabledSounds[i]
+                );
+            }
         }
         EmitSoundToClient(
             client,
@@ -2122,6 +2167,55 @@ static void ResetLiveCountdownTracking()
     g_bTrackedLiveAutoCountdownOriginal = false;
 }
 
+static void RestoreSuppressedControlPointCountdowns()
+{
+    int objectiveResource = FindEntityByClassname(-1, "tf_objective_resource");
+    if (objectiveResource == -1
+        || !HasEntProp(objectiveResource, Prop_Send, "m_flUnlockTimes"))
+    {
+        return;
+    }
+
+    int controlPointCount = GetEntPropArraySize(
+        objectiveResource,
+        Prop_Send,
+        "m_flUnlockTimes"
+    );
+    if (controlPointCount > MAX_TRACKED_CONTROL_POINTS)
+    {
+        controlPointCount = MAX_TRACKED_CONTROL_POINTS;
+    }
+
+    float now = GetGameTime();
+    for (int controlPoint = 0; controlPoint < controlPointCount; controlPoint++)
+    {
+        if (!g_bControlPointCountdownSuppressed[controlPoint])
+        {
+            continue;
+        }
+
+        float trackedUnlockTime = g_fTrackedControlPointUnlockTime[controlPoint];
+        float networkUnlockTime = GetEntPropFloat(
+            objectiveResource,
+            Prop_Send,
+            "m_flUnlockTimes",
+            controlPoint
+        );
+        if (trackedUnlockTime > now && networkUnlockTime <= 0.0)
+        {
+            SetEntPropFloat(
+                objectiveResource,
+                Prop_Send,
+                "m_flUnlockTimes",
+                trackedUnlockTime,
+                controlPoint
+            );
+        }
+
+        g_bControlPointCountdownSuppressed[controlPoint] = false;
+    }
+}
+
 static void ClearControlPointUnlockCountdowns()
 {
     for (int controlPoint = 0;
@@ -2129,6 +2223,7 @@ static void ClearControlPointUnlockCountdowns()
         controlPoint++)
     {
         g_fTrackedControlPointUnlockTime[controlPoint] = 0.0;
+        g_bControlPointCountdownSuppressed[controlPoint] = false;
         g_iControlPointUnlockArmedMask[controlPoint] = 0;
         g_bControlPointEnabledReplacementHandled[controlPoint] = false;
     }
@@ -2154,6 +2249,7 @@ static void CancelCountdownMonitorTimer()
     }
     ResetSetupCountdownTracking();
     ResetLiveCountdownTracking();
+    RestoreSuppressedControlPointCountdowns();
     ResetControlPointUnlockTracking();
 }
 
