@@ -25,7 +25,7 @@ static void ReplaceControlPointModels()
 {
 	int entity = -1;
 
-	while ((entity = FindEntityByClassname(entity, "team_control_point")) != -1)
+	while ((entity = FindEntityByClassname(entity, "prop_dynamic")) != -1)
 	{
 		char model[PLATFORM_MAX_PATH];
 
