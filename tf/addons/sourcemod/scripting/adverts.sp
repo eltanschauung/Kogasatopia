@@ -37,7 +37,7 @@ enum AdvertsSection
 
 ArrayList g_Ads;
 ConVar g_CvarEnabled, g_CvarFile, g_CvarInterval, g_CvarRandom, g_CvarPrefix;
-Handle g_Timer;
+Handle g_Timer = null;
 int g_AdIndex;
 
 public void OnPluginStart()
@@ -67,21 +67,13 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
-	// NO_MAPCHANGE timers are closed by SourceMod during transitions; forget stale handles before recreating.
-	g_Timer = null;
-	LoadAdvertisements();
-	RestartTimer();
+	// Timer lifetime is map-scoped and explicitly owned by this plugin.
+	StopAdTimer();
 }
 
 public void OnMapEnd()
 {
-	ClearTimer();
-}
-
-public void OnPluginEnd()
-{
-	ClearTimer();
-	delete g_Ads;
+	StopAdTimer();
 }
 
 public void CvarChanged_Settings(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -103,6 +95,10 @@ public Action Command_ReloadAds(int args)
 
 public Action Timer_DisplayAd(Handle timer)
 {
+	if (timer != g_Timer) {
+		return Plugin_Stop;
+	}
+
 	if (!g_CvarEnabled.BoolValue || !g_Ads.Length) {
 		return Plugin_Continue;
 	}
@@ -256,17 +252,18 @@ bool ExtractQuotedString(const char[] line, char[] buffer, int maxlen)
 
 void RestartTimer()
 {
-	ClearTimer();
+	StopAdTimer();
 	int interval = g_CvarInterval.IntValue;
 	if (interval > 0) {
-		g_Timer = CreateTimer(float(interval), Timer_DisplayAd, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		g_Timer = CreateTimer(float(interval), Timer_DisplayAd, _, TIMER_REPEAT);
 	}
 }
 
-void ClearTimer()
+void StopAdTimer()
 {
-	delete g_Timer;
+	Handle timer = g_Timer;
 	g_Timer = null;
+	delete timer;
 }
 
 void FormatChatMessage(const char[] prefix, const char[] msg, char[] out, int maxlen)
