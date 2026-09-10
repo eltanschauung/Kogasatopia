@@ -3621,7 +3621,7 @@ static void AppendOptListClientName(char[] output, int maxlen, int client, int e
         StrCat(output, maxlen, ", ");
     }
 
-    char displayName[256];
+    char displayName[512];
     if (!colorized)
     {
         GetClientName(client, displayName, sizeof(displayName));
