@@ -3528,8 +3528,24 @@ public int MenuHandler_GroupOptions(Menu menu, MenuAction action, int client, in
 
 public Action Command_ListOptedInClients(int client, int args)
 {
-    char names[1024];
-    int count = 0;
+    char allSoundsNames[1024];
+    char mostlyEnabledNames[1024];
+    int allSoundsCount = 0;
+    int mostlyEnabledCount = 0;
+    int totalGroups = 0;
+
+    if (gGroupNames != null)
+    {
+        char groupName[MAX_GROUP_NAME];
+        for (int i = 0; i < gGroupNames.Length; i++)
+        {
+            gGroupNames.GetString(i, groupName, sizeof(groupName));
+            if (!StrEqual(groupName, DEFAULT_GROUP))
+            {
+                totalGroups++;
+            }
+        }
+    }
 
     for (int target = 1; target <= MaxClients; target++)
     {
@@ -3538,23 +3554,55 @@ public Action Command_ListOptedInClients(int client, int args)
             continue;
         }
 
-        if (count > 0)
+        int enabledGroups = 0;
+        if (gGroupNames != null)
         {
-            StrCat(names, sizeof(names), ", ");
+            char groupName[MAX_GROUP_NAME];
+            for (int i = 0; i < gGroupNames.Length; i++)
+            {
+                gGroupNames.GetString(i, groupName, sizeof(groupName));
+                if (!StrEqual(groupName, DEFAULT_GROUP) && !IsClientGroupDisabled(target, groupName))
+                {
+                    enabledGroups++;
+                }
+            }
         }
 
         char name[MAX_NAME_LENGTH];
         GetClientName(target, name, sizeof(name));
-        StrCat(names, sizeof(names), name);
-        count++;
+
+        if (enabledGroups == totalGroups)
+        {
+            if (allSoundsCount > 0)
+            {
+                StrCat(allSoundsNames, sizeof(allSoundsNames), ", ");
+            }
+            StrCat(allSoundsNames, sizeof(allSoundsNames), name);
+            allSoundsCount++;
+        }
+        else if (enabledGroups * 5 > totalGroups * 4)
+        {
+            if (mostlyEnabledCount > 0)
+            {
+                StrCat(mostlyEnabledNames, sizeof(mostlyEnabledNames), ", ");
+            }
+            StrCat(mostlyEnabledNames, sizeof(mostlyEnabledNames), name);
+            mostlyEnabledCount++;
+        }
     }
 
-    if (count == 0)
+    if (allSoundsCount == 0)
     {
-        strcopy(names, sizeof(names), "none");
+        strcopy(allSoundsNames, sizeof(allSoundsNames), "none");
+    }
+    if (mostlyEnabledCount == 0)
+    {
+        strcopy(mostlyEnabledNames, sizeof(mostlyEnabledNames), "none");
     }
 
-    ReplyToCommand(client, "[Saysounds] Opted-in clients: %s", names);
+    ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNames);
+    ReplyToCommand(client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledNames);
+
     return Plugin_Handled;
 }
 
