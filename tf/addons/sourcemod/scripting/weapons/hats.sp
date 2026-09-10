@@ -37,6 +37,7 @@ ConVar g_hHatDebug = null;
 enum struct HatConfig
 {
 	bool enabled;
+	bool force;
 	char id[64];
 	char name[64];
 	char prefix[128];
@@ -171,10 +172,7 @@ void CustomHats_OnConfigsExecuted()
 	LoadConfig();
 	RecalculateAllClientEnabledHatCounts();
 	PrecacheConfiguredHats();
-	if (!HasEnabledHats())
-	{
-		RemoveAllHats();
-	}
+	RefreshAllClientHats();
 }
 
 void CustomHats_OnMapStart()
@@ -470,7 +468,7 @@ void ResetClientHatSelections(int client)
 	{
 		g_iHatPaintChoice[client][i] = ClampPaintIndex(g_Hats[i].defaultPaint);
 	}
-	g_iClientEnabledHatCount[client] = 0;
+	RecalculateClientEnabledHatCount(client);
 }
 
 static void RecalculateClientEnabledHatCount(int client)
@@ -482,7 +480,7 @@ static void RecalculateClientEnabledHatCount(int client)
 	int count = 0;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (g_bHatEnabled[client][i] && IsHatEnabled(i))
+		if (IsHatEquippedForClient(client, i))
 		{
 			count++;
 		}
@@ -513,17 +511,7 @@ static void SetClientHatEnabled(int client, int hatIndex, bool enabled)
 		return;
 	}
 	g_bHatEnabled[client][hatIndex] = enabled;
-	if (IsHatEnabled(hatIndex))
-	{
-		if (enabled)
-		{
-			g_iClientEnabledHatCount[client]++;
-		}
-		else if (g_iClientEnabledHatCount[client] > 0)
-		{
-			g_iClientEnabledHatCount[client]--;
-		}
-	}
+	RecalculateClientEnabledHatCount(client);
 }
 
 bool HasClientEnabledHats(int client)
@@ -602,7 +590,8 @@ void UpdateHatForClient(int client)
 	int classIndex = view_as<int>(playerClass);
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		bool enabled = g_bHatEnabled[client][i] && CanClientUseHatForClass(client, i, playerClass);
+		bool enabled = IsHatEquippedForClient(client, i)
+			&& CanClientUseHatForClass(client, i, playerClass);
 		if (!enabled)
 		{
 			RemoveHatIndex(client, i);
@@ -638,7 +627,7 @@ static bool ShouldRefreshHats(int client)
 	int classIndex = view_as<int>(playerClass);
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!g_bHatEnabled[client][i] || !IsHatEnabled(i))
+		if (!IsHatEquippedForClient(client, i))
 		{
 			continue;
 		}
@@ -688,7 +677,8 @@ static bool CookieMatchesEquippedHats(int client)
 	int classIndex = view_as<int>(playerClass);
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		bool enabled = g_bHatEnabled[client][i] && CanClientUseHatForClass(client, i, playerClass);
+		bool enabled = IsHatEquippedForClient(client, i)
+			&& CanClientUseHatForClass(client, i, playerClass);
 		bool hatValid = HasValidEntRef(g_iHatRef[client][i]);
 		bool hideValid = HasValidEntRef(g_iHideHatRef[client][i]);
 		bool shouldHaveHide = enabled && (GetHideDefIndexForClass(i, classIndex) > 0);
@@ -722,7 +712,7 @@ void ShowHatMenu(int client)
 	int added = 0;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!CanClientViewHatForClass(i, playerClass))
+		if (g_Hats[i].force || !CanClientViewHatForClass(i, playerClass))
 		{
 			continue;
 		}
@@ -937,7 +927,9 @@ void EquipHat(int client, int hatIndex)
 	{
 		return;
 	}
-	int paint = g_iHatPaintChoice[client][hatIndex];
+	int paint = g_Hats[hatIndex].force
+		? ClampPaintIndex(g_Hats[hatIndex].defaultPaint)
+		: g_iHatPaintChoice[client][hatIndex];
 	int wearable = CreateHat(client, g_Hats[hatIndex].model, hatDefIndex, g_Hats[hatIndex].level, g_Hats[hatIndex].quality, paint, g_Hats[hatIndex].style, g_Hats[hatIndex].hasModelScale, g_Hats[hatIndex].modelScale);
 	if (wearable != -1)
 	{
@@ -947,7 +939,10 @@ void EquipHat(int client, int hatIndex)
 		}
 		g_iHatRef[client][hatIndex] = EntIndexToEntRef(wearable);
 	}
-	QueueHatStateSave(client);
+	if (!g_Hats[hatIndex].force)
+	{
+		QueueHatStateSave(client);
+	}
 }
 
 void RemoveHatIndex(int client, int hatIndex)
@@ -1072,6 +1067,7 @@ int ClampPaintIndex(int paint)
 void ResetHatConfig(HatConfig hat)
 {
 	hat.enabled = false;
+	hat.force = false;
 	hat.id[0] = '\0';
 	hat.name[0] = '\0';
 	hat.prefix[0] = '\0';
@@ -1106,11 +1102,26 @@ bool IsHatEnabled(int hatIndex)
 	return IsHatIndexValid(hatIndex) && g_Hats[hatIndex].enabled && g_Hats[hatIndex].model[0];
 }
 
+static bool IsHatEquippedForClient(int client, int hatIndex)
+{
+	return IsHatEnabled(hatIndex)
+		&& (g_Hats[hatIndex].force || g_bHatEnabled[client][hatIndex]);
+}
+
+static bool IsHatSelectable(int hatIndex)
+{
+	return IsHatEnabled(hatIndex) && !g_Hats[hatIndex].force;
+}
+
 static bool CanClientAccessHat(int client, int hatIndex)
 {
 	if (!IsHatIndexValid(hatIndex))
 	{
 		return false;
+	}
+	if (g_Hats[hatIndex].force)
+	{
+		return true;
 	}
 	if (!g_Hats[hatIndex].pointsStorePurchase[0])
 	{
@@ -1181,13 +1192,13 @@ int FindHatIndexById(const char[] id)
 
 int GetDefaultHatIndex()
 {
-	if (IsHatEnabled(g_iDefaultHatIndex))
+	if (IsHatSelectable(g_iDefaultHatIndex))
 	{
 		return g_iDefaultHatIndex;
 	}
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (IsHatEnabled(i))
+		if (IsHatSelectable(i))
 		{
 			return i;
 		}
@@ -1198,7 +1209,7 @@ int GetDefaultHatIndex()
 int GetSelectedHatIndex(int client)
 {
 	int hatIndex = FindHatIndexById(g_szHatIdChoice[client]);
-	if (IsHatEnabled(hatIndex))
+	if (IsHatSelectable(hatIndex))
 	{
 		return hatIndex;
 	}
@@ -1250,7 +1261,7 @@ bool AddHatConfig(HatConfig hat)
 	}
 	int hatIndex = g_iHatCount;
 	g_Hats[hatIndex] = hat;
-	if (hat.enabled && g_iDefaultHatIndex < 0)
+	if (hat.enabled && !hat.force && g_iDefaultHatIndex < 0)
 	{
 		g_iDefaultHatIndex = hatIndex;
 	}
@@ -1452,7 +1463,7 @@ void LoadHatStateCookie(int client)
 		if (count > 1 && parts[1][0] != '\0' && StringToInt(parts[0]) != 0)
 		{
 			int hatIndex = FindHatIndexById(parts[1]);
-			if (IsHatEnabled(hatIndex))
+			if (IsHatEnabled(hatIndex) && !g_Hats[hatIndex].force)
 			{
 				g_bHatEnabled[client][hatIndex] = true;
 				if (count > 2)
@@ -1503,6 +1514,11 @@ void LoadHatStateCookie(int client)
 			{
 				continue;
 			}
+			if (g_Hats[hatIndex].force)
+			{
+				needsResave = true;
+				continue;
+			}
 
 			g_bHatEnabled[client][hatIndex] = true;
 			if (partCount > 1 && entryParts[1][0])
@@ -1539,6 +1555,11 @@ void LoadHatStateCookie(int client)
 			}
 			if (!IsHatEnabled(hatIndex))
 			{
+				continue;
+			}
+			if (g_Hats[hatIndex].force)
+			{
+				needsResave = true;
 				continue;
 			}
 			g_bHatEnabled[client][hatIndex] = true;
@@ -1639,7 +1660,7 @@ void SaveHatStateCookie(int client, bool allowClear = false)
 	bool first = true;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!g_bHatEnabled[client][i] || !IsHatEnabled(i))
+		if (!g_bHatEnabled[client][i] || !IsHatEnabled(i) || g_Hats[i].force)
 		{
 			continue;
 		}
@@ -1768,6 +1789,7 @@ void LoadConfig()
 					}
 				}
 				hat.enabled = (kv.GetNum("enabled", 1) != 0) && hat.model[0];
+				hat.force = kv.GetNum("force", 0) != 0;
 				hat.baseDefIndex = kv.GetNum("defindex", 0);
 				hat.baseHideDefIndex = kv.GetNum("hide_defindex", 0);
 				hat.quality = kv.GetNum("quality", 6);
@@ -1825,6 +1847,7 @@ void CreateDefaultConfig(const char[] path)
 	file.WriteLine("        {");
 	file.WriteLine("            \"name\" \"mercenary_derby\"");
 	file.WriteLine("            \"enabled\" \"1\"");
+	file.WriteLine("            \"force\" \"0\"");
 	file.WriteLine("            \"model\" \"%s\"", DEFAULT_SCOUT_MODEL);
 	file.WriteLine("            \"model_scale\" \"\"");
 	file.WriteLine("            \"defindex\" \"451\"");
@@ -1912,7 +1935,7 @@ static bool GetClientHatPrefixes(int client, char[] buffer, int maxlen)
 	bool found = false;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!g_bHatEnabled[client][i] || !CanClientUseHatForClass(client, i, playerClass))
+		if (!IsHatEquippedForClient(client, i) || !CanClientUseHatForClass(client, i, playerClass))
 		{
 			continue;
 		}
@@ -1948,7 +1971,7 @@ static bool GetClientHatTagChoices(int client, char[] buffer, int maxlen)
 	bool found = false;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!g_bHatEnabled[client][i] || !CanClientUseHatForClass(client, i, playerClass))
+		if (!IsHatEquippedForClient(client, i) || !CanClientUseHatForClass(client, i, playerClass))
 		{
 			continue;
 		}
@@ -1976,7 +1999,7 @@ static bool ResolveClientHatTag(int client, const char[] hatId, char[] buffer, i
 	}
 
 	int hatIndex = FindHatIndexById(hatId);
-	if (!IsHatEnabled(hatIndex) || !g_bHatEnabled[client][hatIndex])
+	if (!IsHatEquippedForClient(client, hatIndex))
 	{
 		return false;
 	}
@@ -2007,7 +2030,7 @@ static bool FindClientHatTagSource(int client, const char[] prefix, char[] hatId
 
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!g_bHatEnabled[client][i] || !CanClientUseHatForClass(client, i, playerClass))
+		if (!IsHatEquippedForClient(client, i) || !CanClientUseHatForClass(client, i, playerClass))
 		{
 			continue;
 		}
