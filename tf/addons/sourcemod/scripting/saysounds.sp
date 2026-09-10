@@ -5,6 +5,8 @@
 #include <clientprefs>
 #include <textparse>
 
+#include <morecolors>
+
 #include <sdktools_sound>
 #include <sdktools_stringtables>
 #include <sdktools_functions>
@@ -17,9 +19,11 @@
 #undef REQUIRE_PLUGIN
 #include <points_store_api>
 #include <dgm_api>
+#include <filters_api>
 #define REQUIRE_PLUGIN
 #include <plugin_statistics>
 
+#include "include/chat_colors.inc"
 #include "include/steam_identity.inc"
 #include "include/strings.inc"
 
@@ -213,6 +217,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errlen)
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("DGM_GetGameModeKey");
+    MarkNativeAsOptional("Filters_GetChatName");
     RegPluginLibrary("saysounds");
     CreateNative("SaySounds_ShouldPlay", Native_ShouldPlay);
     CreateNative("SaySounds_PlaySoundToOptedIn", Native_PlaySoundToOptedIn);
@@ -3530,6 +3535,8 @@ public Action Command_ListOptedInClients(int client, int args)
 {
     char allSoundsNames[1024];
     char mostlyEnabledNames[1024];
+    char allSoundsPlainNames[1024];
+    char mostlyEnabledPlainNames[1024];
     int allSoundsCount = 0;
     int mostlyEnabledCount = 0;
     int totalGroups = 0;
@@ -3568,25 +3575,16 @@ public Action Command_ListOptedInClients(int client, int args)
             }
         }
 
-        char name[MAX_NAME_LENGTH];
-        GetClientName(target, name, sizeof(name));
-
         if (enabledGroups == totalGroups)
         {
-            if (allSoundsCount > 0)
-            {
-                StrCat(allSoundsNames, sizeof(allSoundsNames), ", ");
-            }
-            StrCat(allSoundsNames, sizeof(allSoundsNames), name);
+            AppendOptListClientName(allSoundsNames, sizeof(allSoundsNames), target, allSoundsCount, true);
+            AppendOptListClientName(allSoundsPlainNames, sizeof(allSoundsPlainNames), target, allSoundsCount, false);
             allSoundsCount++;
         }
         else if (enabledGroups * 5 > totalGroups * 4)
         {
-            if (mostlyEnabledCount > 0)
-            {
-                StrCat(mostlyEnabledNames, sizeof(mostlyEnabledNames), ", ");
-            }
-            StrCat(mostlyEnabledNames, sizeof(mostlyEnabledNames), name);
+            AppendOptListClientName(mostlyEnabledNames, sizeof(mostlyEnabledNames), target, mostlyEnabledCount, true);
+            AppendOptListClientName(mostlyEnabledPlainNames, sizeof(mostlyEnabledPlainNames), target, mostlyEnabledCount, false);
             mostlyEnabledCount++;
         }
     }
@@ -3594,16 +3592,52 @@ public Action Command_ListOptedInClients(int client, int args)
     if (allSoundsCount == 0)
     {
         strcopy(allSoundsNames, sizeof(allSoundsNames), "none");
+        strcopy(allSoundsPlainNames, sizeof(allSoundsPlainNames), "none");
     }
     if (mostlyEnabledCount == 0)
     {
         strcopy(mostlyEnabledNames, sizeof(mostlyEnabledNames), "none");
+        strcopy(mostlyEnabledPlainNames, sizeof(mostlyEnabledPlainNames), "none");
     }
 
-    ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNames);
-    ReplyToCommand(client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledNames);
+    if (client > 0 && IsClientInGame(client))
+    {
+        CPrintToChatEx(client, client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNames);
+        CPrintToChatEx(client, client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledNames);
+    }
+    else
+    {
+        ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsPlainNames);
+        ReplyToCommand(client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledPlainNames);
+    }
 
     return Plugin_Handled;
+}
+
+static void AppendOptListClientName(char[] output, int maxlen, int client, int existingCount, bool colorized)
+{
+    if (existingCount > 0)
+    {
+        StrCat(output, maxlen, ", ");
+    }
+
+    char displayName[256];
+    if (!colorized)
+    {
+        GetClientName(client, displayName, sizeof(displayName));
+    }
+    else if (GetFeatureStatus(FeatureType_Native, "Filters_GetChatName") != FeatureStatus_Available
+        || !Filters_GetChatName(client, displayName, sizeof(displayName))
+        || !displayName[0])
+    {
+        FormatEx(displayName, sizeof(displayName), "{teamcolor}%N{default}", client);
+    }
+
+    if (colorized)
+    {
+        ChatColors_ResolveTeamTag(client, displayName, sizeof(displayName));
+    }
+    StrCat(output, maxlen, displayName);
 }
 
 public Action Command_ToggleSoundOpt(int client, int args)
