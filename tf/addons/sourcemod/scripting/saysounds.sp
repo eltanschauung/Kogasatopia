@@ -3533,9 +3533,11 @@ public int MenuHandler_GroupOptions(Menu menu, MenuAction action, int client, in
 
 public Action Command_ListOptedInClients(int client, int args)
 {
-    char allSoundsNames[1024];
+    char allSoundsNames[256];
+    char allSoundsNamesOverflow[256];
     char mostlyEnabledNames[1024];
-    char allSoundsPlainNames[1024];
+    char allSoundsPlainNames[256];
+    char allSoundsPlainNamesOverflow[256];
     char mostlyEnabledPlainNames[1024];
     int allSoundsCount = 0;
     int mostlyEnabledCount = 0;
@@ -3577,8 +3579,16 @@ public Action Command_ListOptedInClients(int client, int args)
 
         if (enabledGroups == totalGroups)
         {
-            AppendOptListClientName(allSoundsNames, sizeof(allSoundsNames), target, allSoundsCount, true);
-            AppendOptListClientName(allSoundsPlainNames, sizeof(allSoundsPlainNames), target, allSoundsCount, false);
+            if (allSoundsCount < 6)
+            {
+                AppendOptListClientName(allSoundsNames, sizeof(allSoundsNames), target, allSoundsCount, true);
+                AppendOptListClientName(allSoundsPlainNames, sizeof(allSoundsPlainNames), target, allSoundsCount, false);
+            }
+            else
+            {
+                AppendOptListClientName(allSoundsNamesOverflow, sizeof(allSoundsNamesOverflow), target, allSoundsCount - 6, true);
+                AppendOptListClientName(allSoundsPlainNamesOverflow, sizeof(allSoundsPlainNamesOverflow), target, allSoundsCount - 6, false);
+            }
             allSoundsCount++;
         }
         else if (enabledGroups * 5 > totalGroups * 4)
@@ -3603,11 +3613,19 @@ public Action Command_ListOptedInClients(int client, int args)
     if (client > 0 && IsClientInGame(client))
     {
         CPrintToChatEx(client, client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNames);
+        if (allSoundsCount > 6)
+        {
+            CPrintToChatEx(client, client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNamesOverflow);
+        }
         CPrintToChatEx(client, client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledNames);
     }
     else
     {
         ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsPlainNames);
+        if (allSoundsCount > 6)
+        {
+            ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsPlainNamesOverflow);
+        }
         ReplyToCommand(client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledPlainNames);
     }
 
