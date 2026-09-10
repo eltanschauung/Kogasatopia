@@ -7,6 +7,16 @@
 #define TOUHOU_CONTROL_POINT_MODEL \
 	"models/touhou/cap_point_touhou.mdl"
 
+static const char g_TouhouControlPointMaterials[][] =
+{
+	"materials/models/touhou/barrier_bottom.vmt",
+	"materials/models/touhou/barrier_bottom.vtf",
+	"materials/models/touhou/barrier_red.vmt",
+	"materials/models/touhou/barrier_top.vmt",
+	"materials/models/touhou/barrier_top.vtf",
+	"materials/models/touhou/barrier2_blue.vtf"
+};
+
 public Plugin myinfo =
 {
 	name = "Touhou Control Point Test",
@@ -22,6 +32,11 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+	for (int i = 0; i < sizeof(g_TouhouControlPointMaterials); i++)
+	{
+		AddFileToDownloadsTable(g_TouhouControlPointMaterials[i]);
+	}
+
 	PrecacheModel(TOUHOU_CONTROL_POINT_MODEL, true);
 	ReplaceControlPointModels();
 }
