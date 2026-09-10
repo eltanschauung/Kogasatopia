@@ -271,6 +271,7 @@ public void OnPluginStart()
     g_hDisabledGroupsCookie = RegClientCookie("saysounds_disabled_groups", "Disabled saysound groups", CookieAccess_Public);
 
     RegConsoleCmd("sm_opt", Command_ToggleSoundOpt);
+    RegConsoleCmd("sm_optlist", Command_ListOptedInClients);
     RegConsoleCmd("sm_opts", Command_ShowGroupOptions);
     RegConsoleCmd("sm_sounds", Command_ListSounds);
     RegConsoleCmd("sm_saysounds", Command_ListSounds);
@@ -3523,6 +3524,38 @@ public int MenuHandler_GroupOptions(Menu menu, MenuAction action, int client, in
     }
 
     return 0;
+}
+
+public Action Command_ListOptedInClients(int client, int args)
+{
+    char names[1024];
+    int count = 0;
+
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        if (!IsClientInGame(target) || IsFakeClient(target) || !SaySounds_ShouldPlay(target))
+        {
+            continue;
+        }
+
+        if (count > 0)
+        {
+            StrCat(names, sizeof(names), ", ");
+        }
+
+        char name[MAX_NAME_LENGTH];
+        GetClientName(target, name, sizeof(name));
+        StrCat(names, sizeof(names), name);
+        count++;
+    }
+
+    if (count == 0)
+    {
+        strcopy(names, sizeof(names), "none");
+    }
+
+    ReplyToCommand(client, "[Saysounds] Opted-in clients: %s", names);
+    return Plugin_Handled;
 }
 
 public Action Command_ToggleSoundOpt(int client, int args)
