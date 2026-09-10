@@ -217,7 +217,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errlen)
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("DGM_GetGameModeKey");
-    MarkNativeAsOptional("Filters_GetChatName");
+    MarkNativeAsOptional("Filters_GetSteamIdColorTag");
     RegPluginLibrary("saysounds");
     CreateNative("SaySounds_ShouldPlay", Native_ShouldPlay);
     CreateNative("SaySounds_PlaySoundToOptedIn", Native_PlaySoundToOptedIn);
@@ -3621,16 +3621,24 @@ static void AppendOptListClientName(char[] output, int maxlen, int client, int e
         StrCat(output, maxlen, ", ");
     }
 
-    char displayName[512];
+    char displayName[256];
     if (!colorized)
     {
         GetClientName(client, displayName, sizeof(displayName));
     }
-    else if (GetFeatureStatus(FeatureType_Native, "Filters_GetChatName") != FeatureStatus_Available
-        || !Filters_GetChatName(client, displayName, sizeof(displayName))
-        || !displayName[0])
+    else
     {
-        FormatEx(displayName, sizeof(displayName), "{teamcolor}%N{default}", client);
+        char colorToken[32];
+        char steamId64[32];
+        if (GetFeatureStatus(FeatureType_Native, "Filters_GetSteamIdColorTag") != FeatureStatus_Available
+            || !GetClientAuthId(client, AuthId_SteamID64, steamId64, sizeof(steamId64))
+            || !Filters_GetSteamIdColorTag(steamId64, colorToken, sizeof(colorToken))
+            || !colorToken[0])
+        {
+            strcopy(colorToken, sizeof(colorToken), "teamcolor");
+        }
+
+        FormatEx(displayName, sizeof(displayName), "{%s}%N{default}", colorToken, client);
     }
 
     if (colorized)
