@@ -1,7 +1,11 @@
+// Timer ownership belongs to a client session, not a reusable player slot.
+// Clear ownership before calling engine natives: respawning fires hooks synchronously.
+int g_iRespawnScheduledTeam[MAXPLAYERS + 1];
+
 void DGM_StartRespawnReminderTimer(int client)
 {
     DGM_ClearRespawnReminderTimer(client);
-    if (!g_cvPopulationRespawns.BoolValue)
+    if (!Client_IsInGame(client) || !g_cvPopulationRespawns.BoolValue)
     {
         return;
     }
@@ -9,31 +13,22 @@ void DGM_StartRespawnReminderTimer(int client)
     g_hRespawnReminderTimers[client] = CreateTimer(
         DGM_RESPAWN_REMINDER_INTERVAL,
         Timer_RespawnReminder,
-        GetClientUserId(client),
+        GetClientSerial(client),
         TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action Timer_RespawnReminder(Handle timer, int userId)
+public Action Timer_RespawnReminder(Handle timer, int serial)
 {
-    int owner = 0;
-    for (int client = 1; client <= MaxClients; client++)
+    int client = GetClientFromSerial(serial);
+    if (client == 0 || g_hRespawnReminderTimers[client] != timer)
     {
-        if (g_hRespawnReminderTimers[client] == timer)
-        {
-            owner = client;
-            break;
-        }
+        return Plugin_Stop;
     }
 
-    int client = GetClientOfUserId(userId);
-    if (!g_cvPopulationRespawns.BoolValue
-        || owner == 0 || client != owner || !IsClientInGame(client)
+    if (!g_cvPopulationRespawns.BoolValue || !IsClientInGame(client)
         || g_InternalOverride || DGM_AreRespawnTimesForcedOn())
     {
-        if (owner > 0)
-        {
-            g_hRespawnReminderTimers[owner] = null;
-        }
+        g_hRespawnReminderTimers[client] = null;
         return Plugin_Stop;
     }
 
@@ -44,13 +39,14 @@ public Action Timer_RespawnReminder(Handle timer, int userId)
 
 void DGM_ClearRespawnReminderTimer(int client)
 {
-    if (client <= 0 || client > MaxClients || g_hRespawnReminderTimers[client] == null)
+    if (client <= 0 || client > MaxClients)
     {
         return;
     }
 
-    delete g_hRespawnReminderTimers[client];
+    Handle timer = g_hRespawnReminderTimers[client];
     g_hRespawnReminderTimers[client] = null;
+    delete timer;
 }
 
 void DGM_ClearAllRespawnReminderTimers()
@@ -72,31 +68,32 @@ void DGM_ResetRespawnReminderTimerHandles()
 int DGM_RespawnDeadClients()
 {
     int respawned = 0;
-
-    for (int i = 1; i <= MaxClients; i++)
+    for (int client = 1; client <= MaxClients; client++)
     {
-        if (!Client_IsInGame(i) || IsPlayerAlive(i) || GetClientTeam(i) <= view_as<int>(TFTeam_Spectator))
+        if (!Client_IsInGame(client) || IsPlayerAlive(client)
+            || GetClientTeam(client) <= view_as<int>(TFTeam_Spectator))
         {
             continue;
         }
 
-        DGM_ClearRespawnTimer(i);
-        TF2_RespawnPlayer(i);
+        DGM_ClearRespawnTimer(client);
+        TF2_RespawnPlayer(client);
         respawned++;
     }
-
     return respawned;
 }
 
 void DGM_ClearRespawnTimer(int client)
 {
-    if (client <= 0 || client > MaxClients || g_hRespawnTimers[client] == null)
+    if (client <= 0 || client > MaxClients)
     {
         return;
     }
 
-    delete g_hRespawnTimers[client];
+    Handle timer = g_hRespawnTimers[client];
     g_hRespawnTimers[client] = null;
+    g_iRespawnScheduledTeam[client] = 0;
+    delete timer;
 }
 
 void DGM_ClearAllRespawnTimers()
@@ -112,83 +109,96 @@ void DGM_ResetRespawnTimerHandles()
     for (int client = 1; client <= MaxClients; client++)
     {
         g_hRespawnTimers[client] = null;
+        g_iRespawnScheduledTeam[client] = 0;
     }
 }
 
 void DGM_ScheduleRespawnTimer(int client, float delay)
 {
     DGM_ClearRespawnTimer(client);
-
-    int userId = GetClientUserId(client);
-    if (userId <= 0)
+    if (!Client_IsInGame(client) || GetClientTeam(client) <= view_as<int>(TFTeam_Spectator))
     {
         return;
     }
 
+    // Also rejects NaN. ConVars are bounded, but this helper has other callers.
+    if (!(delay >= 0.0))
+    {
+        delay = 0.0;
+    }
+
+    g_iRespawnScheduledTeam[client] = GetClientTeam(client);
     g_hRespawnTimers[client] = CreateTimer(
-        delay, Timer_RespawnClient, userId, TIMER_FLAG_NO_MAPCHANGE);
+        delay, Timer_RespawnClient, GetClientSerial(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
-        int client = GetClientOfUserId(event.GetInt("userid"));
-        if (!Client_IsInGame(client)) return;
-        DGM_ClearRespawnTimer(client);
-
-        if (DGM_ShouldDisableInstantRespawn())
-        {
-            return;
-        }
-
-        if (g_InternalOverride)
-        {
-            return;
-        }
-
-        float baseRespawn = GetConVarFloat(g_cvRespawnTime);
-        if (FloatCompare(baseRespawn, DGM_RESPAWN_DISABLED_TIME) == 0)
-        {
-            return;
-        }
-
-        float override = GetConVarFloat(g_cvTimeOverride);
-        if (override > 0)
-        {
-            DGM_ScheduleRespawnTimer(client, override);
-            return;
-        }
-
-        float time = baseRespawn;
-        int team = GetClientTeam(client);
-        float redTime = GetConVarFloat(g_cvRedTime);
-        float bluTime = GetConVarFloat(g_cvBluTime);
-        if (redTime != bluTime)
-        {
-        if (team == 2) time = redTime;
-        else if (team == 3) time = bluTime;
-        }
-        DGM_ScheduleRespawnTimer(client, time);
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!Client_IsInGame(client))
+    {
         return;
+    }
+    DGM_ClearRespawnTimer(client);
+
+    if (DGM_ShouldDisableInstantRespawn() || g_InternalOverride)
+    {
+        return;
+    }
+
+    float baseRespawn = g_cvRespawnTime.FloatValue;
+    if (FloatCompare(baseRespawn, DGM_RESPAWN_DISABLED_TIME) == 0)
+    {
+        return;
+    }
+
+    float overrideTime = g_cvTimeOverride.FloatValue;
+    if (overrideTime > 0.0)
+    {
+        DGM_ScheduleRespawnTimer(client, overrideTime);
+        return;
+    }
+
+    float delay = baseRespawn;
+    int team = GetClientTeam(client);
+    float redTime = g_cvRedTime.FloatValue;
+    float bluTime = g_cvBluTime.FloatValue;
+    if (redTime != bluTime)
+    {
+        if (team == 2)
+        {
+            delay = redTime;
+        }
+        else if (team == 3)
+        {
+            delay = bluTime;
+        }
+    }
+    DGM_ScheduleRespawnTimer(client, delay);
 }
 
-public Action Timer_RespawnClient(Handle timer, int userId)
+public Action Timer_RespawnClient(Handle timer, int serial)
 {
-    int client = GetClientOfUserId(userId);
-    if (client <= 0 || !Client_IsInGame(client) || g_hRespawnTimers[client] != timer)
+    int client = GetClientFromSerial(serial);
+    if (client == 0 || g_hRespawnTimers[client] != timer)
     {
         return Plugin_Stop;
     }
 
+    int expectedTeam = g_iRespawnScheduledTeam[client];
     g_hRespawnTimers[client] = null;
+    g_iRespawnScheduledTeam[client] = 0;
 
-    if (DGM_ShouldDisableInstantRespawn())
+    // Settings and team membership can change while the timer is queued.
+    if (!Client_IsInGame(client) || g_InternalOverride
+        || DGM_AreRespawnTimesForcedOn() || DGM_ShouldDisableInstantRespawn())
     {
         return Plugin_Stop;
     }
 
-    if (Client_IsInGame(client) && !IsPlayerAlive(client) && GetClientTeam(client) > 1) {
+    if (!IsPlayerAlive(client) && expectedTeam > 1 && GetClientTeam(client) == expectedTeam)
+    {
         TF2_RespawnPlayer(client);
     }
     return Plugin_Stop;
 }
-

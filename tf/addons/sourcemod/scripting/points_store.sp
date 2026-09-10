@@ -2,14 +2,10 @@
 #pragma newdecls required
 
 #include <sourcemod>
-
 #include <sdkhooks>
-
 #include <tf2>
 #include <tf2_stocks>
-
 #include <multicolors>
-
 #undef REQUIRE_PLUGIN
 #include <dgm_api>
 #include <filters_api>
@@ -18,13 +14,13 @@
 #include <whaletracker_api>
 #define REQUIRE_PLUGIN
 #include <plugin_statistics>
-
 #include "include/client_validation.inc"
 #include "include/chat_colors.inc"
 #include "include/database.inc"
 #include "include/steam_identity.inc"
 #include "include/tf2_classes.inc"
 
+// Request ownership, indexed catalogues and receipt handling live in the modules below.
 #define BP_TRANS_DB_CONFIG_DEFAULT "default"
 #define BP_TRANS_TABLE "bonuspoints_transactions"
 #define BP_BALANCE_TABLE "points_store_balances"
@@ -65,7 +61,6 @@ ArrayList g_ItemColors = null;
 ArrayList g_ItemPrices = null;
 ArrayList g_ItemDurations = null;
 ArrayList g_ItemUses = null;
-
 StringMap g_ClientPurchases[MAXPLAYERS + 1];
 StringMap g_ClientPurchaseExpiresAt[MAXPLAYERS + 1];
 StringMap g_ClientPurchaseUsesRemaining[MAXPLAYERS + 1];
@@ -74,7 +69,6 @@ int g_ClientBonusPoints[MAXPLAYERS + 1];
 bool g_ClientBonusPointsLoaded[MAXPLAYERS + 1];
 bool g_ClientBonusPointsPending[MAXPLAYERS + 1];
 char g_ClientShopDetailItem[MAXPLAYERS + 1][BP_TRANS_ITEM_KEY_MAX];
-
 Database g_Database = null;
 ConVar g_CvarDatabase = null;
 ConVar g_CvarEventLogging = null;
@@ -162,12 +156,8 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
     CreateNative("PointsStore_GetPurchaseExpiresAt", Native_PointsStore_GetPurchaseExpiresAt);
     CreateNative("PointsStore_GetPurchaseUsesRemaining", Native_PointsStore_GetPurchaseUsesRemaining);
     CreateNative("PointsStore_ConsumePurchaseUse", Native_PointsStore_ConsumePurchaseUse);
-    g_IdempotentAwardForward = new GlobalForward(
-        "PointsStore_OnApplyBonusPointsSteamIdOnce",
-        ET_Ignore,
-        Param_String,
-        Param_Cell,
-        Param_Cell);
+    g_IdempotentAwardForward = new GlobalForward("PointsStore_OnApplyBonusPointsSteamIdOnce",
+        ET_Ignore, Param_String, Param_Cell, Param_Cell);
     return APLRes_Success;
 }
 

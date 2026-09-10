@@ -1,6 +1,4 @@
-/**
- * Unified TF2 weapon configuration, custom loadout, model, sound, and gameplay behavior.
- */
+/** Unified TF2 weapon configuration, custom loadout, models, sounds and gameplay. */
 #pragma semicolon 1
 #pragma newdecls required
 
@@ -9,14 +7,12 @@
 #include <sdkhooks>
 #include <sdktools>
 #include <sdktools_sound>
-
 #include <tf2>
 #include <tf2utils>
 #include <tf_econ_data>
 #include <tf2attributes>
 #include <tf2items>
 #include <tf2_stocks>
-
 #include <tf_ontakedamage>
 #include <morecolors>
 #include <sourcescramble>
@@ -42,10 +38,8 @@
 #include <points_store_api>
 #define REQUIRE_PLUGIN
 #include <plugin_statistics>
-
 #define WEAPONS_INCLUDE_SHAREDDEFS_ONLY
 #include <weapons>
-
 #include "include/database.inc"
 #include "include/steam_identity.inc"
 #include "include/item_indexes.inc"
@@ -55,78 +49,52 @@
 
 #tryinclude <autoversioning/version>
 #if defined __ninjabuild_auto_version_included
-	#define VERSION_SUFFIX "-" ... GIT_COMMIT_SHORT_HASH
+    #define VERSION_SUFFIX "-" ... GIT_COMMIT_SHORT_HASH
 #else
-	#define VERSION_SUFFIX ""
+    #define VERSION_SUFFIX ""
 #endif
 
-public Plugin myinfo = {
-	name = "Weapons",
-	author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden",
-	description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-	version = "7.1" ... VERSION_SUFFIX,
-	url = "https://kogasa.tf"
-}
+public Plugin myinfo =
+{
+    name = "Weapons",
+    author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden",
+    description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
+    version = "7.1" ... VERSION_SUFFIX,
+    url = "https://kogasa.tf"
+};
 
-// 29/08/2026: Combined ca_replace_sound and viewmodel_override into cwx to reduce number of plugins + less concern about order conflicts
-// 30/08/2026: Combined CWX and WeaponReverts so one plugin owns each weapon's complete runtime state.
-// 30/08/2026: Embedded SM-TFCustAttr so custom attributes share the same item lifecycle.
-// 08/09/2026: Combined Hat Removal so wearable visibility shares the unified entity lifecycle.
-
-// this is the maximum expected length of our UID; it is intentional that this is *not* shared
-// to dependent plugins, as we may change this at any time
 #define MAX_ITEM_IDENTIFIER_LENGTH 64
-
-// this is the maximum length of the item name displayed to players
 #define MAX_ITEM_NAME_LENGTH 128
-
-// this is the maximum length of the per-weapon description printed by sm_c
 #define MAX_ITEM_DESCRIPTION_LENGTH 512
-
 #define WEAPONS_CONFIG_PATH "configs/weapons.cfg"
 #define WEAPONS_CONFIG_ROOT "Weapons"
 #define WEAPONS_ITEM_CLASSES_SECTION "ItemClasses"
 #define WEAPONS_CONFIG_ITEM_SECTION "CustomWeapons"
 #define WEAPONS_CONFIG_SOUND_SECTION "SoundGroups"
-
-// this is the number of slots allocated to our thing
 #define NUM_ITEMS 7
-
-// okay, so we can't use TFClassType even view_as'd
-// otherwise it'll warn on array-based enumstruct
 #define NUM_PLAYER_CLASSES 10
-
 #define WEAPONS_STATS_DB_CONFIG_DEFAULT "default"
-// Preserve the historical table name so existing popularity data remains continuous.
+// Preserve existing statistics and external integrations.
 #define WEAPONS_STATS_STATE_TABLE "cwx_weapon_popularity"
-
-// we're recycling the following attribute to ensure that the item UID persists across dropped
-// weapons - it's kinda icky and if anyone else happened to get the same idea it'd be bad, but
-// it's the best we've got without trying TOO hard
-// TODO: rework this in the future to optionally use an injected attribute?
 #define ATTRIB_NAME_CUSTOM_UID "random drop line item unusual list"
 #define POINTS_STORE_HAS_PURCHASE_NATIVE "PointsStore_HasPurchase"
 
 bool g_bRetrievedLoadout[MAXPLAYERS + 1];
-
 Cookie g_ItemPersistCookies[NUM_PLAYER_CLASSES][NUM_ITEMS];
-
 bool g_bForceReequipItems[MAXPLAYERS + 1];
-
 ConVar sm_weapons_enable_loadout;
 ConVar sm_weapons_statistics;
 ConVar sm_weapons_statistics_database;
 ConVar sm_weapons_validate_debug;
 ConVar sm_weapons_validate_repair;
 ConVar sm_weapons_hide_reskin_only;
-
 ConVar mp_stalemate_meleeonly;
-
 Database g_WeaponsStatsDb = null;
 bool g_WeaponsStatsDbReady = false;
 bool g_WeaponsStatsIsMySql = false;
 Handle g_hWeaponsStatsDbReconnectTimer = null;
 Handle g_hOnItemRuntimeStateReady = null;
+int g_attrdef_AllowedInMedievalMode;
 
 #include "weapons/custom_attributes.sp"
 #include "weapons/whitelist.sp"
@@ -143,1615 +111,243 @@ Handle g_hOnItemRuntimeStateReady = null;
 #include "weapons/gameplay.sp"
 #include "weapons/commands.sp"
 #include "weapons/equip_commands.sp"
+#include "weapons/loadout_controller.sp"
+#include "weapons/statistics_persistence.sp"
 
-int g_attrdef_AllowedInMedievalMode;
-
-public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen) {
-	WeaponsCustomAttributes_RegisterNatives();
-	CustomHats_RegisterNatives();
-	MarkNativeAsOptional("DGM_CurrentNormalizedMap");
-	MarkNativeAsOptional("DGM_NormalizeMapName");
-	MarkNativeAsOptional("DGM_GetGameModeKey");
-
-	RegPluginLibrary("weapons");
-	WeaponsGameplay_RegisterNatives();
-
-	CreateNative("Weapons_SetPlayerLoadoutItem", Native_SetPlayerLoadoutItem);
-	CreateNative("Weapons_RemovePlayerLoadoutItem", Native_RemovePlayerLoadoutItem);
-	CreateNative("Weapons_GetPlayerLoadoutItem", Native_GetPlayerLoadoutItem);
-	CreateNative("Weapons_EquipPlayerItem", Native_EquipPlayerItem);
-	CreateNative("Weapons_CanPlayerAccessItem", Native_CanPlayerAccessItem);
-	CreateNative("Weapons_GetItemList", Native_GetItemList);
-	CreateNative("Weapons_IsItemUIDValid", Native_IsItemUIDValid);
-	CreateNative("Weapons_GetItemUIDFromEntity", Native_GetItemUIDFromEntity);
-	CreateNative("Weapons_GetItemDisplayName", Native_GetItemDisplayName);
-	CreateNative("Weapons_IsItemReskinOnly", Native_IsItemReskinOnly);
-	CreateNative("Weapons_GetItemExtData", Native_GetItemExtData);
-	CreateNative("Weapons_GetItemLoadoutSlot", Native_GetItemLoadoutSlot);
-	
-	return APLRes_Success;
+public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
+{
+    WeaponsCustomAttributes_RegisterNatives();
+    CustomHats_RegisterNatives();
+    MarkNativeAsOptional("DGM_CurrentNormalizedMap");
+    MarkNativeAsOptional("DGM_NormalizeMapName");
+    MarkNativeAsOptional("DGM_GetGameModeKey");
+    RegPluginLibrary("weapons");
+    WeaponsGameplay_RegisterNatives();
+    CreateNative("Weapons_SetPlayerLoadoutItem", Native_SetPlayerLoadoutItem);
+    CreateNative("Weapons_RemovePlayerLoadoutItem", Native_RemovePlayerLoadoutItem);
+    CreateNative("Weapons_GetPlayerLoadoutItem", Native_GetPlayerLoadoutItem);
+    CreateNative("Weapons_EquipPlayerItem", Native_EquipPlayerItem);
+    CreateNative("Weapons_CanPlayerAccessItem", Native_CanPlayerAccessItem);
+    CreateNative("Weapons_GetItemList", Native_GetItemList);
+    CreateNative("Weapons_IsItemUIDValid", Native_IsItemUIDValid);
+    CreateNative("Weapons_GetItemUIDFromEntity", Native_GetItemUIDFromEntity);
+    CreateNative("Weapons_GetItemDisplayName", Native_GetItemDisplayName);
+    CreateNative("Weapons_IsItemReskinOnly", Native_IsItemReskinOnly);
+    CreateNative("Weapons_GetItemExtData", Native_GetItemExtData);
+    CreateNative("Weapons_GetItemLoadoutSlot", Native_GetItemLoadoutSlot);
+    return APLRes_Success;
 }
 
-public void OnPluginStart() {
-	WeaponsCustomAttributes_OnPluginStart();
-	WeaponsWhitelist_OnPluginStart();
-	WeaponsMovement_OnPluginStart();
-	CustomHats_OnPluginStart();
-	WeaponsHatVisibility_OnPluginStart();
-	LoadTranslations("weapons.phrases");
-	LoadTranslations("common.phrases");
-	LoadTranslations("core.phrases");
-	
-	GameData hGameConf = new GameData("weapons");
-	if (!hGameConf) {
-		SetFailState("Failed to load gamedata (weapons.txt).");
-	}
-	
-	Handle dtGetLoadoutItem = DHookCreateFromConf(hGameConf, "CTFPlayer::GetLoadoutItem()");
-	DHookEnableDetour(dtGetLoadoutItem, false, OnGetLoadoutItemPre);
-	DHookEnableDetour(dtGetLoadoutItem, true, OnGetLoadoutItemPost);
-	
-	Handle dtManageRegularWeapons = DHookCreateFromConf(hGameConf, "CTFPlayer::ManageRegularWeapons()");
-	if (!dtManageRegularWeapons) {
-		SetFailState("Failed to create detour %s", "CTFPlayer::ManageRegularWeapons()");
-	}
-	DHookEnableDetour(dtManageRegularWeapons, false, OnManageRegularWeaponsPre);
-	DHookEnableDetour(dtManageRegularWeapons, true, OnManageRegularWeaponsPost);
-	
-	WeaponsGameplay_OnPluginStart(hGameConf);
-	WeaponsSound_OnPluginStart(hGameConf);
-	delete hGameConf;
-	
-	HookUserMessage(GetUserMessageId("PlayerLoadoutUpdated"), OnPlayerLoadoutUpdated,
-			.post = OnPlayerLoadoutUpdatedPost);
-	
-	CreateVersionConVar("sm_weapons_version", "Unified weapons plugin version.");
-	
-	sm_weapons_enable_loadout = CreateConVar("sm_weapons_enable_loadout", "1",
-			"Allows players to receive custom items they have selected.");
-	sm_weapons_statistics = CreateConVar("sm_weapons_statistics", "1",
-			"Record custom weapons equip/unequip popularity statistics.", _, true, 0.0, true, 1.0);
-	sm_weapons_statistics_database = CreateConVar("sm_weapons_statistics_database",
-			WEAPONS_STATS_DB_CONFIG_DEFAULT,
-			"Database config used for custom weapon popularity statistics.");
-	sm_weapons_validate_debug = CreateConVar("sm_weapons_validate_debug", "0",
-			"Log m_bValidatedAttachedEntity state after custom item creation and equip.",
-			_, true, 0.0, true, 1.0);
-	sm_weapons_validate_repair = CreateConVar("sm_weapons_validate_repair", "1",
-			"Re-assert m_bValidatedAttachedEntity if TF2 clears it after attachment.",
-			_, true, 0.0, true, 1.0);
-	sm_weapons_hide_reskin_only = CreateConVar("sm_weapons_hide_reskin_only", "1",
-			"Hide reskin-only weapons from sm_c descriptions.", _, true, 0.0, true, 1.0);
-	sm_weapons_statistics.AddChangeHook(OnWeaponsStatisticsEnabledChanged);
-	sm_weapons_statistics_database.AddChangeHook(OnWeaponsStatisticsDatabaseChanged);
-	ConnectWeaponsStatisticsDatabase();
-	g_hOnItemRuntimeStateReady = CreateGlobalForward("Weapons_OnItemRuntimeStateReady",
-		ET_Ignore, Param_Cell, Param_Cell);
-	
-	RegAdminCmd("sm_weapons_export", ExportActiveWeapon, ADMFLAG_ROOT);
-	
-	// player commands
-	RegAdminCmd("sm_cw", DisplayItems, 0);
-	RegAdminCmd("sm_cwc", DisplayItems, 0);
-	RegAdminCmd("sm_cwx", DisplayItems, 0);
-	RegAdminCmd("sm_items", DisplayItems, 0);
-	RegAdminCmd("sm_weapons", DisplayItems, 0);
-	RegAdminCmd("sm_weapon", DisplayItems, 0);
-	RegAdminCmd("sm_custom", DisplayItems, 0);
-	RegAdminCmd("sm_customweapons", DisplayItems, 0);
-	RegAdminCmd("sm_weps", DisplayItems, 0);
-	RegAdminCmd("sm_equip", DisplayItems, 0);
-	RegAdminCmd("sm_c", DisplayItemDescriptions, 0);
-	RegAdminCmd("sm_cp", DisplayItemDescriptions, 0);
-	RegAdminCmd("sm_c2", DisplayItemDescriptions, 0);
-	AddCommandListener(DisplayItemsCompat, "sm_cus");
-	
-	mp_stalemate_meleeonly = FindConVar("mp_stalemate_meleeonly");
-	
-	// TODO: I'd like to use a separate, independent database for this
-	// but leveraging the cookie system is easier for now
-	char cookieName[64], cookieDesc[128];
-	for (int c; c < NUM_PLAYER_CLASSES; c++) {
-		for (int i; i < NUM_ITEMS; i++) {
-			FormatEx(cookieName, sizeof(cookieName), "cwx_loadout_%d_%d", c, i);
-			FormatEx(cookieDesc, sizeof(cookieDesc),
-					"Weapons loadout entry for class %d in slot %d", c, i);
-			g_ItemPersistCookies[c][i] = new Cookie(cookieName, cookieDesc,
-					CookieAccess_Private);
-		}
-	}
-	
-	for (int i = 1; i <= MaxClients; i++) {
-		if (!IsClientConnected(i)) {
-			continue;
-		}
-		OnClientConnected(i);
-		
-		if (IsClientAuthorized(i)) {
-			FetchLoadoutItems(i);
-		}
-	}
-
-	WeaponsModels_OnPluginStart();
-	LoadWeaponsConfig();
-	WeaponsCommands_OnPluginStart();
-	WeaponsEquipCommands_OnPluginStart();
-}
-
-public void OnPluginEnd() {
-	CustomHats_OnPluginEnd();
-	WeaponsGameplay_OnPluginEnd();
-	WeaponsModels_OnPluginEnd();
-	WeaponsSound_OnPluginEnd();
-	Db_CancelTimer(g_hWeaponsStatsDbReconnectTimer);
-	Db_Close(g_WeaponsStatsDb, g_WeaponsStatsDbReady);
-	delete g_hOnItemRuntimeStateReady;
-	WeaponsConfig_Close();
-	WeaponsCustomAttributes_OnPluginEnd();
-}
-
-public void OnConfigsExecuted() {
-	WeaponsMovement_OnConfigsExecuted();
-	CustomHats_OnConfigsExecuted();
-}
-
-void Weapons_NotifyItemRuntimeStateReady(int client, int entity) {
-	if (!IsClientInGame(client) || !IsValidEntity(entity)) {
-		return;
-	}
-
-	Weapons_ApplyEngineOverrides(entity);
-	WeaponsMovement_OnItemRuntimeStateReady(client, entity);
-	WeaponsModels_OnItemRuntimeStateReady(client, entity);
-	WeaponsSound_OnItemRuntimeStateReady(client, entity);
-	WeaponsGameplay_OnItemRuntimeStateReady(client, entity);
-
-	if (g_hOnItemRuntimeStateReady == null) {
-		return;
-	}
-
-	Call_StartForward(g_hOnItemRuntimeStateReady);
-	Call_PushCell(client);
-	Call_PushCell(entity);
-	Call_Finish();
-}
-
-public void OnAllPluginsLoaded() {
-	BuildLoadoutSlotMenu();
-	
-	g_attrdef_AllowedInMedievalMode =
-			TF2Econ_TranslateAttributeNameToDefinitionIndex("allowed in medieval mode");
-}
-
-public void OnLibraryAdded(const char[] name) {
-	CustomHats_OnLibraryAdded(name);
-}
-
-public void OnLibraryRemoved(const char[] name) {
-	CustomHats_OnLibraryRemoved(name);
-}
-
-Action DisplayItemDescriptions(int client, int argc) {
-	if (!client || !IsClientInGame(client)) {
-		return Plugin_Handled;
-	}
-
-	int playerClass = view_as<int>(TF2_GetPlayerClass(client));
-	if (!playerClass) {
-		return Plugin_Handled;
-	}
-
-	StringMap printedDescriptions = new StringMap();
-	StringMapSnapshot itemList = GetCustomItemList();
-
-	for (int i; i < itemList.Length; i++) {
-		char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-		itemList.GetKey(i, uid, sizeof(uid));
-
-		CustomItemDefinition item;
-		if (!GetCustomItemDefinition(uid, item)) {
-			continue;
-		}
-
-		if (item.loadoutPosition[playerClass] == -1) {
-			continue;
-		}
-
-		if (sm_weapons_hide_reskin_only.BoolValue && item.reskinOnly) {
-			continue;
-		}
-
-		char description[MAX_ITEM_DESCRIPTION_LENGTH * 3];
-		bool hasDescription = FormatItemDescription(item, description, sizeof(description));
-
-		char dedupeKey[MAX_ITEM_DESCRIPTION_LENGTH * 3];
-		strcopy(dedupeKey, sizeof(dedupeKey), description);
-		if (!hasDescription) {
-			strcopy(dedupeKey, sizeof(dedupeKey), uid);
-		}
-
-		if (printedDescriptions.ContainsKey(dedupeKey)) {
-			continue;
-		}
-		printedDescriptions.SetValue(dedupeKey, 1);
-
-		if (hasDescription) {
-			CPrintToChat(client, "%s", description);
-		} else {
-			CPrintToChat(client, "{gold}[Weapons]{default} This weapon has no set description.");
-		}
-	}
-
-	delete itemList;
-	delete printedDescriptions;
-	return Plugin_Handled;
-}
-
-bool FormatItemDescription(const CustomItemDefinition item, char[] buffer, int maxlen) {
-	buffer[0] = '\0';
-
-	bool hasPositive = item.descriptionPositive[0] != '\0';
-	bool hasNeutral = item.descriptionNeutral[0] != '\0';
-	bool hasNegative = item.descriptionNegative[0] != '\0';
-	if (!hasPositive && !hasNeutral && !hasNegative) {
-		return false;
-	}
-
-	Format(buffer, maxlen, "{gold}%s{default}:", item.displayName);
-	bool needsComma = false;
-
-	if (hasPositive) {
-		AppendItemDescriptionPart(buffer, maxlen, "{green}", item.descriptionPositive, needsComma);
-	}
-	if (hasNeutral) {
-		AppendItemDescriptionPart(buffer, maxlen, "{default}", item.descriptionNeutral, needsComma);
-	}
-	if (hasNegative) {
-		AppendItemDescriptionPart(buffer, maxlen, "{red}", item.descriptionNegative, needsComma);
-	}
-	return true;
-}
-
-void AppendItemDescriptionPart(char[] buffer, int maxlen, const char[] color, const char[] text, bool &needsComma) {
-	if (needsComma) {
-		StrCat(buffer, maxlen, ",");
-	}
-	StrCat(buffer, maxlen, " ");
-	StrCat(buffer, maxlen, color);
-	StrCat(buffer, maxlen, text);
-	needsComma = true;
-}
-
-public void OnMapStart() {
-	WeaponsMovement_OnMapStart();
-	WeaponsCustomAttributes_OnMapStart();
-	WeaponsModels_OnMapStart();
-	CustomHats_OnMapStart();
-	LoadWeaponsConfig();
-	PrecacheMenuResources();
-	WeaponsGameplay_OnMapStart();
-}
-
-public void OnMapEnd() {
-	WeaponsMovement_OnMapEnd();
-	WeaponsSound_Clear();
-	WeaponsGameplay_OnMapEnd();
-	WeaponsCustomAttributes_OnMapEnd();
-}
-
-public void OnClientPutInServer(int client) {
-	WeaponsMovement_OnClientPutInServer(client);
-	WeaponsSound_ResetClient(client, true);
-	WeaponsModels_OnClientPutInServer(client);
-	WeaponsGameplay_OnClientPutInServer(client);
-	CustomHats_OnClientPutInServer(client);
-	WeaponsHatVisibility_OnClientPutInServer(client);
-}
-
-public void OnClientDisconnect(int client) {
-	CustomHats_OnClientDisconnect(client);
-	WeaponsHatVisibility_OnClientDisconnect(client);
-	WeaponsMovement_OnClientDisconnect(client);
-	WeaponsWhitelist_OnClientDisconnect(client);
-	WeaponsSound_ResetClient(client, true);
-	WeaponsModels_OnClientDisconnect(client);
-	WeaponsGameplay_OnClientDisconnect(client);
-}
-
-void Weapons_OnWeaponSwitchPost(int client, int weapon) {
-	Plasma_OnWeaponSwitchPost(client);
-	WeaponsMovement_OnWeaponSwitchPost(client, weapon);
-	WeaponsSound_OnWeaponSwitchPost(client, weapon);
-	WeaponsModels_OnWeaponSwitchPost(client, weapon);
-}
-
-public void OnEntityCreated(int entity, const char[] className) {
-	WeaponsCustomAttributes_OnEntityCreated(entity);
-	WeaponsSound_OnEntityCreated(entity, className);
-	WeaponsModels_OnEntityCreated(entity, className);
-	WeaponsGameplay_OnEntityCreated(entity, className);
-	WeaponsHatVisibility_OnEntityCreated(entity, className);
-}
-
-public void TF2_OnConditionRemoved(int client, TFCond condition) {
-	WeaponsModels_OnConditionRemoved(client, condition);
-	WeaponsGameplay_OnConditionRemoved(client, condition);
-}
-
-/**
- * Clear out per-client inventory from previous player.
- */
-public void OnClientConnected(int client) {
-	g_bRetrievedLoadout[client] = false;
-	for (int c; c < NUM_PLAYER_CLASSES; c++) {
-		for (int i; i < NUM_ITEMS; i++) {
-			g_CurrentLoadout[client][c][i].Clear(.initialize = true);
-		}
-	}
-	CustomHats_OnClientConnected(client);
-}
-
-public void OnClientAuthorized(int client, const char[] auth) {
-	FetchLoadoutItems(client);
-}
-
-/**
- * Called when we know our client is valid.  Retrieve our loadout from our storage backend.
- * 
- * `g_bRetrievedLoadout[client]` should be set once our loadout is retrieved, which may happen
- * asynchronously.
- */
-void FetchLoadoutItems(int client) {
-	if (AreClientCookiesCached(client)) {
-		OnClientCookiesCached(client);
-	}
-}
-
-public void OnClientCookiesCached(int client) {
-	CustomHats_OnClientCookiesCached(client);
-	WeaponsHatVisibility_OnClientCookiesCached(client);
-	bool wasRetrieved = g_bRetrievedLoadout[client];
-
-	for (int c; c < NUM_PLAYER_CLASSES; c++) {
-		for (int i; i < NUM_ITEMS; i++) {
-			g_ItemPersistCookies[c][i].Get(client, g_CurrentLoadout[client][c][i].uid,
-					sizeof(g_CurrentLoadout[][][].uid));
-		}
-	}
-	g_bRetrievedLoadout[client] = true;
-	WeaponsStats_MirrorClientSavedLoadout(client);
-
-	/*
-	 * Clientprefs can finish after the first PlayerLoadoutUpdated message.  In that
-	 * case the initial equip pass saw an empty loadout and no later pass occurs until
-	 * a class change / regeneration.  Apply the newly retrieved loadout next frame.
-	 */
-	if (!wasRetrieved && IsClientInGame(client)) {
-		RequestFrame(Frame_ApplyRetrievedLoadout, GetClientUserId(client));
-	}
-}
-
-void Frame_ApplyRetrievedLoadout(any userid) {
-	int client = GetClientOfUserId(userid);
-	if (!client || !IsClientInGame(client) || !IsPlayerAlive(client)
-			|| !g_bRetrievedLoadout[client]) {
-		return;
-	}
-
-	int playerClass = view_as<int>(TF2_GetPlayerClass(client));
-	if (playerClass <= 0 || playerClass >= NUM_PLAYER_CLASSES) {
-		return;
-	}
-
-	ApplyClientCustomLoadout(client);
-}
-
-// int Weapons_EquipPlayerItem(int client, const char[] uid);
-int Native_EquipPlayerItem(Handle plugin, int argc) {
-	int client = GetNativeCell(1);
-	
-	char itemuid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(2, itemuid, sizeof(itemuid));
-	
-	CustomItemDefinition item;
-	if (!GetCustomItemDefinition(itemuid, item)) {
-		return INVALID_ENT_REFERENCE;
-	}
-	
-	int itemEntity = EquipCustomItem(client, item);
-	return IsValidEntity(itemEntity)? EntIndexToEntRef(itemEntity) : INVALID_ENT_REFERENCE;
-}
-
-// bool Weapons_CanPlayerAccessItem(int client, const char[] uid);
-int Native_CanPlayerAccessItem(Handle plugin, int argc) {
-	int client = GetNativeCell(1);
-	
-	char itemuid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(2, itemuid, sizeof(itemuid));
-	
-	CustomItemDefinition item;
-	if (!GetCustomItemDefinition(itemuid, item)) {
-		return false;
-	}
-	return CanPlayerAccessItem(client, item);
-}
-
-// ArrayList Weapons_GetItemList(WeaponsItemFilterCriteria func = INVALID_FUNCTION, any data = 0);
-int Native_GetItemList(Handle plugin, int argc) {
-	Function func = GetNativeFunction(1);
-	any data = GetNativeCell(2);
-	
-	StringMapSnapshot itemSnapshot = GetCustomItemList();
-	
-	ArrayList itemList = new ArrayList(ByteCountToCells(MAX_ITEM_IDENTIFIER_LENGTH));
-	for (int i, n = itemSnapshot.Length; i < n; i++) {
-		char itemuid[MAX_ITEM_IDENTIFIER_LENGTH];
-		itemSnapshot.GetKey(i, itemuid, sizeof(itemuid));
-		
-		if (func == INVALID_FUNCTION) {
-			itemList.PushString(itemuid);
-			continue;
-		}
-		
-		bool result;
-		Call_StartFunction(plugin, func);
-		Call_PushString(itemuid);
-		Call_PushCell(data);
-		Call_Finish(result);
-		
-		if (result) {
-			itemList.PushString(itemuid);
-		}
-	}
-	delete itemSnapshot;
-	
-	return MoveHandle(itemList, plugin);
-}
-
-// bool Weapons_IsItemUIDValid(const char[] uid);
-int Native_IsItemUIDValid(Handle plugin, int argc) {
-	char itemuid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(1, itemuid, sizeof(itemuid));
-	
-	CustomItemDefinition item;
-	return GetCustomItemDefinition(itemuid, item);
-}
-
-// bool Weapons_GetItemUIDFromEntity(int entity, char[] buffer, int maxlen);
-int Native_GetItemUIDFromEntity(Handle plugin, int argc) {
-	int entity = GetNativeCell(1);
-	
-	if (!IsValidEntity(entity) || !HasEntProp(entity, Prop_Send, "m_AttributeList")) {
-		ThrowNativeError(SP_ERROR_NATIVE, "Entity %d is invalid or not an item", entity);
-		return false;
-	}
-	
-	// only pull the value from the runtime attribute list
-	Address result = TF2Attrib_GetByName(entity, ATTRIB_NAME_CUSTOM_UID);
-	if (!result) {
-		return false;
-	}
-	
-	any rawValue = TF2Attrib_GetValue(result);
-	
-	int maxlen = GetNativeCell(3);
-	char[] buffer = new char[maxlen];
-	
-	TF2Attrib_UnsafeGetStringValue(rawValue, buffer, maxlen);
-	
-	if (strcmp(buffer, "") == 0) {
-		return false;
-	}
-	
-	SetNativeString(2, buffer, maxlen);
-	return true;
-}
-
-// int Weapons_GetItemLoadoutSlot(const char[] uid, TFClassType playerClass);
-int Native_GetItemLoadoutSlot(Handle plugin, int argc) {
-	char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(1, uid, sizeof(uid));
-	int playerClass = GetNativeCell(2);
-	
-	CustomItemDefinition customItem;
-	if (!GetCustomItemDefinition(uid, customItem)) {
-		return -1;
-	}
-	return customItem.loadoutPosition[playerClass];
-}
-
-// bool Weapons_GetItemDisplayName(const char[] uid, char[] buffer, int maxlen);
-int Native_GetItemDisplayName(Handle plugin, int argc) {
-	char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(1, uid, sizeof(uid));
-
-	CustomItemDefinition customItem;
-	if (!GetCustomItemDefinition(uid, customItem) || !customItem.displayName[0]) {
-		return false;
-	}
-
-	SetNativeString(2, customItem.displayName, GetNativeCell(3), true);
-	return true;
-}
-
-// bool Weapons_IsItemReskinOnly(const char[] uid);
-int Native_IsItemReskinOnly(Handle plugin, int argc) {
-	char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(1, uid, sizeof(uid));
-
-	CustomItemDefinition customItem;
-	return GetCustomItemDefinition(uid, customItem) && customItem.reskinOnly;
-}
-
-// optional<KeyValues> Weapons_GetItemExtData(const char[] uid, const char[] section);
-int Native_GetItemExtData(Handle plugin, int argc) {
-	char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-	char sectionName[64];
-	
-	GetNativeString(1, uid, sizeof(uid));
-	GetNativeString(2, sectionName, sizeof(sectionName));
-	
-	CustomItemDefinition customItem;
-	if (!GetCustomItemDefinition(uid, customItem)) {
-		return 0;
-	}
-	
-	KeyValues result = customItem.GetExtData(sectionName);
-	return result? MoveHandle(result, plugin) : 0;
-}
-
-int s_LastUpdatedClient;
-
-/**
- * Called once the game has updated the player's loadout with all the weapons it wanted, but
- * before the post_inventory_application event is fired.
- * 
- * As other plugins may send usermessages in response to our equip events, we have to wait until
- * after the usermessage is sent before we can run our own logic.  We don't have access to the
- * usermessage itself in post, so this function simply grabs the info it needs.
- */
-Action OnPlayerLoadoutUpdated(UserMsg msg_id, BfRead msg, const int[] players,
-		int playersNum, bool reliable, bool init) {
-	int client = msg.ReadByte();
-	s_LastUpdatedClient = GetClientSerial(client);
-	return Plugin_Continue;
-}
-
-/**
- * Called once the game has updated the player's loadout with all the weapons it wanted, but
- * before the post_inventory_application event is fired.
- * 
- * This is the point where we check our custom loadout settings, then create our items if
- * necessary (because persistence is implemented, the player may already have our custom items,
- * and we keep track of them so we don't unnecessarily reequip them).
- */
-void OnPlayerLoadoutUpdatedPost(UserMsg msg_id, bool sent) {
-	int client = GetClientFromSerial(s_LastUpdatedClient);
-	ApplyClientCustomLoadout(client);
-}
-
-/**
- * Equips the configured custom loadout for the client's current class.
- * Called both after the normal TF2 loadout update and after an asynchronous
- * clientprefs load completes too late for that update.
- */
-void ApplyClientCustomLoadout(int client) {
-	if (!sm_weapons_enable_loadout.BoolValue || client <= 0 || client > MaxClients
-			|| !IsClientInGame(client)) {
-		return;
-	}
-
-	int playerClass = view_as<int>(TF2_GetPlayerClass(client));
-	if (playerClass <= 0 || playerClass >= NUM_PLAYER_CLASSES) {
-		return;
-	}
-
-	for (int i; i < NUM_ITEMS; i++) {
-		if (g_CurrentLoadout[client][playerClass][i].IsEmpty()) {
-			// no item specified, use default
-			continue;
-		}
-		
-		CustomItemDefinition item;
-		if (!g_CurrentLoadout[client][playerClass][i].GetItemDefinition(item)) {
-			continue;
-		}
-
-		// equip our item if it isn't already equipped, or if it's being killed
-		// the latter applies to items that are normally invalid for the class
-		int currentLoadoutItem = EntRefToEntIndex(g_CurrentLoadout[client][playerClass][i].entity);
-		if (g_bForceReequipItems[client]
-				|| currentLoadoutItem == INVALID_ENT_REFERENCE
-				|| !IsValidEntity(currentLoadoutItem)
-				|| GetEntityFlags(currentLoadoutItem) & FL_KILLME) {
-			if (!CanPlayerEquipItem(client, item)) {
-				continue;
-			}
-			
-			if (!IsCustomItemAllowed(client, item)) {
-				continue;
-			}
-			
-			int entity = EquipCustomItem(client, item);
-			Weapons_MarkValidatedAttachedEntity(entity, client, "loadout_apply");
-			
-			g_CurrentLoadout[client][playerClass][i].entity = EntIndexToEntRef(entity);
-		} else {
-			/*
-			 * TF2 can retain the entity through regeneration while clearing part of
-			 * its runtime attribute list. Entref validity alone is not a sufficient
-			 * loadout health check.
-			 */
-			EnsureCustomItemRuntimeAttributes(currentLoadoutItem, item, client,
-				"persisted_loadout");
-			Weapons_MarkValidatedAttachedEntity(currentLoadoutItem, client,
-				"persisted_loadout");
-			Weapons_NotifyItemRuntimeStateReady(client, currentLoadoutItem);
-		}
-	}
-
-	WeaponsGameplay_QueueWearerAttributeRefresh(client);
-	
-	// TODO: switch to the correct slot if we're not holding anything
-	// as is the case again, this happens on non-valid-for-class items
-}
-
-/**
- * Called when the game wants to know what item the player has in a specific class / slot.  This
- * only happens when the game is regenerating the player (resupply, spawn).  This hook
- * intercepts the result and returns one of the following:
- * 
- * - the player's inventory item view, if we are not overriding it ourselves (no change)
- * - the spawned entity's item view, if our override item exists; this will prevent our custom
- *   item from being invalidated when we touch resupply
- * - an uninitialized item view, if our override item does not exist; the game will skip adding
- *   a weapon in that slot, and we can then spawn our own item later
- * 
- * The game expects there to be a valid CEconItemView pointer in certain areas of the code, so
- * avoid returning a nullptr.
- */
-MRESReturn OnGetLoadoutItemPre(int client, DHookReturn hReturn, DHookParam hParams) {
-    return WeaponsWhitelist_OnGetLoadoutItemPre(client, hReturn, hParams);
-}
-
-MRESReturn OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams) {
-    MRESReturn whitelistResult = WeaponsWhitelist_ApplyLoadoutRule(client, hReturn, hParams);
-    if (whitelistResult == MRES_Supercede) {
-        return whitelistResult;
+public void OnPluginStart()
+{
+    WeaponsCustomAttributes_OnPluginStart();
+    WeaponsWhitelist_OnPluginStart();
+    WeaponsMovement_OnPluginStart();
+    CustomHats_OnPluginStart();
+    WeaponsHatVisibility_OnPluginStart();
+    LoadTranslations("weapons.phrases");
+    LoadTranslations("common.phrases");
+    LoadTranslations("core.phrases");
+    GameData gameConf = new GameData("weapons");
+    if (gameConf == null)
+    {
+        SetFailState("Failed to load gamedata (weapons.txt).");
     }
-
-	if (!sm_weapons_enable_loadout.BoolValue) {
-		return MRES_Ignored;
-	}
-	
-	int playerClass = hParams.Get(1);
-	int loadoutSlot = hParams.Get(2);
-	
-	if (loadoutSlot < 0 || loadoutSlot >= NUM_ITEMS) {
-		return MRES_Ignored;
-	}
-	
-	int storedItemRef = g_CurrentLoadout[client][playerClass][loadoutSlot].entity;
-	int storedItem = EntRefToEntIndex(storedItemRef);
-	
-	if (!g_CurrentLoadout[client][playerClass][loadoutSlot].IsEmpty()) {
-		CustomItemDefinition item;
-		if (!g_CurrentLoadout[client][playerClass][loadoutSlot].GetItemDefinition(item)
-				|| !CanPlayerEquipItemForClass(client, playerClass, item)) {
-			if (storedItem != INVALID_ENT_REFERENCE && IsValidEntity(storedItem)) {
-				RemoveEntity(storedItem);
-				g_CurrentLoadout[client][playerClass][loadoutSlot].entity = INVALID_ENT_REFERENCE;
-			}
-			return MRES_Ignored;
-		}
-	}
-	
-	if (storedItem == INVALID_ENT_REFERENCE || !IsValidEntity(storedItem) || GetEntityFlags(storedItem) & FL_KILLME
-			|| !HasEntProp(storedItem, Prop_Send, "m_Item")) {
-		// the loadout entity we keep track of isn't valid, so we may need to make one
-		// we expect to have to equip something new at this point
-		
-		if (g_CurrentLoadout[client][playerClass][loadoutSlot].IsEmpty()) {
-			// we don't have nor want a custom item; let the game process it
-			return MRES_Ignored;
-		}
-		
-		/**
-		 * We have a custom item we'd like to spawn in; don't return a loadout item, otherwise
-		 * we may equip / unequip a user's inventory weapon that has side effects
-		 * (e.g. Gunslinger).
-		 * 
-		 * We'll initialize our custom item later in `OnPlayerLoadoutUpdated`.
-		 */
-		static int s_DefaultItem = INVALID_ENT_REFERENCE;
-		storedItem = EntRefToEntIndex(s_DefaultItem);
-		if (storedItem == INVALID_ENT_REFERENCE || !IsValidEntity(storedItem)) {
-			storedItem = TF2_SpawnWearable();
-			s_DefaultItem = EntIndexToEntRef(storedItem);
-			RemoveEntity(storedItem); // (this is OK, RemoveEntity doesn't act immediately)
-		}
-	}
-	
-	Address pStoredItemView = GetEntityAddress(storedItem)
-			+ view_as<Address>(GetEntSendPropOffs(storedItem, "m_Item", true));
-	
-	hReturn.Value = pStoredItemView;
-	return MRES_Supercede;
+    Handle getLoadout = DHookCreateFromConf(gameConf, "CTFPlayer::GetLoadoutItem()");
+    Handle manageWeapons = DHookCreateFromConf(gameConf, "CTFPlayer::ManageRegularWeapons()");
+    if (getLoadout == null || manageWeapons == null)
+    {
+        delete gameConf;
+        SetFailState("Failed to create required weapon loadout detours.");
+    }
+    DHookEnableDetour(getLoadout, false, OnGetLoadoutItemPre);
+    DHookEnableDetour(getLoadout, true, OnGetLoadoutItemPost);
+    DHookEnableDetour(manageWeapons, false, OnManageRegularWeaponsPre);
+    DHookEnableDetour(manageWeapons, true, OnManageRegularWeaponsPost);
+    WeaponsGameplay_OnPluginStart(gameConf);
+    WeaponsSound_OnPluginStart(gameConf);
+    delete gameConf;
+    HookUserMessage(GetUserMessageId("PlayerLoadoutUpdated"), OnPlayerLoadoutUpdated,
+        .post = OnPlayerLoadoutUpdatedPost);
+    CreateVersionConVar("sm_weapons_version", "Unified weapons plugin version.");
+    sm_weapons_enable_loadout = CreateConVar("sm_weapons_enable_loadout", "1", "Allows players to receive custom items they have selected.");
+    sm_weapons_statistics = CreateConVar("sm_weapons_statistics", "1", "Record custom weapons equip/unequip popularity statistics.", _, true, 0.0, true, 1.0);
+    sm_weapons_statistics_database = CreateConVar("sm_weapons_statistics_database", WEAPONS_STATS_DB_CONFIG_DEFAULT, "Database config used for custom weapon popularity statistics.");
+    sm_weapons_validate_debug = CreateConVar("sm_weapons_validate_debug", "0", "Log m_bValidatedAttachedEntity state after custom item creation and equip.", _, true, 0.0, true, 1.0);
+    sm_weapons_validate_repair = CreateConVar("sm_weapons_validate_repair", "1", "Re-assert m_bValidatedAttachedEntity if TF2 clears it after attachment.", _, true, 0.0, true, 1.0);
+    sm_weapons_hide_reskin_only = CreateConVar("sm_weapons_hide_reskin_only", "1", "Hide reskin-only weapons from sm_c descriptions.", _, true, 0.0, true, 1.0);
+    sm_weapons_statistics.AddChangeHook(OnWeaponsStatisticsEnabledChanged);
+    sm_weapons_statistics_database.AddChangeHook(OnWeaponsStatisticsDatabaseChanged);
+    ConnectWeaponsStatisticsDatabase();
+    g_hOnItemRuntimeStateReady = CreateGlobalForward("Weapons_OnItemRuntimeStateReady", ET_Ignore, Param_Cell, Param_Cell);
+    RegAdminCmd("sm_weapons_export", ExportActiveWeapon, ADMFLAG_ROOT);
+    RegAdminCmd("sm_cw", DisplayItems, 0);
+    RegAdminCmd("sm_cwc", DisplayItems, 0);
+    RegAdminCmd("sm_cwx", DisplayItems, 0);
+    RegAdminCmd("sm_items", DisplayItems, 0);
+    RegAdminCmd("sm_weapons", DisplayItems, 0);
+    RegAdminCmd("sm_weapon", DisplayItems, 0);
+    RegAdminCmd("sm_custom", DisplayItems, 0);
+    RegAdminCmd("sm_customweapons", DisplayItems, 0);
+    RegAdminCmd("sm_weps", DisplayItems, 0);
+    RegAdminCmd("sm_equip", DisplayItems, 0);
+    RegAdminCmd("sm_c", DisplayItemDescriptions, 0);
+    RegAdminCmd("sm_cp", DisplayItemDescriptions, 0);
+    RegAdminCmd("sm_c2", DisplayItemDescriptions, 0);
+    AddCommandListener(DisplayItemsCompat, "sm_cus");
+    mp_stalemate_meleeonly = FindConVar("mp_stalemate_meleeonly");
+    char cookieName[64], cookieDesc[128];
+    for (int playerClass = 0; playerClass < NUM_PLAYER_CLASSES; playerClass++)
+    {
+        for (int slot = 0; slot < NUM_ITEMS; slot++)
+        {
+            FormatEx(cookieName, sizeof(cookieName), "cwx_loadout_%d_%d", playerClass, slot);
+            FormatEx(cookieDesc, sizeof(cookieDesc), "Weapons loadout entry for class %d in slot %d", playerClass, slot);
+            g_ItemPersistCookies[playerClass][slot] = new Cookie(cookieName, cookieDesc, CookieAccess_Private);
+        }
+    }
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientConnected(client))
+        {
+            continue;
+        }
+        OnClientConnected(client);
+        if (IsClientAuthorized(client))
+        {
+            FetchLoadoutItems(client);
+        }
+    }
+    WeaponsModels_OnPluginStart();
+    LoadWeaponsConfig();
+    WeaponsCommands_OnPluginStart();
+    WeaponsEquipCommands_OnPluginStart();
 }
 
-/**
- * Intercept ManageRegularWeapons to trick the game into thinking the weapons we have are valid
- * for that class, so they don't get removed.
- */
-MRESReturn OnManageRegularWeaponsPre(int client, Handle hParams) {
-	TFClassType playerClass = TF2_GetPlayerClass(client);
-	for (int s; s < NUM_ITEMS; s++) {
-		int storedItem = EntRefToEntIndex(g_CurrentLoadout[client][playerClass][s].entity);
-		if (storedItem == INVALID_ENT_REFERENCE || !IsValidEntity(storedItem)) {
-			continue;
-		}
-		
-		int validitemdef = FindBaseItem(playerClass, s);
-		if (validitemdef == TF_ITEMDEF_DEFAULT) {
-			continue;
-		}
-		
-		int currentitemdef = GetEntProp(storedItem, Prop_Send, "m_iItemDefinitionIndex");
-		if (TF2Econ_GetItemLoadoutSlot(currentitemdef, playerClass) != -1) {
-			// only replace the itemdef if the existing one is not valid for the class
-			// this is because something something static attribute retention
-			
-			// we should probably just drop support for invalid weapons at this point;
-			// it's starting to be a headache to manage
-			continue;
-		}
-		
-		// replace the itemdef and classname with ones actually valid for that class to skirt
-		// around the ValidateWeapons checks
-		char classname[64];
-		TF2Econ_GetItemClassName(validitemdef, classname, sizeof(classname));
-		
-		// we need to translate the item class because base shotguns use 'tf_weapon_shotgun'
-		TF2Econ_TranslateWeaponEntForClass(classname, sizeof(classname), playerClass);
-		
-		SetEntProp(storedItem, Prop_Send, "m_iItemDefinitionIndex", validitemdef);
-		SetEntPropString(storedItem, Prop_Data, "m_iClassname", classname);
-	}
-	return MRES_Ignored;
+public void OnPluginEnd()
+{
+    CustomHats_OnPluginEnd();
+    WeaponsGameplay_OnPluginEnd();
+    WeaponsModels_OnPluginEnd();
+    WeaponsSound_OnPluginEnd();
+    WeaponsStats_StopConnection();
+    delete g_hOnItemRuntimeStateReady;
+    WeaponsConfig_Close();
+    WeaponsCustomAttributes_OnPluginEnd();
+    delete g_WeaponsItemMetadataOffsets;
 }
 
-/**
- * For every custom item in our loadout, reapply the correct defindex / classname.
- */
-MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams) {
-	TFClassType playerClass = TF2_GetPlayerClass(client);
-	for (int s; s < NUM_ITEMS; s++) {
-		int storedItem = EntRefToEntIndex(g_CurrentLoadout[client][playerClass][s].entity);
-		if (storedItem == INVALID_ENT_REFERENCE || !IsValidEntity(storedItem)) {
-			continue;
-		}
-		
-		CustomItemDefinition item;
-		if (!g_CurrentLoadout[client][playerClass][s].GetItemDefinition(item)) {
-			continue;
-		}
-		
-		// have to resolve the classname since, y'know, multiclass.
-		char realClassName[64];
-		strcopy(realClassName, sizeof(realClassName), item.className);
-		TF2Econ_TranslateWeaponEntForClass(realClassName, sizeof(realClassName), playerClass);
-		
-		SetEntProp(storedItem, Prop_Send, "m_iItemDefinitionIndex", item.defindex);
-		SetEntPropString(storedItem, Prop_Data, "m_iClassname", realClassName);
-		Weapons_MarkValidatedAttachedEntity(storedItem, client, "manage_regular_weapons");
-	}
-	return MRES_Ignored;
+public void OnConfigsExecuted()
+{
+    WeaponsMovement_OnConfigsExecuted();
+    CustomHats_OnConfigsExecuted();
 }
 
-/**
- * Handles a special case where the player is refunding all of their upgrades, which may stomp
- * on any existing runtime attributes applied to our weapon.
- */
-public Action OnClientCommandKeyValues(int client, KeyValues kv) {
-	char cmd[64];
-	kv.GetSectionName(cmd, sizeof(cmd));
-	
-	/**
-	 * Mark the player to always invalidate our items so they get reequipped during respawn --
-	 * this is fine since TF2 manages to reapply upgrades to plugin-granted items.
-	 * 
-	 * The player gets their loadout changed multiple times during respec so we can't just
-	 * invalidate the reference in LoadoutEntry.entity (since it'll be valid after the first
-	 * change).
-	 * 
-	 * Hopefully nobody's blocking "MVM_Respec", because that would leave this flag set.
-	 * Otherwise we should be able to hook CUpgrades::GrantOrRemoveAllUpgrades() directly,
-	 * though that incurs a gamedata burden.
-	 */
-	if (StrEqual(cmd, "MVM_Respec")) {
-		g_bForceReequipItems[client] = true;
-	}
+void Weapons_NotifyItemRuntimeStateReady(int client, int entity)
+{
+    if (!Weapons_IsValidClient(client) || entity <= MaxClients || !IsValidEntity(entity))
+    {
+        return;
+    }
+    int serial = GetClientSerial(client);
+    int ref = EntIndexToEntRef(entity);
+    Weapons_ApplyEngineOverrides(entity);
+    if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    WeaponsMovement_OnItemRuntimeStateReady(client, entity);
+    if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    WeaponsModels_OnItemRuntimeStateReady(client, entity);
+    if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    WeaponsSound_OnItemRuntimeStateReady(client, entity);
+    if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    WeaponsGameplay_OnItemRuntimeStateReady(client, entity);
+    if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)
+        || g_hOnItemRuntimeStateReady == null) return;
+    Call_StartForward(g_hOnItemRuntimeStateReady);
+    Call_PushCell(client);
+    Call_PushCell(entity);
+    Call_Finish();
 }
 
-public void OnClientCommandKeyValues_Post(int client, KeyValues kv) {
-	char cmd[64];
-	kv.GetSectionName(cmd, sizeof(cmd));
-	
-	if (StrEqual(cmd, "MVM_Respec")) {
-		g_bForceReequipItems[client] = false;
-	}
+public void OnAllPluginsLoaded()
+{
+    BuildLoadoutSlotMenu();
+    g_attrdef_AllowedInMedievalMode = TF2Econ_TranslateAttributeNameToDefinitionIndex("allowed in medieval mode");
 }
 
-/**
- * Returns the base item associated with the given playerClass and loadoutSlot combination, or
- * TF_ITEMDEF_DEFAULT if no match is found.
- */
-int FindBaseItem(TFClassType playerClass, int loadoutSlot) {
-	static ArrayList s_BaseItems;
-	if (!s_BaseItems) {
-		s_BaseItems = TF2Econ_GetItemList(FilterBaseItems);
-	}
-	
-	for (int i, n = s_BaseItems.Length; i < n; i++) {
-		int itemdef = s_BaseItems.Get(i);
-		if (TF2Econ_GetItemLoadoutSlot(itemdef, playerClass) == loadoutSlot) {
-			return itemdef;
-		}
-	}
-	return TF_ITEMDEF_DEFAULT;
+public void OnLibraryAdded(const char[] name)
+{
+    CustomHats_OnLibraryAdded(name);
 }
 
-bool FilterBaseItems(int itemdef, any __) {
-	return TF2Econ_IsItemInBaseSet(itemdef);
+public void OnLibraryRemoved(const char[] name)
+{
+    CustomHats_OnLibraryRemoved(name);
 }
 
-// bool Weapons_SetPlayerLoadoutItem(int client, TFClassType playerClass, const char[] uid, int flags = 0);
-int Native_SetPlayerLoadoutItem(Handle plugin, int argc) {
-	int client = GetNativeCell(1);
-	int playerClass = GetNativeCell(2);
-	
-	char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-	GetNativeString(3, uid, sizeof(uid));
-	
-	int flags = GetNativeCell(4);
-	
-	return SetClientCustomLoadoutItem(client, playerClass, uid, flags);
+public void OnMapStart()
+{
+    WeaponsMovement_OnMapStart();
+    WeaponsCustomAttributes_OnMapStart();
+    WeaponsModels_OnMapStart();
+    CustomHats_OnMapStart();
+    LoadWeaponsConfig();
+    PrecacheMenuResources();
+    WeaponsGameplay_OnMapStart();
 }
 
-/**
- * Saves the current item into the loadout for the specified class.
- */
-bool SetClientCustomLoadoutItem(int client, int playerClass, const char[] itemuid, int flags) {
-	CustomItemDefinition item;
-	if (!GetCustomItemDefinition(itemuid, item)) {
-		return false;
-	}
-	
-	if ((flags & LOADOUT_FLAG_UPDATE_BACKEND)
-			&& !CanPlayerEquipItemForClass(client, playerClass, item)) {
-		return false;
-	}
-	
-	int itemSlot = item.loadoutPosition[playerClass];
-	if (0 <= itemSlot < NUM_ITEMS) {
-		if (flags & LOADOUT_FLAG_UPDATE_BACKEND) {
-			char previousUid[MAX_ITEM_IDENTIFIER_LENGTH];
-			strcopy(previousUid, sizeof(previousUid),
-					g_CurrentLoadout[client][playerClass][itemSlot].uid);
-			bool changed = !StrEqual(previousUid, itemuid, false);
-
-			// item being set as user preference; update backend and set permanent UID slot
-			g_ItemPersistCookies[playerClass][itemSlot].Set(client, itemuid);
-			g_CurrentLoadout[client][playerClass][itemSlot].SetItemUID(itemuid);
-
-			if (changed) {
-				if (previousUid[0]) {
-					WeaponsStats_RecordUnequip(client, playerClass, itemSlot, previousUid);
-				}
-				WeaponsStats_RecordEquip(client, playerClass, itemSlot, itemuid, item);
-			}
-		} else {
-			// item being set temporarily; set as overload
-			g_CurrentLoadout[client][playerClass][itemSlot].SetOverloadItemUID(itemuid);
-		}
-		
-		g_CurrentLoadout[client][playerClass][itemSlot].entity = INVALID_ENT_REFERENCE;
-	} else {
-		return false;
-	}
-	
-	if (flags & LOADOUT_FLAG_ATTEMPT_REGEN) {
-		OnClientCustomLoadoutItemModified(client, playerClass);
-	}
-	return true;
+public void OnMapEnd()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        Weapons_ResetLoadoutRequests(client);
+    }
+    WeaponsMovement_OnMapEnd();
+    WeaponsSound_Clear();
+    WeaponsGameplay_OnMapEnd();
+    WeaponsCustomAttributes_OnMapEnd();
 }
 
-// void Weapons_RemovePlayerLoadoutItem(int client, TFClassType playerClass, int itemSlot, int flags = 0);
-int Native_RemovePlayerLoadoutItem(Handle plugin, int argc) {
-	int client = GetNativeCell(1);
-	int playerClass = GetNativeCell(2);
-	int itemSlot = GetNativeCell(3);
-	int flags = GetNativeCell(4);
-	
-	UnsetClientCustomLoadoutItem(client, playerClass, itemSlot, flags);
-	return 0;
+public void OnClientPutInServer(int client)
+{
+    WeaponsMovement_OnClientPutInServer(client);
+    WeaponsSound_ResetClient(client, true);
+    WeaponsModels_OnClientPutInServer(client);
+    WeaponsGameplay_OnClientPutInServer(client);
+    CustomHats_OnClientPutInServer(client);
+    WeaponsHatVisibility_OnClientPutInServer(client);
 }
 
-/**
- * Unsets any existing item in the given loadout slot for the specified class.
- */
-void UnsetClientCustomLoadoutItem(int client, int playerClass, int itemSlot, int flags) {
-	if (flags & LOADOUT_FLAG_UPDATE_BACKEND) {
-		char previousUid[MAX_ITEM_IDENTIFIER_LENGTH];
-		strcopy(previousUid, sizeof(previousUid),
-				g_CurrentLoadout[client][playerClass][itemSlot].uid);
-
-		g_CurrentLoadout[client][playerClass][itemSlot].Clear();
-		g_ItemPersistCookies[playerClass][itemSlot].Set(client, "");
-
-		if (previousUid[0]) {
-			WeaponsStats_RecordUnequip(client, playerClass, itemSlot, previousUid);
-		}
-	} else {
-		g_CurrentLoadout[client][playerClass][itemSlot].SetOverloadItemUID("");
-	}
-	
-	if (flags & LOADOUT_FLAG_ATTEMPT_REGEN) {
-		OnClientCustomLoadoutItemModified(client, playerClass);
-	}
+public void OnClientDisconnect(int client)
+{
+    Weapons_ResetLoadoutRequests(client);
+    CustomHats_OnClientDisconnect(client);
+    WeaponsHatVisibility_OnClientDisconnect(client);
+    WeaponsMovement_OnClientDisconnect(client);
+    WeaponsWhitelist_OnClientDisconnect(client);
+    WeaponsSound_ResetClient(client, true);
+    WeaponsModels_OnClientDisconnect(client);
+    WeaponsGameplay_OnClientDisconnect(client);
 }
 
-void OnWeaponsStatisticsEnabledChanged(ConVar convar, const char[] oldValue, const char[] newValue) {
-	if (StringToInt(newValue)) {
-		ConnectWeaponsStatisticsDatabase();
-	} else {
-		Db_CancelTimer(g_hWeaponsStatsDbReconnectTimer);
-		Db_Close(g_WeaponsStatsDb, g_WeaponsStatsDbReady);
-	}
+void Weapons_OnWeaponSwitchPost(int client, int weapon)
+{
+    Plasma_OnWeaponSwitchPost(client);
+    WeaponsMovement_OnWeaponSwitchPost(client, weapon);
+    WeaponsSound_OnWeaponSwitchPost(client, weapon);
+    WeaponsModels_OnWeaponSwitchPost(client, weapon);
 }
 
-void OnWeaponsStatisticsDatabaseChanged(ConVar convar, const char[] oldValue, const char[] newValue) {
-	ConnectWeaponsStatisticsDatabase();
+public void OnEntityCreated(int entity, const char[] className)
+{
+    WeaponsCustomAttributes_OnEntityCreated(entity);
+    WeaponsSound_OnEntityCreated(entity, className);
+    WeaponsModels_OnEntityCreated(entity, className);
+    WeaponsGameplay_OnEntityCreated(entity, className);
+    WeaponsHatVisibility_OnEntityCreated(entity, className);
 }
 
-bool WeaponsStats_IsEnabled() {
-	return sm_weapons_statistics == null || sm_weapons_statistics.BoolValue;
-}
-
-bool WeaponsStats_CanWriteState() {
-	return WeaponsStats_IsEnabled() && Db_IsReady(g_WeaponsStatsDb, g_WeaponsStatsDbReady);
-}
-
-void ConnectWeaponsStatisticsDatabase() {
-	Db_CancelTimer(g_hWeaponsStatsDbReconnectTimer);
-	Db_Close(g_WeaponsStatsDb, g_WeaponsStatsDbReady);
-
-	if (!WeaponsStats_IsEnabled()) {
-		return;
-	}
-
-	char dbConfig[64];
-	sm_weapons_statistics_database.GetString(dbConfig, sizeof(dbConfig));
-	TrimString(dbConfig);
-	if (!dbConfig[0]) {
-		strcopy(dbConfig, sizeof(dbConfig), WEAPONS_STATS_DB_CONFIG_DEFAULT);
-	}
-
-	if (!Db_CheckConfigOrLog("weapons", dbConfig)) {
-		return;
-	}
-
-	SQL_TConnect(WeaponsStats_OnDatabaseConnected, dbConfig);
-}
-
-public void WeaponsStats_OnDatabaseConnected(Handle owner, Handle hndl, const char[] error, any data) {
-	if (hndl == null) {
-		LogError("[Weapons] Statistics database connection failed: %s",
-				error[0] ? error : "unknown error");
-		ScheduleWeaponsStatsDatabaseReconnect();
-		return;
-	}
-
-	Db_Close(g_WeaponsStatsDb, g_WeaponsStatsDbReady);
-	g_WeaponsStatsDb = view_as<Database>(hndl);
-
-	char driverIdent[32];
-	DBDriver driver = g_WeaponsStatsDb.Driver;
-	driver.GetIdentifier(driverIdent, sizeof(driverIdent));
-	g_WeaponsStatsIsMySql = StrEqual(driverIdent, "mysql", false);
-	if (g_WeaponsStatsIsMySql && !g_WeaponsStatsDb.SetCharset("utf8mb4")) {
-		LogError("[Weapons] Failed to set statistics database charset to utf8mb4.");
-	}
-
-	EnsureWeaponsStatsSchema();
-}
-
-void ScheduleWeaponsStatsDatabaseReconnect(float delay = DB_RECONNECT_DELAY) {
-	g_WeaponsStatsDbReady = false;
-	if (g_hWeaponsStatsDbReconnectTimer == null) {
-		g_hWeaponsStatsDbReconnectTimer = CreateTimer(delay, Timer_ReconnectWeaponsStatsDatabase,
-				_, TIMER_FLAG_NO_MAPCHANGE);
-	}
-}
-
-public Action Timer_ReconnectWeaponsStatsDatabase(Handle timer, any data) {
-	g_hWeaponsStatsDbReconnectTimer = null;
-	ConnectWeaponsStatisticsDatabase();
-	return Plugin_Stop;
-}
-
-void EnsureWeaponsStatsSchema() {
-	if (g_WeaponsStatsDb == null) {
-		return;
-	}
-
-	char query[2048];
-	if (g_WeaponsStatsIsMySql) {
-		Format(query, sizeof(query),
-			"CREATE TABLE IF NOT EXISTS %s ("
-			... "steamid64 VARCHAR(32) NOT NULL, "
-			... "player_name VARCHAR(128) NOT NULL DEFAULT '', "
-			... "class_index TINYINT NOT NULL, "
-			... "class_name VARCHAR(16) NOT NULL DEFAULT '', "
-			... "loadout_slot TINYINT NOT NULL, "
-			... "weapon_uid VARCHAR(64) NOT NULL, "
-			... "weapon_name VARCHAR(128) NOT NULL DEFAULT '', "
-			... "equipped TINYINT(1) NOT NULL DEFAULT 0, "
-			... "first_equipped_at INT NOT NULL DEFAULT 0, "
-			... "last_equipped_at INT NOT NULL DEFAULT 0, "
-			... "last_unequipped_at INT NOT NULL DEFAULT 0, "
-			... "equip_count INT NOT NULL DEFAULT 0, "
-			... "unequip_count INT NOT NULL DEFAULT 0, "
-			... "updated_at INT NOT NULL DEFAULT 0, "
-			... "PRIMARY KEY (steamid64, class_index, loadout_slot, weapon_uid), "
-			... "KEY idx_cwx_weapon_equipped (weapon_uid, equipped), "
-			... "KEY idx_cwx_weapon_unique (weapon_uid, steamid64), "
-			... "KEY idx_cwx_class_weapon (class_name, weapon_uid)) "
-			... "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
-			WEAPONS_STATS_STATE_TABLE);
-	} else {
-		Format(query, sizeof(query),
-			"CREATE TABLE IF NOT EXISTS %s ("
-			... "steamid64 VARCHAR(32) NOT NULL, "
-			... "player_name VARCHAR(128) NOT NULL DEFAULT '', "
-			... "class_index INTEGER NOT NULL, "
-			... "class_name VARCHAR(16) NOT NULL DEFAULT '', "
-			... "loadout_slot INTEGER NOT NULL, "
-			... "weapon_uid VARCHAR(64) NOT NULL, "
-			... "weapon_name VARCHAR(128) NOT NULL DEFAULT '', "
-			... "equipped INTEGER NOT NULL DEFAULT 0, "
-			... "first_equipped_at INTEGER NOT NULL DEFAULT 0, "
-			... "last_equipped_at INTEGER NOT NULL DEFAULT 0, "
-			... "last_unequipped_at INTEGER NOT NULL DEFAULT 0, "
-			... "equip_count INTEGER NOT NULL DEFAULT 0, "
-			... "unequip_count INTEGER NOT NULL DEFAULT 0, "
-			... "updated_at INTEGER NOT NULL DEFAULT 0, "
-			... "PRIMARY KEY (steamid64, class_index, loadout_slot, weapon_uid))",
-			WEAPONS_STATS_STATE_TABLE);
-	}
-
-	g_WeaponsStatsDb.Query(WeaponsStats_OnSchemaReady, query);
-}
-
-public void WeaponsStats_OnSchemaReady(Database db, DBResultSet results, const char[] error, any data) {
-	if (error[0]) {
-		LogError("[Weapons] Failed to create statistics schema: %s", error);
-		if (Db_IsTransientError(error)) {
-			ScheduleWeaponsStatsDatabaseReconnect();
-		}
-		return;
-	}
-
-	g_WeaponsStatsDbReady = true;
-	Db_CancelTimer(g_hWeaponsStatsDbReconnectTimer);
-	if (!g_WeaponsStatsIsMySql) {
-		g_WeaponsStatsDb.Query(WeaponsStats_OnQueryComplete,
-				"CREATE INDEX IF NOT EXISTS idx_cwx_weapon_equipped "
-				... "ON cwx_weapon_popularity (weapon_uid, equipped)");
-		g_WeaponsStatsDb.Query(WeaponsStats_OnQueryComplete,
-				"CREATE INDEX IF NOT EXISTS idx_cwx_weapon_unique "
-				... "ON cwx_weapon_popularity (weapon_uid, steamid64)");
-		g_WeaponsStatsDb.Query(WeaponsStats_OnQueryComplete,
-				"CREATE INDEX IF NOT EXISTS idx_cwx_class_weapon "
-				... "ON cwx_weapon_popularity (class_name, weapon_uid)");
-	}
-	WeaponsStats_MirrorLoadedClients();
-}
-
-public void WeaponsStats_OnQueryComplete(Database db, DBResultSet results, const char[] error, any data) {
-	if (!error[0]) {
-		return;
-	}
-
-	LogError("[Weapons] Statistics query failed: %s", error);
-	if (Db_IsTransientError(error)) {
-		ScheduleWeaponsStatsDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
-	}
-}
-
-void WeaponsStats_RecordEquip(int client, int playerClass, int itemSlot, const char[] itemUid,
-		const CustomItemDefinition item) {
-	if (!WeaponsStats_IsEnabled()) {
-		return;
-	}
-
-	char weaponName[MAX_ITEM_NAME_LENGTH];
-	if (item.displayName[0]) {
-		strcopy(weaponName, sizeof(weaponName), item.displayName);
-	} else {
-		strcopy(weaponName, sizeof(weaponName), itemUid);
-	}
-	WeaponsStats_LogTransition("weapon_equip", client, playerClass, itemSlot, itemUid, weaponName);
-
-	char steamId64[KOGASA_STEAMID_MAX], playerName[MAX_NAME_LENGTH];
-	if (!WeaponsStats_GetClientStateIdentity(client, steamId64, sizeof(steamId64),
-			playerName, sizeof(playerName))) {
-		return;
-	}
-
-	WeaponsStats_ClearSlotState(steamId64, playerClass, itemSlot, true);
-	WeaponsStats_UpsertEquipState(steamId64, playerName, playerClass, itemSlot, itemUid,
-			weaponName, true);
-}
-
-void WeaponsStats_RecordUnequip(int client, int playerClass, int itemSlot, const char[] itemUid) {
-	if (!WeaponsStats_IsEnabled()) {
-		return;
-	}
-
-	char weaponName[MAX_ITEM_NAME_LENGTH];
-	WeaponsStats_GetWeaponName(itemUid, weaponName, sizeof(weaponName));
-	WeaponsStats_LogTransition("weapon_unequip", client, playerClass, itemSlot, itemUid,
-			weaponName);
-
-	char steamId64[KOGASA_STEAMID_MAX], playerName[MAX_NAME_LENGTH];
-	if (!WeaponsStats_GetClientStateIdentity(client, steamId64, sizeof(steamId64),
-			playerName, sizeof(playerName))) {
-		return;
-	}
-
-	WeaponsStats_ClearSlotState(steamId64, playerClass, itemSlot, true);
-}
-
-void WeaponsStats_MirrorLoadedClients() {
-	for (int client = 1; client <= MaxClients; client++) {
-		if (IsClientConnected(client) && g_bRetrievedLoadout[client]) {
-			WeaponsStats_MirrorClientSavedLoadout(client);
-		}
-	}
-}
-
-void WeaponsStats_MirrorClientSavedLoadout(int client) {
-	if (!WeaponsStats_CanWriteState()) {
-		return;
-	}
-
-	char steamId64[KOGASA_STEAMID_MAX], playerName[MAX_NAME_LENGTH];
-	if (!WeaponsStats_GetClientStateIdentity(client, steamId64, sizeof(steamId64),
-			playerName, sizeof(playerName))) {
-		return;
-	}
-
-	for (int playerClass = 1; playerClass < NUM_PLAYER_CLASSES; playerClass++) {
-		for (int itemSlot = 0; itemSlot < NUM_ITEMS; itemSlot++) {
-			char itemUid[MAX_ITEM_IDENTIFIER_LENGTH];
-			strcopy(itemUid, sizeof(itemUid), g_CurrentLoadout[client][playerClass][itemSlot].uid);
-			if (!itemUid[0]) {
-				continue;
-			}
-
-			char weaponName[MAX_ITEM_NAME_LENGTH];
-			WeaponsStats_GetWeaponName(itemUid, weaponName, sizeof(weaponName));
-			WeaponsStats_UpsertEquipState(steamId64, playerName, playerClass, itemSlot,
-					itemUid, weaponName, false);
-		}
-	}
-}
-
-bool WeaponsStats_GetClientStateIdentity(int client, char[] steamId64, int steamLen,
-		char[] playerName, int nameLen) {
-	if (!WeaponsStats_CanWriteState()) {
-		return false;
-	}
-
-	if (!Kogasa_GetClientSteamId64(client, steamId64, steamLen, true)) {
-		return false;
-	}
-
-	if (!GetClientName(client, playerName, nameLen) || !playerName[0]) {
-		strcopy(playerName, nameLen, steamId64);
-	}
-	return true;
-}
-
-void WeaponsStats_LogTransition(const char[] eventName, int client, int playerClass, int itemSlot,
-		const char[] itemUid, const char[] weaponName) {
-	char steamId64[KOGASA_STEAMID_MAX] = "unknown";
-	char playerName[MAX_NAME_LENGTH] = "unknown";
-	char className[16];
-	char safeEvent[64];
-	char safeUid[MAX_ITEM_IDENTIFIER_LENGTH];
-	char safeWeaponName[MAX_ITEM_NAME_LENGTH];
-
-	if (client > 0 && client <= MaxClients && IsClientConnected(client)) {
-		Kogasa_GetClientSteamId64(client, steamId64, sizeof(steamId64), true);
-		GetClientName(client, playerName, sizeof(playerName));
-	}
-	WeaponsStats_GetClassName(playerClass, className, sizeof(className));
-	strcopy(safeEvent, sizeof(safeEvent), eventName);
-	strcopy(safeUid, sizeof(safeUid), itemUid);
-	strcopy(safeWeaponName, sizeof(safeWeaponName), weaponName);
-	WeaponsStats_SanitizeField(steamId64, sizeof(steamId64));
-	WeaponsStats_SanitizeField(playerName, sizeof(playerName));
-	WeaponsStats_SanitizeField(className, sizeof(className));
-	WeaponsStats_SanitizeField(safeEvent, sizeof(safeEvent));
-	WeaponsStats_SanitizeField(safeUid, sizeof(safeUid));
-	WeaponsStats_SanitizeField(safeWeaponName, sizeof(safeWeaponName));
-
-	int userid = (client > 0 && client <= MaxClients && IsClientConnected(client))
-			? GetClientUserId(client) : 0;
-	char message[512];
-	Format(message, sizeof(message),
-			"event=%s|client=%d|userid=%d|steamid64=%s|name=%s|class=%s|class_index=%d|slot=%d|weapon_uid=%s|weapon_name=%s",
-			safeEvent,
-			client,
-			userid,
-			steamId64,
-			playerName,
-			className,
-			playerClass,
-			itemSlot,
-			safeUid,
-			safeWeaponName);
-	PluginStats_Record(safeEvent, message);
-}
-
-void WeaponsStats_ClearSlotState(const char[] steamId64, int playerClass, int itemSlot,
-		bool incrementUnequipCount) {
-	if (!WeaponsStats_CanWriteState()) {
-		return;
-	}
-
-	char escapedSteam[64];
-	Db_Escape(g_WeaponsStatsDb, steamId64, escapedSteam, sizeof(escapedSteam), "weapons");
-
-	int now = GetTime();
-	char query[1024];
-	if (incrementUnequipCount) {
-		Format(query, sizeof(query),
-			"UPDATE %s SET equipped = 0, "
-			... "last_unequipped_at = CASE WHEN equipped != 0 THEN %d ELSE last_unequipped_at END, "
-			... "unequip_count = unequip_count + CASE WHEN equipped != 0 THEN 1 ELSE 0 END, "
-			... "updated_at = %d "
-			... "WHERE steamid64 = '%s' AND class_index = %d AND loadout_slot = %d AND equipped != 0",
-			WEAPONS_STATS_STATE_TABLE,
-			now,
-			now,
-			escapedSteam,
-			playerClass,
-			itemSlot);
-	} else {
-		Format(query, sizeof(query),
-			"UPDATE %s SET equipped = 0, updated_at = %d "
-			... "WHERE steamid64 = '%s' AND class_index = %d AND loadout_slot = %d AND equipped != 0",
-			WEAPONS_STATS_STATE_TABLE,
-			now,
-			escapedSteam,
-			playerClass,
-			itemSlot);
-	}
-	g_WeaponsStatsDb.Query(WeaponsStats_OnQueryComplete, query);
-}
-
-void WeaponsStats_UpsertEquipState(const char[] steamId64, const char[] playerName,
-		int playerClass, int itemSlot, const char[] itemUid, const char[] weaponName,
-		bool incrementEquipCount) {
-	if (!WeaponsStats_CanWriteState()) {
-		return;
-	}
-
-	char className[16];
-	WeaponsStats_GetClassName(playerClass, className, sizeof(className));
-
-	char escapedSteam[64], escapedName[256], escapedClass[64], escapedUid[128], escapedWeapon[256];
-	Db_Escape(g_WeaponsStatsDb, steamId64, escapedSteam, sizeof(escapedSteam), "weapons");
-	Db_Escape(g_WeaponsStatsDb, playerName, escapedName, sizeof(escapedName), "weapons");
-	Db_Escape(g_WeaponsStatsDb, className, escapedClass, sizeof(escapedClass), "weapons");
-	Db_Escape(g_WeaponsStatsDb, itemUid, escapedUid, sizeof(escapedUid), "weapons");
-	Db_Escape(g_WeaponsStatsDb, weaponName, escapedWeapon, sizeof(escapedWeapon), "weapons");
-
-	int now = GetTime();
-	int updateIncrement = incrementEquipCount ? 1 : 0;
-	char query[2048];
-	if (g_WeaponsStatsIsMySql) {
-		Format(query, sizeof(query),
-			"INSERT INTO %s (steamid64, player_name, class_index, class_name, loadout_slot, "
-			... "weapon_uid, weapon_name, equipped, first_equipped_at, last_equipped_at, "
-			... "last_unequipped_at, equip_count, unequip_count, updated_at) "
-			... "VALUES ('%s', '%s', %d, '%s', %d, '%s', '%s', 1, %d, %d, 0, 1, 0, %d) "
-			... "ON DUPLICATE KEY UPDATE player_name = VALUES(player_name), "
-			... "class_name = VALUES(class_name), weapon_name = VALUES(weapon_name), "
-			... "equipped = 1, last_equipped_at = VALUES(last_equipped_at), "
-			... "equip_count = equip_count + %d, updated_at = VALUES(updated_at)",
-			WEAPONS_STATS_STATE_TABLE,
-			escapedSteam,
-			escapedName,
-			playerClass,
-			escapedClass,
-			itemSlot,
-			escapedUid,
-			escapedWeapon,
-			now,
-			now,
-			now,
-			updateIncrement);
-	} else {
-		Format(query, sizeof(query),
-			"INSERT INTO %s (steamid64, player_name, class_index, class_name, loadout_slot, "
-			... "weapon_uid, weapon_name, equipped, first_equipped_at, last_equipped_at, "
-			... "last_unequipped_at, equip_count, unequip_count, updated_at) "
-			... "VALUES ('%s', '%s', %d, '%s', %d, '%s', '%s', 1, %d, %d, 0, 1, 0, %d) "
-			... "ON CONFLICT(steamid64, class_index, loadout_slot, weapon_uid) DO UPDATE SET "
-			... "player_name = excluded.player_name, class_name = excluded.class_name, "
-			... "weapon_name = excluded.weapon_name, equipped = 1, "
-			... "last_equipped_at = excluded.last_equipped_at, "
-			... "equip_count = %s.equip_count + %d, updated_at = excluded.updated_at",
-			WEAPONS_STATS_STATE_TABLE,
-			escapedSteam,
-			escapedName,
-			playerClass,
-			escapedClass,
-			itemSlot,
-			escapedUid,
-			escapedWeapon,
-			now,
-			now,
-			now,
-			WEAPONS_STATS_STATE_TABLE,
-			updateIncrement);
-	}
-	g_WeaponsStatsDb.Query(WeaponsStats_OnQueryComplete, query);
-}
-
-void WeaponsStats_GetWeaponName(const char[] itemUid, char[] buffer, int maxlen) {
-	CustomItemDefinition item;
-	if (GetCustomItemDefinition(itemUid, item) && item.displayName[0]) {
-		strcopy(buffer, maxlen, item.displayName);
-		return;
-	}
-	strcopy(buffer, maxlen, itemUid);
-}
-
-void WeaponsStats_GetClassName(int playerClass, char[] buffer, int maxlen) {
-	TF2Classes_GetKey(view_as<TFClassType>(playerClass), buffer, maxlen, "unknown");
-}
-
-void WeaponsStats_SanitizeField(char[] value, int maxlen) {
-	ReplaceString(value, maxlen, "|", "/", false);
-	ReplaceString(value, maxlen, "\r", " ", false);
-	ReplaceString(value, maxlen, "\n", " ", false);
-	ReplaceString(value, maxlen, "\t", " ", false);
-	ReplaceString(value, maxlen, "\"", "'", false);
-	TrimString(value);
-}
-
-// bool Weapons_GetPlayerLoadoutItem(int client, TFClassType playerClass, int itemSlot, char[] uid, int uidLen, int flags = 0);
-int Native_GetPlayerLoadoutItem(Handle plugin, int argc) {
-	int client = GetNativeCell(1);
-	int playerClass = GetNativeCell(2);
-	int itemSlot = GetNativeCell(3);
-	int uidLen = GetNativeCell(5);
-	int flags = GetNativeCell(6);
-	
-	if (g_CurrentLoadout[client][playerClass][itemSlot].IsEmpty()) {
-		return false;
-	}
-	
-	char[] uid = new char[uidLen];
-	if (flags & LOADOUT_FLAG_UPDATE_BACKEND) {
-		strcopy(uid, uidLen, g_CurrentLoadout[client][playerClass][itemSlot].uid);
-	} else {
-		strcopy(uid, uidLen, g_CurrentLoadout[client][playerClass][itemSlot].override_uid);
-	}
-	SetNativeString(4, uid, uidLen);
-	return true;
-}
-
-/**
- * Called when a player's custom inventory has changed.  Decide if we should act on it.
- */
-void OnClientCustomLoadoutItemModified(int client, int modifiedClass) {
-	if (view_as<int>(TF2_GetPlayerClass(client)) != modifiedClass) {
-		// do nothing if the loadout for the current class wasn't modified
-		return;
-	}
-	
-	if (!sm_weapons_enable_loadout.BoolValue) {
-		// do nothing if user selections are disabled
-		return;
-	}
-	
-	if (IsPlayerAllowedToRespawnOnLoadoutChange(client)) {
-		// see if the player is into being respawned on loadout changes
-		QueryClientConVar(client, "tf_respawn_on_loadoutchanges", OnLoadoutRespawnPreference);
-	} else {
-		PrintToChat(client, "%t", "LoadoutChangesUpdate");
-	}
-}
-
-/**
- * Called after inventory change and we have the client's tf_respawn_on_loadoutchanges convar
- * value.  Respawn them if desired.
- */
-void OnLoadoutRespawnPreference(QueryCookie cookie, int client, ConVarQueryResult result,
-		const char[] cvarName, const char[] cvarValue) {
-	if (result != ConVarQuery_Okay) {
-		return;
-	} else if (!StringToInt(cvarValue) || !IsPlayerAllowedToRespawnOnLoadoutChange(client)) {
-		// the second check for respawn room is in case we're somehow not in one between
-		// the query and the callback
-		PrintToChat(client, "%t", "LoadoutChangesUpdate");
-		return;
-	}
-	
-	// mark player as regenerating during respawn -- this prevents stickies from despawning
-	// this matches the game's internal behavior during GC loadout changes
-	SetEntProp(client, Prop_Send, "m_bRegenerating", true);
-	TF2_RespawnPlayer(client);
-	SetEntProp(client, Prop_Send, "m_bRegenerating", false);
-}
-
-/**
- * Returns whether or not the player can actually equip this item normally.
- * (This does not prevent admins from forcibly applying the item to the player.)
- */
-bool CanPlayerEquipItem(int client, const CustomItemDefinition item) {
-	TFClassType playerClass = TF2_GetPlayerClass(client);
-	
-	return CanPlayerEquipItemForClass(client, view_as<int>(playerClass), item);
-}
-
-/**
- * Returns whether or not the player can equip this item for the given class.
- */
-bool CanPlayerEquipItemForClass(int client, int playerClass, const CustomItemDefinition item) {
-	if (playerClass <= 0 || playerClass >= NUM_PLAYER_CLASSES) {
-		return false;
-	}
-	
-	if (item.loadoutPosition[playerClass] == -1) {
-		return false;
-	}
-	
-	return CanPlayerAccessItem(client, item);
-}
-
-/**
- * Returns whether the item should be visible to the client. Store-gated items
- * remain visible so the loadout menu can direct players to !shop.
- */
-bool CanPlayerViewItem(int client, const CustomItemDefinition item) {
-	return !item.access[0] || CheckCommandAccess(client, item.access, 0, true);
-}
-
-bool ItemRequiresPointsStorePurchase(int client, const CustomItemDefinition item) {
-	if (!item.pointsStorePurchase[0]) {
-		return false;
-	}
-
-	return client <= 0 || client > MaxClients || !IsClientInGame(client)
-		|| GetFeatureStatus(FeatureType_Native, POINTS_STORE_HAS_PURCHASE_NATIVE)
-			!= FeatureStatus_Available
-		|| !PointsStore_HasPurchase(client, item.pointsStorePurchase);
-}
-
-/**
- * Returns whether or not the player has access to this item.
- */
-bool CanPlayerAccessItem(int client, const CustomItemDefinition item) {
-	if (!CanPlayerViewItem(client, item)) {
-		// this item requires access
-		return false;
-	}
-	
-	if (ItemRequiresPointsStorePurchase(client, item)) {
-		return false;
-	}
-	
-	return true;
-}
-
-/**
- * Returns whether or not the player is in a respawn room that their team owns, for the purpose
- * of repsawning on loadout change.
- */
-static bool IsPlayerInRespawnRoom(int client) {
-	float vecMins[3], vecMaxs[3], vecCenter[3], vecOrigin[3];
-	GetClientMins(client, vecMins);
-	GetClientMaxs(client, vecMaxs);
-	GetClientAbsOrigin(client, vecOrigin);
-	
-	GetCenterFromPoints(vecMins, vecMaxs, vecCenter);
-	AddVectors(vecOrigin, vecCenter, vecCenter);
-	return TF2Util_IsPointInRespawnRoom(vecCenter, client, true);
-}
-
-/**
- * Returns whether or not the player is allowed to respawn on loadout changes.
- */
-static bool IsPlayerAllowedToRespawnOnLoadoutChange(int client) {
-	if (!IsClientInGame(client) || !IsPlayerInRespawnRoom(client) || !IsPlayerAlive(client)) {
-		return false;
-	}
-	
-	// prevent respawns on sudden death
-	// ideally we'd base this off of CTFGameRules::CanChangeClassInStalemate(), but that
-	// requires either gamedata or keeping track of the stalemate time ourselves
-	if (GameRules_GetRoundState() == RoundState_Stalemate) {
-		return false;
-	}
-	
-	return true;
-}
-
-/**
- * Returns whether or not the custom item is currently allowed.  This is specifically for
- * instances where the item may be temporarily restricted (Medieval, melee-only Sudden Death).
- * 
- * sm_weapons_enable_loadout is checked earlier, during OnPlayerLoadoutUpdatedPost and
- * OnGetLoadoutItemPost.
- */
-static bool IsCustomItemAllowed(int client, const CustomItemDefinition item) {
-	if (!IsClientInGame(client)) {
-		return false;
-	}
-	
-	TFClassType playerClass = TF2_GetPlayerClass(client);
-	int slot = item.loadoutPosition[playerClass];
-	
-	// TODO work out other restrictions?
-	
-	if (GameRules_GetRoundState() == RoundState_Stalemate && mp_stalemate_meleeonly.BoolValue) {
-		bool bMelee = slot == 2 || (playerClass == TFClass_Spy && (slot == 5 || slot == 6));
-		if (!bMelee) {
-			return false;
-		}
-	}
-	
-	if (GameRules_GetProp("m_bPlayingMedieval")) {
-		bool bMedievalAllowed;
-		if (slot == 2) {
-			bMedievalAllowed = true;
-		}
-		
-		if (!bMedievalAllowed) {
-			// non-melee item; time to check the schema...
-			bool bMedievalAllowedInSchema;
-			
-			bool bNativeAttributeOverride;
-			if (item.nativeAttributes) {
-				char configValue[8];
-				item.nativeAttributes.GetString("allowed in medieval mode",
-						configValue, sizeof(configValue));
-				
-				if (configValue[0]) {
-					// don't fallback to static attributes if override in config
-					bNativeAttributeOverride = true;
-					bMedievalAllowedInSchema = !!StringToInt(configValue);
-				}
-			}
-			if (!bNativeAttributeOverride && item.bKeepStaticAttributes) {
-				// TODO we should cache this...
-				ArrayList attribList = TF2Econ_GetItemStaticAttributes(item.defindex);
-				bMedievalAllowedInSchema =
-						attribList.FindValue(g_attrdef_AllowedInMedievalMode) != -1;
-				delete attribList;
-			}
-			
-			if (!bMedievalAllowedInSchema) {
-				return false;
-			}
-		}
-	}
-	return true;
+public void TF2_OnConditionRemoved(int client, TFCond condition)
+{
+    WeaponsModels_OnConditionRemoved(client, condition);
+    WeaponsGameplay_OnConditionRemoved(client, condition);
 }

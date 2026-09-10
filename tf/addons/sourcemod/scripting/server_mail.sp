@@ -3,9 +3,7 @@
 
 #include <sourcemod>
 #include <clientprefs>
-
 #include <multicolors>
-
 #undef REQUIRE_PLUGIN
 #include <filters_api>
 #include <hugs_api>
@@ -14,9 +12,9 @@
 #include <saysounds>
 #include <whaletracker_api>
 #define REQUIRE_PLUGIN
-
 #include "include/steam_identity.inc"
 
+// Session-owned reminder lifecycle is implemented in server_mail/lifecycle.sp.
 #define MAIL_DB_CONFIG "server_mail"
 #define MAIL_TABLE "mail"
 #define MAIL_STEAMID_MAX 32
@@ -40,14 +38,12 @@ enum MailViewMode
     MailView_Sent,
     MailView_Unread
 };
-
 enum MailRedemptionQueueResult
 {
     MailRedemption_Queued = 0,
     MailRedemption_AlreadyPending,
     MailRedemption_Failed
 };
-
 enum struct MailSearchResult
 {
     char steamId[MAIL_STEAMID_MAX];
@@ -64,7 +60,6 @@ GlobalForward g_MailSendResultForward = null;
 Cookie g_MailUnreadReminderCookie = null;
 Handle g_MailUnreadReminderTimer[MAXPLAYERS + 1];
 bool g_MailUnreadReminderPending[MAXPLAYERS + 1];
-
 ArrayList g_MailSearchResults[MAXPLAYERS + 1];
 char g_MailPendingContents[MAXPLAYERS + 1][MAIL_CONTENTS_MAX];
 char g_MailPendingSearch[MAXPLAYERS + 1][MAIL_NAME_MAX];
@@ -76,7 +71,6 @@ float g_MailNextSendAllowedAt[MAXPLAYERS + 1];
 bool g_MailUserSendPending[MAXPLAYERS + 1];
 bool g_MailRedeemAllPending[MAXPLAYERS + 1];
 bool g_MailReadAllPending[MAXPLAYERS + 1];
-
 StringMap g_MailPendingRedemptions = null;
 StringMap g_MailRedemptionUsers = null;
 StringMap g_MailRedemptionTitles = null;
@@ -103,7 +97,6 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     CreateNative("ServerMail_SendCustomSteamId", Native_ServerMail_SendCustomSteamId);
     CreateNative("ServerMail_SendCurrencySteamId", Native_ServerMail_SendCurrencySteamId);
     CreateNative("ServerMail_CheckPendingStimulus", Native_ServerMail_CheckPendingStimulus);
-
     MarkNativeAsOptional("Filters_GetChatName");
     MarkNativeAsOptional("Filters_GetSteamIdColorTag");
     MarkNativeAsOptional("Filters_GetLastRecordedSteamName");
@@ -116,14 +109,8 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     MarkNativeAsOptional("SaySounds_PlayCommand");
     MarkNativeAsOptional("RTD_ApplyGiftedRoll");
     MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeHours");
-
-    g_MailSendResultForward = new GlobalForward(
-        "ServerMail_OnMailSendResult",
-        ET_Ignore,
-        Param_String,
-        Param_Cell,
-        Param_Cell,
-        Param_Cell);
+    g_MailSendResultForward = new GlobalForward("ServerMail_OnMailSendResult",
+        ET_Ignore, Param_String, Param_Cell, Param_Cell, Param_Cell);
     return APLRes_Success;
 }
 

@@ -2,27 +2,23 @@
 #pragma newdecls required
 
 #include <sourcemod>
-
 #include <sdktools>
 #include <sdkhooks>
 #include <sdktools_gamerules>
 #include <dhooks>
-
 #include <tf2>
 #include <tf2_stocks>
 #include <controlpoints>
 #include <morecolors>
 #include <plugin_statistics>
-
 #undef REQUIRE_EXTENSIONS
 #include <tf2_setuptime>
 #include <tf2setupuber>
 #define REQUIRE_EXTENSIONS
 
-// I forked the controlpoints file from powerlord to add new gamemodes, you can get it at https://github.com/babasproke2/sourcemod-snippets
-
+// Uses the repository's fork of controlpoints by powerlord / babasproke2.
+// Session-owned timers are implemented in dgm/respawn_timers.sp.
 #define PLUGIN_VERSION "4.3"
-
 #include "include/dgm_api.inc"
 #include "include/client_validation.inc"
 #define DGM_MAX_CONTROL_POINTS 8
@@ -60,15 +56,10 @@ bool g_bRoundStartedOnce;
 bool g_bRespawnAdminTouchedThisMap;
 bool g_bSetupTeamRatioForwardFired;
 GlobalForward g_hSetupTeamRatioReadyForward;
-
 ConVar g_cHostname;
-
 int g_PointCaptures;
-bool g_InternalOverride; // For disabling this plugin's respawn time management in any case
-
+bool g_InternalOverride;
 ConVar g_cvGameMode;
-
-// Add a ConVar to hook the value of mp_disable_respawn_times
 Handle g_cvMpDisableRespawnTimes = INVALID_HANDLE;
 Handle g_hSetupStateTimer = INVALID_HANDLE;
 Handle g_hSetupStartTimer = INVALID_HANDLE;
@@ -94,7 +85,8 @@ int g_iCapturePoint[DGM_MAX_CAPTURE_INTERVALS];
 int g_iOriginalUpgradePerHit = 0;
 DynamicDetour g_hConstructionMultiplierDetour = null;
 
-public Plugin myinfo = {
+public Plugin myinfo =
+{
     name = "Gamemode Detector",
     author = "Hombre",
     description = "Handles gamemode settings and instant respawns",

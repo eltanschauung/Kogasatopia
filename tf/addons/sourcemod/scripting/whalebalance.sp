@@ -3,14 +3,10 @@
 
 #include <sourcemod>
 #include <clientprefs>
-
 #include <sdktools>
-
 #include <tf2_stocks>
-
 #include <morecolors>
 #include <nativevotes>
-
 #undef REQUIRE_PLUGIN
 #include <dgm_api>
 #include <clans_api>
@@ -20,7 +16,6 @@
 #include <whaletracker_api>
 #define REQUIRE_PLUGIN
 #include <plugin_statistics>
-
 #include "include/database.inc"
 #include "include/duel_detection.inc"
 #include "include/steam_identity.inc"
@@ -29,13 +24,14 @@
 native int FilterAlerts_MarkAutobalance(int client);
 native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 
-#define CHECK_INTERVAL      3.0
-#define MAP_START_DELAY     30.0
-#define TEAM_RED            2
-#define TEAM_BLUE           3
-#define TEAM_GREEN          4
-#define TEAM_YELLOW         5
-#define GAME_TEAM_COUNT     4
+// One generation-owned respawn chain per client: whalebalance/runtime.sp.
+#define CHECK_INTERVAL 3.0
+#define MAP_START_DELAY 30.0
+#define TEAM_RED 2
+#define TEAM_BLUE 3
+#define TEAM_GREEN 4
+#define TEAM_YELLOW 5
+#define GAME_TEAM_COUNT 4
 #define MEDIC_AUTOBALANCE_UBER_FLOOR 0.05
 #define POINTS_STORE_AB_IMMUNITY_ITEM "abImmunity24h"
 #define TEAM_MOVE_SAYSOUND "tp-enderman"
@@ -61,49 +57,49 @@ enum TeamBalanceState
     TeamBalance_Settling
 };
 
-StringMap g_hMapImmunity = null;            // SteamID64 set for map-long immunity.
-StringMap g_hPersistentImmunity = null;     // SteamID64 set for persistent admin immunity.
-StringMap g_hVolunteers = null;             // SteamID64 set for persistent autobalance volunteers.
-StringMap g_hScrambleImmunity = null;       // SteamID64 set for two completed scrambles.
-Database  g_hImmunityDb = null;
-Handle    g_hImmunityDbReconnectTimer = null;
-bool      g_bImmunityDbReady = false;
-bool      g_bVolunteerDbReady = false;
-int       g_iPersistentVolunteerCount = 0;
-ConVar  g_hLogEnabled;
-ConVar  g_hDiffThreshold;
-ConVar  g_hActionDelay;
-ConVar  g_hMaxUnbalanceTime;
-ConVar  g_hForceThresholdDelta;
-ConVar  g_hSimpleSelection;
-ConVar  g_hIgnoreWinning;
-ConVar  g_hDatabaseConfig;
-ConVar  g_hMpAutoteamBalance;
-ConVar  g_hMpTeamsUnbalanceLimit;
-int     g_iSavedAutoteamBalance;
-int     g_iSavedUnbalanceLimit;
-Handle  g_hAutoBalanceTimer = INVALID_HANDLE;
-float   g_fImbalanceDetectedAt = 0.0;
-int     g_iSwapRequestSenderUserId[MAXPLAYERS + 1];
-int     g_iSwapRequestSenderTeam[MAXPLAYERS + 1];
-int     g_iSwapRequestTargetTeam[MAXPLAYERS + 1];
-Handle  g_hSwapRequestTimer[MAXPLAYERS + 1];
-bool    g_bSwapRequestFinalizing[MAXPLAYERS + 1];
+StringMap g_hMapImmunity = null;
+StringMap g_hPersistentImmunity = null;
+StringMap g_hVolunteers = null;
+StringMap g_hScrambleImmunity = null;
+Database g_hImmunityDb = null;
+Handle g_hImmunityDbReconnectTimer = null;
+bool g_bImmunityDbReady = false;
+bool g_bVolunteerDbReady = false;
+int g_iPersistentVolunteerCount = 0;
+ConVar g_hLogEnabled;
+ConVar g_hDiffThreshold;
+ConVar g_hActionDelay;
+ConVar g_hMaxUnbalanceTime;
+ConVar g_hForceThresholdDelta;
+ConVar g_hSimpleSelection;
+ConVar g_hIgnoreWinning;
+ConVar g_hDatabaseConfig;
+ConVar g_hMpAutoteamBalance;
+ConVar g_hMpTeamsUnbalanceLimit;
+int g_iSavedAutoteamBalance;
+int g_iSavedUnbalanceLimit;
+Handle g_hAutoBalanceTimer = INVALID_HANDLE;
+float g_fImbalanceDetectedAt = 0.0;
+int g_iSwapRequestSenderUserId[MAXPLAYERS + 1];
+int g_iSwapRequestSenderTeam[MAXPLAYERS + 1];
+int g_iSwapRequestTargetTeam[MAXPLAYERS + 1];
+Handle g_hSwapRequestTimer[MAXPLAYERS + 1];
+bool g_bSwapRequestFinalizing[MAXPLAYERS + 1];
 TeamBalanceState g_eTeamBalanceState = TeamBalance_Idle;
-float   g_fTeamBalanceStateUntil = 0.0;
-float   g_fScrambleCooldownUntil = 0.0;
-int     g_iScramblesSinceImmunityClear = 0;
-int     g_iBalanceRespawnAttempts[MAXPLAYERS + 1];
-int     g_iBalanceRespawnExpectedTeam[MAXPLAYERS + 1];
-float   g_fBalanceMovedUntil[MAXPLAYERS + 1];
+float g_fTeamBalanceStateUntil = 0.0;
+float g_fScrambleCooldownUntil = 0.0;
+int g_iScramblesSinceImmunityClear = 0;
+int g_iBalanceRespawnAttempts[MAXPLAYERS + 1];
+int g_iBalanceRespawnExpectedTeam[MAXPLAYERS + 1];
+float g_fBalanceMovedUntil[MAXPLAYERS + 1];
 
 public Plugin myinfo =
 {
-    name        = "whalebalance",
-    author      = "Hombre, AW 'Swixel' Stanley",
+    name = "whalebalance",
+    author = "Hombre, AW 'Swixel' Stanley",
     description = "Unified autobalance, team-swap, scramble-vote, and ranking controller.",
-    version     = "3.0",
-    url         = "https://kogasa.tf"
+    version = "3.0",
+    url = "https://kogasa.tf"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
