@@ -33,6 +33,7 @@
 #define MAX_GROUP_PREF_VALUE 512
 #define DEFAULT_GROUP "all"
 #define API_ONLY_GROUPS_SECTION "apionlygroups"
+#define FORCED_SOUND_GROUPS_SECTION "forcedsoundgroups"
 #define PAID_SAYSOUND_GROUPS_SECTION "paidsaysoundgroups"
 #define GROUP_ALIASES_SECTION "groupaliases"
 #define ROUND_START_SIRENS_SECTION "roundstartsirenreplacements"
@@ -78,6 +79,7 @@ public Plugin myinfo =
 StringMap gSoundMap;
 StringMap gSoundGroupMap;
 StringMap gAPIOnlyGroups;
+StringMap gForcedSoundGroups;
 StringMap gPaidSaysoundGroups;
 StringMap gGroupAliases;
 ArrayList gCommandNames;
@@ -108,6 +110,7 @@ ArrayList gReadyUnlockReplacements;
 ArrayList gReadyUnlockGroups;
 bool gConfigLoaded = false;
 bool gConfigInAPIOnlyGroups = false;
+bool gConfigInForcedSoundGroups = false;
 bool gConfigInPaidSaysoundGroups = false;
 bool gConfigInGroupAliases = false;
 bool gConfigInRoundStartSirens = false;
@@ -118,6 +121,7 @@ bool gConfigInCountdownReplacements = false;
 bool gConfigInUnlockReplacements = false;
 int gConfigSectionDepth = 0;
 int gConfigAPIOnlyGroupsDepth = -1;
+int gConfigForcedSoundGroupsDepth = -1;
 int gConfigPaidSaysoundGroupsDepth = -1;
 int gConfigGroupAliasesDepth = -1;
 int gConfigRoundStartSirensDepth = -1;
@@ -238,6 +242,7 @@ public void OnPluginStart()
     gSoundMap = new StringMap();
     gSoundGroupMap = new StringMap();
     gAPIOnlyGroups = new StringMap();
+    gForcedSoundGroups = new StringMap();
     gPaidSaysoundGroups = new StringMap();
     gGroupAliases = new StringMap();
     gCommandNames = new ArrayList(ByteCountToCells(MAX_COMMAND_NAME));
@@ -364,6 +369,12 @@ public void OnPluginEnd()
     {
         delete gAPIOnlyGroups;
         gAPIOnlyGroups = null;
+    }
+
+    if (gForcedSoundGroups != null)
+    {
+        delete gForcedSoundGroups;
+        gForcedSoundGroups = null;
     }
 
     if (gPaidSaysoundGroups != null)
@@ -2406,6 +2417,7 @@ void LoadSaySoundConfig()
     gSoundMap.Clear();
     gSoundGroupMap.Clear();
     gAPIOnlyGroups.Clear();
+    gForcedSoundGroups.Clear();
     gPaidSaysoundGroups.Clear();
     gGroupAliases.Clear();
     gCommandNames.Clear();
@@ -2436,6 +2448,7 @@ void LoadSaySoundConfig()
     gReadyUnlockGroups.Clear();
     gConfigLoaded = false;
     gConfigInAPIOnlyGroups = false;
+    gConfigInForcedSoundGroups = false;
     gConfigInPaidSaysoundGroups = false;
     gConfigInGroupAliases = false;
     gConfigInRoundStartSirens = false;
@@ -2446,6 +2459,7 @@ void LoadSaySoundConfig()
     gConfigInUnlockReplacements = false;
     gConfigSectionDepth = 0;
     gConfigAPIOnlyGroupsDepth = -1;
+    gConfigForcedSoundGroupsDepth = -1;
     gConfigPaidSaysoundGroupsDepth = -1;
     gConfigGroupAliasesDepth = -1;
     gConfigRoundStartSirensDepth = -1;
@@ -2465,13 +2479,25 @@ void LoadSaySoundConfig()
         return;
     }
 
+    char parserPath[PLATFORM_MAX_PATH];
+    bool usingNormalizedConfig = BuildParseableSaySoundConfig(filePath, parserPath, sizeof(parserPath));
+
     SMCParser parser = new SMCParser();
     parser.OnEnterSection = Config_EnterSection;
     parser.OnLeaveSection = Config_LeaveSection;
     parser.OnKeyValue = Config_KeyValue;
 
     int errorLine, errorColumn;
-    SMCError result = parser.ParseFile(filePath, errorLine, errorColumn);
+    SMCError result;
+    if (usingNormalizedConfig)
+    {
+        result = parser.ParseFile(parserPath, errorLine, errorColumn);
+        DeleteFile(parserPath);
+    }
+    else
+    {
+        result = parser.ParseFile(filePath, errorLine, errorColumn);
+    }
 
     if (result != SMCError_Okay)
     {
@@ -2495,6 +2521,95 @@ void LoadSaySoundConfig()
     gConfigLoaded = true;
 }
 
+static bool BuildParseableSaySoundConfig(const char[] sourcePath, char[] parserPath, int maxlen)
+{
+    ConVar hostPort = FindConVar("hostport");
+    int port = (hostPort != null) ? hostPort.IntValue : 0;
+    BuildPath(Path_SM, parserPath, maxlen, "data/saysounds_parser_%d.tmp", port);
+
+    File source = OpenFile(sourcePath, "r");
+    if (source == null)
+    {
+        return false;
+    }
+
+    File destination = OpenFile(parserPath, "w");
+    if (destination == null)
+    {
+        delete source;
+        return false;
+    }
+
+    bool awaitingForcedSectionBrace = false;
+    bool inForcedSection = false;
+    char line[1024];
+    char trimmed[1024];
+    char token[MAX_GROUP_NAME];
+
+    while (source.ReadLine(line, sizeof(line)))
+    {
+        strcopy(trimmed, sizeof(trimmed), line);
+        TrimString(trimmed);
+
+        if (!inForcedSection && IsForcedSoundGroupsHeader(trimmed))
+        {
+            awaitingForcedSectionBrace = true;
+        }
+        else if (awaitingForcedSectionBrace && StrEqual(trimmed, "{"))
+        {
+            awaitingForcedSectionBrace = false;
+            inForcedSection = true;
+        }
+        else if (inForcedSection && StrEqual(trimmed, "}"))
+        {
+            inForcedSection = false;
+        }
+        else if (inForcedSection && ExtractSingleQuotedToken(trimmed, token, sizeof(token)))
+        {
+            destination.WriteLine("        \"%s\" \"\"", token);
+            continue;
+        }
+
+        destination.WriteString(line, false);
+    }
+
+    delete destination;
+    delete source;
+    return true;
+}
+
+static bool IsForcedSoundGroupsHeader(const char[] line)
+{
+    char sectionName[64];
+    if (!ExtractSingleQuotedToken(line, sectionName, sizeof(sectionName)))
+    {
+        return false;
+    }
+
+    Strings_ToLower(sectionName, sizeof(sectionName));
+    return StrEqual(sectionName, FORCED_SOUND_GROUPS_SECTION)
+        || StrEqual(sectionName, "forced_sound_groups")
+        || StrEqual(sectionName, "forced-sound-groups");
+}
+
+static bool ExtractSingleQuotedToken(const char[] line, char[] output, int maxlen)
+{
+    output[0] = '\0';
+
+    int length = strlen(line);
+    if (length < 2 || line[0] != '"' || line[length - 1] != '"')
+    {
+        return false;
+    }
+
+    char token[1024];
+    strcopy(token, sizeof(token), line[1]);
+    token[length - 2] = '\0';
+    TrimString(token);
+    strcopy(output, maxlen, token);
+    return output[0] != '\0';
+}
+
 public SMCResult Config_EnterSection(SMCParser parser, const char[] name, bool optQuotes)
 {
     gConfigSectionDepth++;
@@ -2510,6 +2625,13 @@ public SMCResult Config_EnterSection(SMCParser parser, const char[] name, bool o
     {
         gConfigInAPIOnlyGroups = true;
         gConfigAPIOnlyGroupsDepth = gConfigSectionDepth;
+    }
+    else if (StrEqual(sectionName, FORCED_SOUND_GROUPS_SECTION)
+        || StrEqual(sectionName, "forced_sound_groups")
+        || StrEqual(sectionName, "forced-sound-groups"))
+    {
+        gConfigInForcedSoundGroups = true;
+        gConfigForcedSoundGroupsDepth = gConfigSectionDepth;
     }
     else if (StrEqual(sectionName, PAID_SAYSOUND_GROUPS_SECTION)
         || StrEqual(sectionName, "paid_saysound_groups")
@@ -2577,6 +2699,12 @@ public SMCResult Config_LeaveSection(SMCParser parser)
     {
         gConfigInAPIOnlyGroups = false;
         gConfigAPIOnlyGroupsDepth = -1;
+    }
+
+    if (gConfigInForcedSoundGroups && gConfigSectionDepth == gConfigForcedSoundGroupsDepth)
+    {
+        gConfigInForcedSoundGroups = false;
+        gConfigForcedSoundGroupsDepth = -1;
     }
 
     if (gConfigInPaidSaysoundGroups && gConfigSectionDepth == gConfigPaidSaysoundGroupsDepth)
@@ -2682,6 +2810,12 @@ public SMCResult Config_KeyValue(SMCParser parser, const char[] key, const char[
         return SMCParse_Continue;
     }
 
+    if (gConfigInForcedSoundGroups)
+    {
+        Config_ForcedSoundGroup(key);
+        return SMCParse_Continue;
+    }
+
     if (gConfigInPaidSaysoundGroups)
     {
         Config_PaidSaysoundGroup(key, value);
@@ -2754,6 +2888,20 @@ static void Config_APIOnlyGroup(const char[] key)
 
     // API-only membership is presence-based; the value is reserved for config compatibility.
     gAPIOnlyGroups.SetValue(groupName, 1);
+}
+
+static void Config_ForcedSoundGroup(const char[] key)
+{
+    char groupName[MAX_GROUP_NAME];
+    strcopy(groupName, sizeof(groupName), key);
+    TrimString(groupName);
+    Strings_ToLower(groupName, sizeof(groupName));
+
+    if (groupName[0] && !StrEqual(groupName, DEFAULT_GROUP))
+    {
+        EnsureGroupRegistered(groupName);
+        gForcedSoundGroups.SetValue(groupName, 1);
+    }
 }
 
 static void Config_PaidSaysoundGroup(const char[] key, const char[] value)
@@ -3161,6 +3309,23 @@ static bool IsGroupPaid(const char[] groupName)
 
     int paid = 0;
     return gPaidSaysoundGroups.GetValue(normalized, paid) && paid != 0;
+}
+
+static bool IsGroupForced(const char[] groupName)
+{
+    if (gForcedSoundGroups == null || !groupName[0])
+    {
+        return false;
+    }
+
+    char normalized[MAX_GROUP_NAME];
+    if (!ResolveKnownGroupName(groupName, normalized, sizeof(normalized)))
+    {
+        return false;
+    }
+
+    int forced = 0;
+    return gForcedSoundGroups.GetValue(normalized, forced) && forced != 0;
 }
 
 static bool CanUseAPIOnlySaySoundGroup(const char[] groupName, bool bypassAPIOnly = false)
@@ -5520,7 +5685,7 @@ static bool CanPlaySaySoundToClient(int client, const char[] groupName, float &e
         return false;
     }
 
-    if (forcePlayback || (g_hForce != null && g_hForce.BoolValue))
+    if (forcePlayback || (g_hForce != null && g_hForce.BoolValue) || IsGroupForced(groupName))
     {
         emitVolume = 1.0;
         return true;
