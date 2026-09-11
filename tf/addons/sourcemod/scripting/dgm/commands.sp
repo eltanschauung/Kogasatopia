@@ -48,7 +48,7 @@ public Action Command_Stats(int client, int args)
         PrintToChat(client, "\x04[Respawn]\x01 respawn_time: \x04%.2f\x01 | respawn_otime: \x04%.2f",
                     respawnTime, timeOverride);
 
-        PrintToChat(client, "\x04[Respawn]\x01 red: \x04%.2f\x01 | blu: \x04%.2f", redTime, bluTime);
+        PrintToChat(client, "\x04[Respawn]\x01 Edicts: \x04%d\x01/2048", GetEntityCount());
 
         PrintToChat(client, "\x04[DGM]\x01 Last round duration: \x04%d\x01 seconds", g_iLastRoundDuration);
 
@@ -194,4 +194,3 @@ public Action Command_RespawnToggle(int client, int args)
     }
     return Plugin_Handled;
 }
-
