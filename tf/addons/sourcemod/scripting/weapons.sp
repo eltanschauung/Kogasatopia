@@ -88,6 +88,7 @@ ConVar sm_weapons_statistics_database;
 ConVar sm_weapons_validate_debug;
 ConVar sm_weapons_validate_repair;
 ConVar sm_weapons_hide_reskin_only;
+ConVar sm_weapons_free;
 ConVar mp_stalemate_meleeonly;
 Database g_WeaponsStatsDb = null;
 bool g_WeaponsStatsDbReady = false;
@@ -176,6 +177,7 @@ public void OnPluginStart()
     sm_weapons_validate_debug = CreateConVar("sm_weapons_validate_debug", "0", "Log m_bValidatedAttachedEntity state after custom item creation and equip.", _, true, 0.0, true, 1.0);
     sm_weapons_validate_repair = CreateConVar("sm_weapons_validate_repair", "1", "Re-assert m_bValidatedAttachedEntity if TF2 clears it after attachment.", _, true, 0.0, true, 1.0);
     sm_weapons_hide_reskin_only = CreateConVar("sm_weapons_hide_reskin_only", "1", "Hide reskin-only weapons from sm_c descriptions.", _, true, 0.0, true, 1.0);
+    sm_weapons_free = CreateConVar("sm_weapons_free", "0", "Treat all custom weapons as unlocked in sm_cw.", _, true, 0.0, true, 1.0);
     sm_weapons_statistics.AddChangeHook(OnWeaponsStatisticsEnabledChanged);
     sm_weapons_statistics_database.AddChangeHook(OnWeaponsStatisticsDatabaseChanged);
     ConnectWeaponsStatisticsDatabase();

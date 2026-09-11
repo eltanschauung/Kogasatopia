@@ -655,7 +655,7 @@ bool CanPlayerViewItem(int client, const CustomItemDefinition item)
 
 bool ItemRequiresPointsStorePurchase(int client, const CustomItemDefinition item)
 {
-    if (!item.pointsStorePurchase[0]) return false;
+    if (sm_weapons_free.BoolValue || !item.pointsStorePurchase[0]) return false;
     return !Weapons_LoadoutClientValid(client) || !IsClientInGame(client)
         || GetFeatureStatus(FeatureType_Native, POINTS_STORE_HAS_PURCHASE_NATIVE) != FeatureStatus_Available
         || !PointsStore_HasPurchase(client, item.pointsStorePurchase);
