@@ -12,14 +12,16 @@
 #define Weapons_ATTR_CUSTOM_MELEE_HIT_SOUND "custom melee hit sound"
 #define WEAPONS_SOUND_ENTRY_BATSABER_SWING "Weapon_BatSaber.Swing"
 #define WEAPONS_SOUND_ENTRY_BATSABER_HIT_FLESH "Weapon_BatSaber.HitFlesh"
-#define WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN 3.0
+#define WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN 1.5
 #define WEAPONS_LAST_WEAPON_SLOT 5
+#define WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT (WEAPONS_LAST_WEAPON_SLOT + 2)
+#define WEAPONS_DEPLOY_COOLDOWN_UNKNOWN_SLOT (WEAPONS_LAST_WEAPON_SLOT + 1)
 
 StringMap g_WeaponsSoundGroups;
 DynamicHook g_WeaponsSoundPrimaryAttackHook;
 int g_iWeaponsSoundWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 char g_sWeaponsSoundGroup[MAXPLAYERS + 1][64];
-float g_flWeaponsNextDeploySoundTime[MAXPLAYERS + 1];
+float g_flWeaponsNextDeploySoundTime[MAXPLAYERS + 1][WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT];
 
 static const char g_WeaponsSoundBatSaberSwingSamples[][] =
 {
@@ -183,8 +185,19 @@ void WeaponsSound_OnWeaponSwitchPost(int client, int weapon)
 
 static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 {
-	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon)
-			|| GetGameTime() < g_flWeaponsNextDeploySoundTime[client])
+	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon))
+	{
+		return;
+	}
+
+	int slot = view_as<int>(TF2Util_GetWeaponSlot(weapon));
+	if (slot < 0 || slot > WEAPONS_LAST_WEAPON_SLOT)
+	{
+		slot = WEAPONS_DEPLOY_COOLDOWN_UNKNOWN_SLOT;
+	}
+
+	float now = GetGameTime();
+	if (now < g_flWeaponsNextDeploySoundTime[client][slot])
 	{
 		return;
 	}
@@ -192,8 +205,8 @@ static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 	if (WeaponsSound_EmitCustomAttribute(client, weapon,
 			Weapons_ATTR_CUSTOM_DEPLOY_SOUND, "custom deploy"))
 	{
-		g_flWeaponsNextDeploySoundTime[client] =
-			GetGameTime() + WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN;
+		g_flWeaponsNextDeploySoundTime[client][slot] =
+			now + WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN;
 	}
 }
 
@@ -367,7 +380,10 @@ void WeaponsSound_ResetClient(int client, bool resetDeployCooldown = false)
 	g_sWeaponsSoundGroup[client][0] = '\0';
 	if (resetDeployCooldown)
 	{
-		g_flWeaponsNextDeploySoundTime[client] = 0.0;
+		for (int slot = 0; slot < WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT; slot++)
+		{
+			g_flWeaponsNextDeploySoundTime[client][slot] = 0.0;
+		}
 	}
 }
 
