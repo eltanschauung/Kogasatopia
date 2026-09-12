@@ -62,7 +62,7 @@ void SecondaryDamageRefill_OnDamage(int attacker, int weapon, float damage)
 	if (updated)
 	{
 		SetClip_Weapon(primary, clip);
-		PrintToChat(attacker, "cobson");
+		EmitSoundToClient(attacker, SOUND_RESTORE_PRIMARY_SHOT);
 	}
 }
 
