@@ -149,6 +149,14 @@ native bool Weapons_GetWeaponInfo(int weaponIndex,
  */
 native bool Weapons_CanClassUseWeapon(const char[] className, int weaponIndex);
 
+/**
+ * Returns the weapon entity responsible for a player death during the current
+ * damage tick. This never falls back to the attacker's active weapon.
+ *
+ * @return Weapon entity index, or -1 when no strict damage weapon is available.
+ */
+native int Weapons_GetKillingWeapon(int attacker, int victim);
+
 forward void OnAmbassadorHeadshotKill(int attacker, int victim);
 forward void OnSandmanCleaverCombo(int attacker, int victim);
 forward void OnMeatshotKill(int attacker, int victim);
@@ -182,5 +190,6 @@ public void __pl_weapons_SetNTVOptional() {
 	MarkNativeAsOptional("Weapons_GetItemLoadoutSlot");
 	MarkNativeAsOptional("Weapons_GetWeaponInfo");
 	MarkNativeAsOptional("Weapons_CanClassUseWeapon");
+	MarkNativeAsOptional("Weapons_GetKillingWeapon");
 }
 #endif

@@ -291,7 +291,7 @@ Action Ambassador102_OnHeadshotDamage(int victim, int attacker, int weapon, floa
 	return Plugin_Changed;
 }
 
-void TryAwardAmbassadorHeadshotKill(Event event, int attacker, int victim)
+void TryAwardAmbassadorHeadshotKill(Event event, int attacker, int victim, int weapon)
 {
 	if (!Accuracy_IsValidClient(attacker) || !Accuracy_IsValidClient(victim) || attacker == victim)
 		return;
@@ -304,7 +304,6 @@ void TryAwardAmbassadorHeadshotKill(Event event, int attacker, int victim)
 	if (event.GetInt("death_flags") & TF_DEATHFLAG_DEADRINGER)
 		return;
 
-	int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
 	if (!IsAmbassadorHeadshotWeapon(weapon))
 		return;
 
@@ -322,4 +321,3 @@ void TryAwardSandmanCleaverCombo(int attacker, int victim)
 
 	FireSandmanCleaverCombo(attacker, victim);
 }
-

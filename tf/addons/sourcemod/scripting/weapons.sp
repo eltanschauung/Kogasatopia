@@ -136,6 +136,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
     CreateNative("Weapons_IsItemReskinOnly", Native_IsItemReskinOnly);
     CreateNative("Weapons_GetItemExtData", Native_GetItemExtData);
     CreateNative("Weapons_GetItemLoadoutSlot", Native_GetItemLoadoutSlot);
+    CreateNative("Weapons_GetKillingWeapon", Native_GetKillingWeapon);
     return APLRes_Success;
 }
 

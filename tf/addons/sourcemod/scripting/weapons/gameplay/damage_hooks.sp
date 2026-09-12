@@ -49,7 +49,8 @@ public Action TF2_OnTakeDamage(
 
 	if (inflictor <= MaxClients
 		|| !IsValidEntity(inflictor)
-		|| !HasEntProp(inflictor, Prop_Send, "m_hLauncher"))
+		|| !HasEntProp(inflictor, Prop_Send, "m_hLauncher")
+		|| !DamageSource_IsProjectileDirectHit(victim, inflictor))
 	{
 		return Plugin_Continue;
 	}
@@ -103,6 +104,15 @@ public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &dam
 
 	int damageWeapon = GetDamageSourceWeapon(attacker, weapon, inflictor);
 	int directDamageWeapon = GetDamageSourceWeapon(0, weapon, inflictor);
+	if (attackerIsPlayer
+		&& damage > 0.0
+		&& client != attacker
+		&& GetClientTeam(client) > 1
+		&& GetClientTeam(attacker) > 1
+		&& GetClientTeam(client) != GetClientTeam(attacker))
+	{
+		DamageSource_RecordPotentialKill(attacker, client, directDamageWeapon);
+	}
 	if (attackerIsPlayer
 		&& damageWeapon > MaxClients
 		&& IsValidEntity(damageWeapon)
@@ -428,4 +438,3 @@ public Action OnTakeDamageAlive(
 
 	return Plugin_Continue;
 }
-

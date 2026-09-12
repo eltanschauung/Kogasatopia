@@ -38,6 +38,72 @@ int GetDamageSourceWeapon(int attacker, int weapon, int inflictor)
 	return -1;
 }
 
+void DamageSourceTracking_ResetClient(int client)
+{
+	if (!Weapons_IsValidPlayerIndex(client))
+		return;
+
+	g_iProjectileDirectHitRef[client] = INVALID_ENT_REFERENCE;
+	g_iProjectileDirectHitTick[client] = 0;
+	g_iLastDamageWeaponRef[client] = INVALID_ENT_REFERENCE;
+	g_iLastDamageWeaponAttackerUserId[client] = 0;
+	g_iLastDamageWeaponTick[client] = 0;
+}
+
+public void ProjectileDirectHit_OnTouch(int projectile, int other)
+{
+	if (!Weapons_IsClientInGame(other))
+		return;
+
+	g_iProjectileDirectHitRef[other] = EntIndexToEntRef(projectile);
+	g_iProjectileDirectHitTick[other] = GetGameTickCount();
+}
+
+bool DamageSource_IsProjectileDirectHit(int victim, int inflictor)
+{
+	return Weapons_IsClientInGame(victim)
+		&& inflictor > MaxClients
+		&& IsValidEntity(inflictor)
+		&& g_iProjectileDirectHitTick[victim] == GetGameTickCount()
+		&& g_iProjectileDirectHitRef[victim] == EntIndexToEntRef(inflictor);
+}
+
+void DamageSource_RecordPotentialKill(int attacker, int victim, int weapon)
+{
+	if (!Weapons_IsValidPlayerIndex(victim))
+		return;
+
+	g_iLastDamageWeaponRef[victim] = INVALID_ENT_REFERENCE;
+	g_iLastDamageWeaponAttackerUserId[victim] = 0;
+	g_iLastDamageWeaponTick[victim] = 0;
+
+	if (!Weapons_IsClientInGame(attacker) || !Weapons_IsValidWeaponEntity(weapon))
+		return;
+
+	g_iLastDamageWeaponRef[victim] = EntIndexToEntRef(weapon);
+	g_iLastDamageWeaponAttackerUserId[victim] = GetClientUserId(attacker);
+	g_iLastDamageWeaponTick[victim] = GetGameTickCount();
+}
+
+int DamageSource_GetKillingWeapon(int attacker, int victim)
+{
+	if (!Weapons_IsClientInGame(attacker)
+		|| !Weapons_IsValidPlayerIndex(victim)
+		|| g_iLastDamageWeaponAttackerUserId[victim] != GetClientUserId(attacker)
+		|| g_iLastDamageWeaponTick[victim] != GetGameTickCount())
+	{
+		return -1;
+	}
+
+	int weapon = EntRefToEntIndex(g_iLastDamageWeaponRef[victim]);
+	return Weapons_IsValidWeaponEntity(weapon) ? weapon : -1;
+}
+
+public any Native_GetKillingWeapon(Handle plugin, int numParams)
+{
+	return DamageSource_GetKillingWeapon(GetNativeCell(1), GetNativeCell(2));
+}
+
 static void FullPelletIgnite_ClearPair(int attacker, int victim)
 {
 	if (!Weapons_IsValidPlayerIndex(attacker) || !Weapons_IsValidPlayerIndex(victim))
@@ -133,4 +199,3 @@ void FullPelletIgnite_TryConsumePost(int victim, int attacker, int weapon, int i
 
 	TF2Util_IgnitePlayer(victim, attacker, burnDuration, damageWeapon);
 }
-

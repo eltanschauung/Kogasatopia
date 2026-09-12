@@ -63,7 +63,7 @@ public void Event_PlayerDeathPost(Event event, const char[] name, bool dontBroad
     int victim = GetClientOfUserId(event.GetInt("userid"));
     int attacker = GetClientOfUserId(event.GetInt("attacker"));
 
-    if (attacker > 0 && attacker != victim && PlayWeaponKillSaySound(attacker))
+    if (attacker > 0 && attacker != victim && PlayWeaponKillSaySound(attacker, victim))
     {
         return;
     }
@@ -150,7 +150,7 @@ void GetDefaultDeathSound(char[] buffer, int maxlen)
     }
 }
 
-static bool GetWeaponKillSaySoundCommand(int attacker, char[] commandName, int maxlen)
+static bool GetWeaponKillSaySoundCommand(int attacker, int victim, char[] commandName, int maxlen)
 {
     if (maxlen > 0)
     {
@@ -162,7 +162,12 @@ static bool GetWeaponKillSaySoundCommand(int attacker, char[] commandName, int m
         return false;
     }
 
-    int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+    if (GetFeatureStatus(FeatureType_Native, "Weapons_GetKillingWeapon") != FeatureStatus_Available)
+    {
+        return false;
+    }
+
+    int weapon = Weapons_GetKillingWeapon(attacker, victim);
     if (weapon <= MaxClients || !IsValidEntity(weapon))
     {
         return false;
@@ -175,10 +180,10 @@ static bool GetWeaponKillSaySoundCommand(int attacker, char[] commandName, int m
     return commandName[0] != '\0';
 }
 
-static bool PlayWeaponKillSaySound(int attacker)
+static bool PlayWeaponKillSaySound(int attacker, int victim)
 {
     char commandName[MAX_COMMAND_NAME * 4];
-    if (!GetWeaponKillSaySoundCommand(attacker, commandName, sizeof(commandName)))
+    if (!GetWeaponKillSaySoundCommand(attacker, victim, commandName, sizeof(commandName)))
     {
         return false;
     }

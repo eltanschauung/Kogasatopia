@@ -113,6 +113,11 @@ int g_iSandmanStunInflictorRef[MAXPLAYERS + 1];
 
 int g_iEnvironmentalKillAttackerUserId[MAXPLAYERS + 1];
 float g_fEnvironmentalKillTime[MAXPLAYERS + 1];
+int g_iProjectileDirectHitRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
+int g_iProjectileDirectHitTick[MAXPLAYERS + 1];
+int g_iLastDamageWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
+int g_iLastDamageWeaponAttackerUserId[MAXPLAYERS + 1];
+int g_iLastDamageWeaponTick[MAXPLAYERS + 1];
 int g_iBlastJumpJaratePendingWeapon[MAXPLAYERS + 1];
 float g_flBlastJumpJaratePendingUntil[MAXPLAYERS + 1];
 int g_iPipebombWearerSecondaryRef[MAXPLAYERS + 1];

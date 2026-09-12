@@ -12,6 +12,7 @@
 
 #undef REQUIRE_PLUGIN
 #include <tf_custom_attributes>
+#include <weapons>
 #define REQUIRE_PLUGIN
 
 #undef REQUIRE_PLUGIN

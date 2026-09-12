@@ -146,7 +146,8 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 		return Plugin_Continue;
 	}
 
-	TryAwardAmbassadorHeadshotKill(event, attacker, client);
+	int killWeapon = DamageSource_GetKillingWeapon(attacker, client);
+	TryAwardAmbassadorHeadshotKill(event, attacker, client, killWeapon);
 
 	if (attacker > 0 && attacker <= MaxClients && IsClientInGame(attacker))
 	{
@@ -158,12 +159,11 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 			WearerRefillSecondaryClipOnKill(attacker);
 		}
 
-		int activeWeapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
-		if (!(activeWeapon > MaxClients && IsValidEntity(activeWeapon)))
-			return Plugin_Continue;
-
-		ReloadOnKill_OnKill(activeWeapon);
-		RefillPrimaryClipOnKill(attacker, activeWeapon);
+		if (Weapons_IsValidWeaponEntity(killWeapon))
+		{
+			ReloadOnKill_OnKill(killWeapon);
+			RefillPrimaryClipOnKill(attacker, killWeapon);
+		}
 	}
 
 	if (tf2_players[attacker].scytheWeapon != 0
@@ -198,4 +198,3 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	}
 	return Plugin_Continue;
 }
-

@@ -235,6 +235,7 @@ stock void ResetClientArrays(int client)
 	tf2_players[client].accuracyStreak = 0;
 	tf2_players[client].accuracyStreakExpiresAt = 0.0;
 	SecondaryDamageRefill_Reset(client);
+	DamageSourceTracking_ResetClient(client);
 	tf2_players[client].oldHealth = 0;
 	if (tf2_players[client].sprokeTimer != null)
 	{
@@ -553,6 +554,7 @@ void WeaponsGameplay_OnEntityCreated(int entity, const char[] class) {
 	if (entity > 0 && entity < MAX_TRACKED_ENTITIES && StrContains(class, "tf_projectile_") == 0)
 	{
 		g_flProjectileSpawnTime[entity] = GetGameTime();
+		SDKHook(entity, SDKHook_Touch, ProjectileDirectHit_OnTouch);
 	}
 
 	if (StrEqual(class, "tf_projectile_stun_ball"))
@@ -621,4 +623,3 @@ public void OnGameFrame()
 		}
 	}
 }
-
