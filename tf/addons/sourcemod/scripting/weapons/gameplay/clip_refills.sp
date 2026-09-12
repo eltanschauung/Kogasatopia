@@ -7,15 +7,20 @@ void SecondaryDamageRefill_Reset(int client)
 	tf2_players[client].secondaryDamageProgressExpiresAt = 0.0;
 }
 
-void SecondaryDamageRefill_OnDamage(int attacker, int weapon, float damage)
+void SecondaryDamageRefill_OnDamage(int attacker, float damage)
 {
 	if (attacker < 1 || attacker > MaxClients || !IsClientInGame(attacker))
 		return;
 
-	if (weapon <= MaxClients || !IsValidEntity(weapon) || damage <= 0.0)
+	if (damage <= 0.0)
 		return;
 
-	int requirement = TF2CustAttr_GetInt(weapon, ATTR_RESTORE_PRIMARY_SHOT_BY_DAMAGE, 0);
+	int activeWeapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+	if (!Weapons_IsValidWeaponEntity(activeWeapon))
+		return;
+
+	int requirement = TF2CustAttr_GetInt(
+		activeWeapon, ATTR_RESTORE_PRIMARY_SHOT_BY_DAMAGE, 0);
 	if (requirement <= 0)
 		return;
 
@@ -251,21 +256,30 @@ static void RefillPrimaryClipNextFrame(int attacker, int sourceWeapon, int amoun
 	RequestFrame(RefillPrimaryClip_ApplyFrame, pack);
 }
 
-void RefillPrimaryClipOnKill(int attacker, int weapon)
+void RefillPrimaryClipOnKill(int attacker, int killWeapon)
 {
-	if (!Weapons_IsClientInGame(attacker) || !Weapons_IsValidWeaponEntity(weapon))
+	if (!Weapons_IsClientInGame(attacker))
 		return;
 
-	int amount = TF2CustAttr_GetInt(weapon, ATTR_REFILL_PRIMARY_CLIP_ON_KILL, 0);
+	int sourceWeapon = killWeapon;
+	int amount = Weapons_IsValidWeaponEntity(killWeapon)
+		? TF2CustAttr_GetInt(killWeapon, ATTR_REFILL_PRIMARY_CLIP_ON_KILL, 0)
+		: 0;
 	if (amount <= 0)
 	{
-		amount = TF2CustAttr_GetInt(weapon, ATTR_RESTORE_PRIMARY_SHOT_KILL, 0);
+		int activeWeapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+		if (Weapons_IsValidWeaponEntity(activeWeapon))
+		{
+			amount = TF2CustAttr_GetInt(
+				activeWeapon, ATTR_RESTORE_PRIMARY_SHOT_KILL, 0);
+			sourceWeapon = activeWeapon;
+		}
 	}
 
 	if (amount <= 0)
 		return;
 
-	RefillPrimaryClipFromWeapon(attacker, weapon, amount);
+	RefillPrimaryClipFromWeapon(attacker, sourceWeapon, amount);
 }
 
 void RefillPrimaryClipOnCrit(int attacker, int victim, int weapon, float damage, int damageType)

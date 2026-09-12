@@ -141,7 +141,7 @@ public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &dam
 
 	if (attackerIsPlayer && damageWeapon > MaxClients && IsValidEntity(damageWeapon))
 	{
-		SecondaryDamageRefill_OnDamage(attacker, damageWeapon, damage);
+		SecondaryDamageRefill_OnDamage(attacker, damage);
 		ReloadOnHit_OnDamage(damageWeapon);
 		if (damage > 0.0
 			&& client != attacker

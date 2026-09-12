@@ -162,8 +162,8 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 		if (Weapons_IsValidWeaponEntity(killWeapon))
 		{
 			ReloadOnKill_OnKill(killWeapon);
-			RefillPrimaryClipOnKill(attacker, killWeapon);
 		}
+		RefillPrimaryClipOnKill(attacker, killWeapon);
 	}
 
 	if (tf2_players[attacker].scytheWeapon != 0
