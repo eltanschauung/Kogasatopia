@@ -46,7 +46,7 @@ bool WeaponsCommands_TryShowClassPage(int client, bool customWeapons)
 		classKey, customWeapons ? "custom" : "reverts");
 
 	char url[256];
-	FormatEx(url, sizeof(url), "https://kogasa.tf/weapons?view=%s#%s", view, view);
+	FormatEx(url, sizeof(url), "https://kogasa.tf/weapons?view=%s&motd=2#%s", view, view);
 
 	KeyValues panel = new KeyValues("data");
 	panel.SetString("title", customWeapons ? "Custom Weapons" : "Weapon Reverts");
