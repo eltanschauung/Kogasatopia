@@ -9,6 +9,52 @@ void WeaponsCommands_OnPluginStart()
 	RegConsoleCmd("sm_changes", Command_WeaponInfo, "Lists configured weapon changes");
 }
 
+void WeaponsCommands_ResetClient(int client)
+{
+	g_WeaponsHtmlMotdPreference[client] = WeaponsHtmlMotd_Unknown;
+}
+
+void WeaponsCommands_QueryHtmlMotdPreference(int client)
+{
+	WeaponsCommands_ResetClient(client);
+	if (!Client_IsInGame(client) || IsFakeClient(client)) return;
+
+	QueryClientConVar(client, "cl_disablehtmlmotd", WeaponsCommands_OnHtmlMotdQueried,
+		GetClientSerial(client));
+}
+
+public void WeaponsCommands_OnHtmlMotdQueried(QueryCookie cookie, int client,
+	ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any serial)
+{
+	if (GetClientFromSerial(serial) != client || result != ConVarQuery_Okay) return;
+
+	g_WeaponsHtmlMotdPreference[client] = StringToInt(cvarValue) == 0
+		? WeaponsHtmlMotd_Enabled
+		: WeaponsHtmlMotd_Disabled;
+}
+
+bool WeaponsCommands_TryShowClassPage(int client, bool customWeapons)
+{
+	if (g_WeaponsHtmlMotdPreference[client] != WeaponsHtmlMotd_Enabled) return false;
+
+	char classKey[16];
+	TF2Classes_GetKey(TF2Classes_GetCurrentOrDesired(client), classKey, sizeof(classKey));
+	if (!classKey[0]) return false;
+
+	char url[192];
+	FormatEx(url, sizeof(url), "https://kogasa.tf/weapons#%s-%s-ingame",
+		classKey, customWeapons ? "custom" : "reverts");
+
+	KeyValues panel = new KeyValues("data");
+	panel.SetString("title", customWeapons ? "Custom Weapons" : "Weapon Reverts");
+	panel.SetString("type", "2");
+	panel.SetString("msg", url);
+	panel.SetNum("customsvr", 1);
+	ShowVGUIPanel(client, "info", panel);
+	delete panel;
+	return true;
+}
+
 static KeyValues LoadWeaponsItemClassesConfig()
 {
 	if (g_WeaponsConfig == null)
@@ -53,6 +99,8 @@ static void AppendWeaponInfoLinePart(char[] buffer, int maxlen, const char[] col
 public Action Command_WeaponInfo(int client, int args)
 {
 	if (!Client_IsInGame(client))
+		return Plugin_Handled;
+	if (WeaponsCommands_TryShowClassPage(client, false))
 		return Plugin_Handled;
 
 	if (g_hWeaponsGameplayConfig == null)

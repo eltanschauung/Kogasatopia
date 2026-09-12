@@ -82,6 +82,13 @@ public Plugin myinfo =
 bool g_bRetrievedLoadout[MAXPLAYERS + 1];
 Cookie g_ItemPersistCookies[NUM_PLAYER_CLASSES][NUM_ITEMS];
 bool g_bForceReequipItems[MAXPLAYERS + 1];
+enum WeaponsHtmlMotdPreference
+{
+    WeaponsHtmlMotd_Unknown = 0,
+    WeaponsHtmlMotd_Enabled,
+    WeaponsHtmlMotd_Disabled
+};
+WeaponsHtmlMotdPreference g_WeaponsHtmlMotdPreference[MAXPLAYERS + 1];
 ConVar sm_weapons_enable_loadout;
 ConVar sm_weapons_statistics;
 ConVar sm_weapons_statistics_database;
@@ -216,6 +223,10 @@ public void OnPluginStart()
             continue;
         }
         OnClientConnected(client);
+        if (IsClientInGame(client))
+        {
+            WeaponsCommands_QueryHtmlMotdPreference(client);
+        }
         if (IsClientAuthorized(client))
         {
             FetchLoadoutItems(client);
@@ -320,8 +331,14 @@ public void OnClientPutInServer(int client)
     WeaponsHatVisibility_OnClientPutInServer(client);
 }
 
+public void OnClientPostAdminCheck(int client)
+{
+    WeaponsCommands_QueryHtmlMotdPreference(client);
+}
+
 public void OnClientDisconnect(int client)
 {
+    WeaponsCommands_ResetClient(client);
     Weapons_ResetLoadoutRequests(client);
     CustomHats_OnClientDisconnect(client);
     WeaponsHatVisibility_OnClientDisconnect(client);

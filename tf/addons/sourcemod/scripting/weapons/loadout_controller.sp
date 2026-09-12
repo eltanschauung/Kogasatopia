@@ -36,6 +36,7 @@ void Weapons_ResetLoadoutRequests(int client)
 public void OnClientConnected(int client)
 {
     Weapons_ResetLoadoutRequests(client);
+    WeaponsCommands_ResetClient(client);
     g_bRetrievedLoadout[client] = false;
     for (int playerClass = 0; playerClass < NUM_PLAYER_CLASSES; playerClass++)
     {
@@ -721,6 +722,7 @@ Action DisplayItemDescriptions(int client, int argc)
     if (!Weapons_IsValidClient(client)) return Plugin_Handled;
     int playerClass = view_as<int>(TF2_GetPlayerClass(client));
     if (!Weapons_LoadoutClassValid(playerClass)) return Plugin_Handled;
+    if (WeaponsCommands_TryShowClassPage(client, true)) return Plugin_Handled;
     StringMap printed = new StringMap();
     StringMapSnapshot snapshot = GetCustomItemList();
     for (int i = 0; i < snapshot.Length; i++)
