@@ -41,9 +41,12 @@ bool WeaponsCommands_TryShowClassPage(int client, bool customWeapons)
 	TF2Classes_GetKey(TF2Classes_GetCurrentOrDesired(client), classKey, sizeof(classKey));
 	if (!classKey[0]) return false;
 
-	char url[192];
-	FormatEx(url, sizeof(url), "https://kogasa.tf/weapons#%s-%s-ingame",
+	char view[48];
+	FormatEx(view, sizeof(view), "%s-%s-ingame",
 		classKey, customWeapons ? "custom" : "reverts");
+
+	char url[256];
+	FormatEx(url, sizeof(url), "https://kogasa.tf/weapons?view=%s#%s", view, view);
 
 	KeyValues panel = new KeyValues("data");
 	panel.SetString("title", customWeapons ? "Custom Weapons" : "Weapon Reverts");
