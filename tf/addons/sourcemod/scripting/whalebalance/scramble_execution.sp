@@ -29,8 +29,8 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
     }
 
     int moved = 0;
-    int pairR[MAX_SWAP_BUFFER];
-    int pairB[MAX_SWAP_BUFFER];
+    int pairR[MAX_SWAP_BUFFER + 1];
+    int pairB[MAX_SWAP_BUFFER + 1];
     int pairCount = 0;
     bool allowBots = g_hCountBots != null && g_hCountBots.BoolValue;
     for (int i = 0; i < swapCount; i++)
@@ -72,6 +72,20 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
         }
     }
 
+    bool medicBalanceMoved = false;
+    if (pairCount > 0 && g_hBalanceMedics != null && g_hBalanceMedics.BoolValue)
+    {
+        int medicPairRed;
+        int medicPairBlu;
+        if (TryBalanceScrambleMedics(ignoreImmunity, allowBots, suppressRespawn, medicPairRed, medicPairBlu))
+        {
+            pairR[pairCount] = medicPairRed;
+            pairB[pairCount] = medicPairBlu;
+            pairCount++;
+            medicBalanceMoved = true;
+        }
+    }
+
     moved = pairCount * 2;
     if (moved > 0)
     {
@@ -82,7 +96,7 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
         CPrintToChatAll("{tomato}[{purple}Gap{tomato}]{default} {gold}Whalescrambling{default} %d players!", moved);
         SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
         LogWhale("Scramble executed: moved=%d pairs=%d suppressRespawn=%d.", moved, pairCount, suppressRespawn ? 1 : 0);
-        LogWhaleStat("scramble_result", "mode=%s|result=executed|moved=%d|pairs=%d|suppress_respawn=%d|setup=%d|ignore_immunity=%d", scrambleMode, moved, pairCount, suppressRespawn ? 1 : 0, setupScramble ? 1 : 0, ignoreImmunity ? 1 : 0);
+        LogWhaleStat("scramble_result", "mode=%s|result=executed|moved=%d|pairs=%d|medic_balance=%d|suppress_respawn=%d|setup=%d|ignore_immunity=%d", scrambleMode, moved, pairCount, medicBalanceMoved ? 1 : 0, suppressRespawn ? 1 : 0, setupScramble ? 1 : 0, ignoreImmunity ? 1 : 0);
         if (suppressRespawn)
         {
             QueuePostAutoScrambleRespawnSweep();
@@ -160,6 +174,137 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
         LogWhaleStat("scramble_result", "mode=%s|result=aborted|reason=no_eligible_pairs|swap=%d|ignore_immunity=%d", scrambleMode, swapCount, ignoreImmunity ? 1 : 0);
     }
     return Plugin_Stop;
+}
+
+static bool TryBalanceScrambleMedics(bool ignoreImmunity, bool allowBots, bool suppressRespawn,
+    int &redClient, int &bluClient)
+{
+    redClient = 0;
+    bluClient = 0;
+
+    int redMedics = CountTeamMedics(TEAM_RED);
+    int bluMedics = CountTeamMedics(TEAM_BLU);
+    int donorTeam;
+    int recipientTeam;
+
+    if (redMedics == 0 && bluMedics > 1)
+    {
+        donorTeam = TEAM_BLU;
+        recipientTeam = TEAM_RED;
+    }
+    else if (bluMedics == 0 && redMedics > 1)
+    {
+        donorTeam = TEAM_RED;
+        recipientTeam = TEAM_BLU;
+    }
+    else
+    {
+        return false;
+    }
+
+    int medic = SelectScrambleMedicCorrectionCandidate(donorTeam, true, ignoreImmunity, allowBots);
+    int counterpart = SelectScrambleMedicCorrectionCandidate(recipientTeam, false, ignoreImmunity, allowBots);
+    if (medic <= 0 || counterpart <= 0)
+    {
+        LogWhale("Post-scramble Medic balance skipped: RED medics=%d BLU medics=%d eligibleMedic=%d eligibleCounterpart=%d.",
+            redMedics, bluMedics, medic > 0 ? 1 : 0, counterpart > 0 ? 1 : 0);
+        LogWhaleStat("scramble_medic_balance", "result=skipped|reason=no_eligible_pair|red_medics=%d|blu_medics=%d|eligible_medic=%d|eligible_counterpart=%d",
+            redMedics, bluMedics, medic > 0 ? 1 : 0, counterpart > 0 ? 1 : 0);
+        return false;
+    }
+
+    if (donorTeam == TEAM_RED)
+    {
+        redClient = medic;
+        bluClient = counterpart;
+    }
+    else
+    {
+        redClient = counterpart;
+        bluClient = medic;
+    }
+
+    if (!TeamBalance_MoveScrambleMedicPair(redClient, bluClient, ignoreImmunity, allowBots, suppressRespawn))
+    {
+        LogWhale("Post-scramble Medic balance rejected by the authoritative mover: RED medics=%d BLU medics=%d.",
+            redMedics, bluMedics);
+        LogWhaleStat("scramble_medic_balance", "result=rejected|reason=controller_validation|red_medics=%d|blu_medics=%d",
+            redMedics, bluMedics);
+        redClient = 0;
+        bluClient = 0;
+        return false;
+    }
+
+    LogWhale("Post-scramble Medic balance executed: RED medics=%d BLU medics=%d donorTeam=%d.",
+        redMedics, bluMedics, donorTeam);
+    LogWhaleStat("scramble_medic_balance", "result=executed|red_medics_before=%d|blu_medics_before=%d|donor_team=%d|recipient_team=%d",
+        redMedics, bluMedics, donorTeam, recipientTeam);
+    return true;
+}
+
+static int CountTeamMedics(int team)
+{
+    int count = 0;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client)
+            && GetClientTeam(client) == team
+            && TF2_GetPlayerClass(client) == TFClass_Medic)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+static int SelectScrambleMedicCorrectionCandidate(int team, bool requireMedic,
+    bool ignoreImmunity, bool allowBots)
+{
+    int candidates[MAXPLAYERS + 1];
+    int candidatePriorities[MAXPLAYERS + 1];
+    int candidateCount = 0;
+    int bestPriority = -1;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!TeamBalance_IsScrambleMedicCandidate(client, team, ignoreImmunity, allowBots)
+            || HasScramblePurchaseImmunity(client)
+            || ((TF2_GetPlayerClass(client) == TFClass_Medic) != requireMedic))
+        {
+            continue;
+        }
+
+        int priority = IsPlayerAlive(client) ? 0 : 2;
+        if (!requireMedic && !Kogasa_IsEngineerWithBuildings(client))
+        {
+            priority++;
+        }
+
+        candidates[candidateCount] = client;
+        candidatePriorities[candidateCount] = priority;
+        candidateCount++;
+        if (priority > bestPriority)
+        {
+            bestPriority = priority;
+        }
+    }
+
+    if (candidateCount == 0)
+    {
+        return 0;
+    }
+
+    int preferred[MAXPLAYERS + 1];
+    int preferredCount = 0;
+    for (int i = 0; i < candidateCount; i++)
+    {
+        if (candidatePriorities[i] == bestPriority)
+        {
+            preferred[preferredCount++] = candidates[i];
+        }
+    }
+
+    return preferred[GetRandomInt(0, preferredCount - 1)];
 }
 
 static void WhaleScramble_AddKothTime()

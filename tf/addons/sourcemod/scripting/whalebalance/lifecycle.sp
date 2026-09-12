@@ -60,6 +60,7 @@ public void OnClientDisconnect(int client)
     if (client > 0 && client <= MaxClients)
     {
         g_fBalanceMovedUntil[client] = 0.0;
+        g_iBalanceMovedOperationGeneration[client] = 0;
     }
     ClearTeamSwapRequestsForClient(client);
     WhaleScramble_OnClientDisconnect(client);

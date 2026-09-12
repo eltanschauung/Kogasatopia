@@ -47,6 +47,7 @@ ConVar g_hKothNoCapAuto = null;
 ConVar g_hPayloadStompFirstCapSeconds = null;
 ConVar g_hWinStreakAuto = null;
 ConVar g_hNoSequentialAuto = null;
+ConVar g_hBalanceMedics = null;
 ConVar g_hMpScrambleTeamsAuto = null;
 int g_iRoundsSinceAuto = 0;
 bool g_bAutoScramblePendingRoundStart = false;
@@ -106,6 +107,7 @@ void WhaleScramble_OnPluginStart()
     g_hPayloadStompFirstCapSeconds = CreateConVar("sm_whalescramble_payload_stomp_first_cap_seconds", "100", "Immediately whale scramble when BLU captures the first payload control point within this many seconds. 0 disables.", _, true, 0.0, true, 600.0);
     g_hWinStreakAuto = CreateConVar("sm_whalescramble_win_streak", "2", "Automatically whale scramble after one team wins this many full rounds in a row. 0 disables.", _, true, 0.0, true, 20.0);
     g_hNoSequentialAuto = CreateConVar("sm_whalescramble_no_sequential", "1", "Block auto scrambles from happening in consecutive rounds or more than once in one round.", _, true, 0.0, true, 1.0);
+    g_hBalanceMedics = CreateConVar("sm_whalescramble_balance_medics", "1", "After a scramble, give a medic-less team one Medic when the opposing team has more than one.", _, true, 0.0, true, 1.0);
     g_hMpScrambleTeamsAuto = FindConVar("mp_scrambleteams_auto");
     for (int i = 0; i < sizeof(SCRAMBLE_COMMANDS); i++)
     {

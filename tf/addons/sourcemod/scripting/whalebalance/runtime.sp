@@ -70,6 +70,18 @@ bool TeamBalance_MoveScramblePair(int redClient, int bluClient, bool ignoreImmun
     return TeamBalance_MoveScramblePairInternal(redClient, bluClient, ignoreImmunity, allowBots, suppressRespawn);
 }
 
+bool TeamBalance_MoveScrambleMedicPair(int redClient, int bluClient, bool ignoreImmunity,
+    bool allowBots, bool suppressRespawn)
+{
+    return TeamBalance_MoveScramblePairCore(redClient, bluClient, ignoreImmunity,
+        allowBots, suppressRespawn, true);
+}
+
+bool TeamBalance_IsScrambleMedicCandidate(int client, int expectedTeam, bool ignoreImmunity, bool allowBots)
+{
+    return TeamBalance_IsScrambleMedicCandidateInternal(client, expectedTeam, ignoreImmunity, allowBots);
+}
+
 bool TeamBalance_QueueRespawn(int client, int expectedTeam)
 {
     return TeamBalance_QueueRespawnInternal(client, expectedTeam, false);
@@ -160,6 +172,22 @@ bool TeamBalance_IsScrambleCandidateInternal(int client, int expectedTeam, bool 
     return ignoreImmunity || !TeamBalance_IsScrambleImmuneInternal(client);
 }
 
+static bool TeamBalance_IsScrambleMedicCandidateInternal(int client, int expectedTeam,
+    bool ignoreImmunity, bool allowBots)
+{
+    if (client <= 0 || client > MaxClients || !IsClientInGame(client)) return false;
+    if (!allowBots && IsFakeClient(client)) return false;
+    int team = GetClientTeam(client);
+    if ((expectedTeam == TEAM_RED || expectedTeam == TEAM_BLUE) && team != expectedTeam) return false;
+    if (team != TEAM_RED && team != TEAM_BLUE) return false;
+    if (DuelDetection_IsClientInDuel(client)) return false;
+
+    bool movedInThisScramble = g_eTeamBalanceState == TeamBalance_ScrambleMoving
+        && g_iBalanceMovedOperationGeneration[client] == g_iBalanceOperationGeneration;
+    if (TeamBalance_IsRecentlyMoved(client) && !movedInThisScramble) return false;
+    return ignoreImmunity || movedInThisScramble || !TeamBalance_IsScrambleImmuneInternal(client);
+}
+
 static bool TeamBalance_IsScrambleImmuneInternal(int client)
 {
     if (client <= 0 || client > MaxClients || !IsClientInGame(client) || g_hScrambleImmunity == null) return false;
@@ -194,10 +222,22 @@ bool TeamBalance_IsSessionOnTeam(int serial, int team)
 bool TeamBalance_MoveScramblePairInternal(int redClient, int bluClient, bool ignoreImmunity,
     bool allowBots, bool suppressRespawn)
 {
+    return TeamBalance_MoveScramblePairCore(redClient, bluClient, ignoreImmunity,
+        allowBots, suppressRespawn, false);
+}
+
+static bool TeamBalance_MoveScramblePairCore(int redClient, int bluClient, bool ignoreImmunity,
+    bool allowBots, bool suppressRespawn, bool allowCurrentScrambleMoves)
+{
     TeamBalance_RefreshState();
     if (g_eTeamBalanceState != TeamBalance_ScramblePending && g_eTeamBalanceState != TeamBalance_ScrambleMoving) return false;
-    if (!TeamBalance_IsScrambleCandidateInternal(redClient, TEAM_RED, ignoreImmunity, allowBots)
-        || !TeamBalance_IsScrambleCandidateInternal(bluClient, TEAM_BLUE, ignoreImmunity, allowBots)
+    bool redEligible = allowCurrentScrambleMoves
+        ? TeamBalance_IsScrambleMedicCandidateInternal(redClient, TEAM_RED, ignoreImmunity, allowBots)
+        : TeamBalance_IsScrambleCandidateInternal(redClient, TEAM_RED, ignoreImmunity, allowBots);
+    bool bluEligible = allowCurrentScrambleMoves
+        ? TeamBalance_IsScrambleMedicCandidateInternal(bluClient, TEAM_BLUE, ignoreImmunity, allowBots)
+        : TeamBalance_IsScrambleCandidateInternal(bluClient, TEAM_BLUE, ignoreImmunity, allowBots);
+    if (!redEligible || !bluEligible
         || TeamBalance_HasScramblePurchaseImmunityInternal(redClient)
         || TeamBalance_HasScramblePurchaseImmunityInternal(bluClient)) return false;
 
@@ -307,7 +347,11 @@ bool TeamBalance_IsRecentlyMoved(int client)
 
 void TeamBalance_MarkRecentlyMoved(int client)
 {
-    if (client > 0 && client <= MaxClients) g_fBalanceMovedUntil[client] = GetEngineTime() + TEAM_BALANCE_MOVE_PROTECTION;
+    if (client > 0 && client <= MaxClients)
+    {
+        g_fBalanceMovedUntil[client] = GetEngineTime() + TEAM_BALANCE_MOVE_PROTECTION;
+        g_iBalanceMovedOperationGeneration[client] = g_iBalanceOperationGeneration;
+    }
 }
 
 void TeamBalance_ResetRuntime()
@@ -321,6 +365,7 @@ void TeamBalance_ResetRuntime()
     {
         TeamBalance_ClearRespawnState(client);
         g_fBalanceMovedUntil[client] = 0.0;
+        g_iBalanceMovedOperationGeneration[client] = 0;
     }
 }
 

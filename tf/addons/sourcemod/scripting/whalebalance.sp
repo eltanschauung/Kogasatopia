@@ -93,6 +93,7 @@ int g_iScramblesSinceImmunityClear = 0;
 int g_iBalanceRespawnAttempts[MAXPLAYERS + 1];
 int g_iBalanceRespawnExpectedTeam[MAXPLAYERS + 1];
 float g_fBalanceMovedUntil[MAXPLAYERS + 1];
+int g_iBalanceMovedOperationGeneration[MAXPLAYERS + 1];
 
 public Plugin myinfo =
 {
