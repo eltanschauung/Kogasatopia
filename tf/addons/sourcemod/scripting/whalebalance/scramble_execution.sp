@@ -77,6 +77,7 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
     {
         TeamBalance_FinishScramble(true);
         g_bScrambledThisRound = true;
+        WhaleScramble_AddKothTime();
         ResetSurrenderVotes("whalescramble_execute");
         CPrintToChatAll("{tomato}[{purple}Gap{tomato}]{default} {gold}Whalescrambling{default} %d players!", moved);
         SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
@@ -159,6 +160,30 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
         LogWhaleStat("scramble_result", "mode=%s|result=aborted|reason=no_eligible_pairs|swap=%d|ignore_immunity=%d", scrambleMode, swapCount, ignoreImmunity ? 1 : 0);
     }
     return Plugin_Stop;
+}
+
+static void WhaleScramble_AddKothTime()
+{
+    if (GetFeatureStatus(FeatureType_Native, "DGM_GetGameModeKey") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "DGM_AddTime") != FeatureStatus_Available)
+    {
+        return;
+    }
+
+    char gamemodeKey[32];
+    if (!DGM_GetGameModeKey(gamemodeKey, sizeof(gamemodeKey))
+        || !StrEqual(gamemodeKey, "koth", false))
+    {
+        return;
+    }
+
+    if (DGM_AddTime(SCRAMBLE_KOTH_ADD_TIME))
+    {
+        LogWhale("KOTH scramble: added %d seconds to both team timers.", SCRAMBLE_KOTH_ADD_TIME);
+        return;
+    }
+
+    LogWhale("KOTH scramble: DGM could not find a round timer to extend.");
 }
 
 static bool IsSetupActive()
