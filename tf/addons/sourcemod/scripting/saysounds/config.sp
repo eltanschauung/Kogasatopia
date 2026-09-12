@@ -34,7 +34,6 @@ void LoadSaySoundConfig()
     gReadyUnlockGroups.Clear();
     gConfigLoaded = false;
     gConfigInAPIOnlyGroups = false;
-    gConfigInForcedSoundGroups = false;
     gConfigInPaidSaysoundGroups = false;
     gConfigInGroupAliases = false;
     gConfigInRoundStartSirens = false;
@@ -45,7 +44,6 @@ void LoadSaySoundConfig()
     gConfigInUnlockReplacements = false;
     gConfigSectionDepth = 0;
     gConfigAPIOnlyGroupsDepth = -1;
-    gConfigForcedSoundGroupsDepth = -1;
     gConfigPaidSaysoundGroupsDepth = -1;
     gConfigGroupAliasesDepth = -1;
     gConfigRoundStartSirensDepth = -1;
@@ -65,9 +63,6 @@ void LoadSaySoundConfig()
         return;
     }
 
-    char parserPath[PLATFORM_MAX_PATH];
-    bool usingNormalizedConfig = BuildParseableSaySoundConfig(filePath, parserPath, sizeof(parserPath));
-
     SMCParser parser = new SMCParser();
     parser.OnEnterSection = Config_EnterSection;
     parser.OnLeaveSection = Config_LeaveSection;
@@ -75,15 +70,7 @@ void LoadSaySoundConfig()
 
     int errorLine, errorColumn;
     SMCError result;
-    if (usingNormalizedConfig)
-    {
-        result = parser.ParseFile(parserPath, errorLine, errorColumn);
-        DeleteFile(parserPath);
-    }
-    else
-    {
-        result = parser.ParseFile(filePath, errorLine, errorColumn);
-    }
+    result = parser.ParseFile(filePath, errorLine, errorColumn);
 
     if (result != SMCError_Okay)
     {
@@ -93,10 +80,12 @@ void LoadSaySoundConfig()
         delete parser;
         gSoundMap.Clear();
         gCommandNames.Clear();
+        RefreshForcedSoundGroups();
         return;
     }
 
     delete parser;
+    RefreshForcedSoundGroups();
 
     if (gCommandNames.Length == 0)
     {
@@ -105,95 +94,6 @@ void LoadSaySoundConfig()
     }
 
     gConfigLoaded = true;
-}
-
-static bool BuildParseableSaySoundConfig(const char[] sourcePath, char[] parserPath, int maxlen)
-{
-    ConVar hostPort = FindConVar("hostport");
-    int port = (hostPort != null) ? hostPort.IntValue : 0;
-    BuildPath(Path_SM, parserPath, maxlen, "data/saysounds_parser_%d.tmp", port);
-
-    File source = OpenFile(sourcePath, "r");
-    if (source == null)
-    {
-        return false;
-    }
-
-    File destination = OpenFile(parserPath, "w");
-    if (destination == null)
-    {
-        delete source;
-        return false;
-    }
-
-    bool awaitingForcedSectionBrace = false;
-    bool inForcedSection = false;
-    char line[1024];
-    char trimmed[1024];
-    char token[MAX_GROUP_NAME];
-
-    while (source.ReadLine(line, sizeof(line)))
-    {
-        strcopy(trimmed, sizeof(trimmed), line);
-        TrimString(trimmed);
-
-        if (!inForcedSection && IsForcedSoundGroupsHeader(trimmed))
-        {
-            awaitingForcedSectionBrace = true;
-        }
-        else if (awaitingForcedSectionBrace && StrEqual(trimmed, "{"))
-        {
-            awaitingForcedSectionBrace = false;
-            inForcedSection = true;
-        }
-        else if (inForcedSection && StrEqual(trimmed, "}"))
-        {
-            inForcedSection = false;
-        }
-        else if (inForcedSection && ExtractSingleQuotedToken(trimmed, token, sizeof(token)))
-        {
-            destination.WriteLine("        \"%s\" \"\"", token);
-            continue;
-        }
-
-        destination.WriteString(line, false);
-    }
-
-    delete destination;
-    delete source;
-    return true;
-}
-
-static bool IsForcedSoundGroupsHeader(const char[] line)
-{
-    char sectionName[64];
-    if (!ExtractSingleQuotedToken(line, sectionName, sizeof(sectionName)))
-    {
-        return false;
-    }
-
-    Strings_ToLower(sectionName, sizeof(sectionName));
-    return StrEqual(sectionName, FORCED_SOUND_GROUPS_SECTION)
-        || StrEqual(sectionName, "forced_sound_groups")
-        || StrEqual(sectionName, "forced-sound-groups");
-}
-
-static bool ExtractSingleQuotedToken(const char[] line, char[] output, int maxlen)
-{
-    output[0] = '\0';
-
-    int length = strlen(line);
-    if (length < 2 || line[0] != '"' || line[length - 1] != '"')
-    {
-        return false;
-    }
-
-    char token[1024];
-    strcopy(token, sizeof(token), line[1]);
-    token[length - 2] = '\0';
-    TrimString(token);
-    strcopy(output, maxlen, token);
-    return output[0] != '\0';
 }
 
 public SMCResult Config_EnterSection(SMCParser parser, const char[] name, bool optQuotes)
@@ -211,13 +111,6 @@ public SMCResult Config_EnterSection(SMCParser parser, const char[] name, bool o
     {
         gConfigInAPIOnlyGroups = true;
         gConfigAPIOnlyGroupsDepth = gConfigSectionDepth;
-    }
-    else if (StrEqual(sectionName, FORCED_SOUND_GROUPS_SECTION)
-        || StrEqual(sectionName, "forced_sound_groups")
-        || StrEqual(sectionName, "forced-sound-groups"))
-    {
-        gConfigInForcedSoundGroups = true;
-        gConfigForcedSoundGroupsDepth = gConfigSectionDepth;
     }
     else if (StrEqual(sectionName, PAID_SAYSOUND_GROUPS_SECTION)
         || StrEqual(sectionName, "paid_saysound_groups")
@@ -285,12 +178,6 @@ public SMCResult Config_LeaveSection(SMCParser parser)
     {
         gConfigInAPIOnlyGroups = false;
         gConfigAPIOnlyGroupsDepth = -1;
-    }
-
-    if (gConfigInForcedSoundGroups && gConfigSectionDepth == gConfigForcedSoundGroupsDepth)
-    {
-        gConfigInForcedSoundGroups = false;
-        gConfigForcedSoundGroupsDepth = -1;
     }
 
     if (gConfigInPaidSaysoundGroups && gConfigSectionDepth == gConfigPaidSaysoundGroupsDepth)
@@ -396,12 +283,6 @@ public SMCResult Config_KeyValue(SMCParser parser, const char[] key, const char[
         return SMCParse_Continue;
     }
 
-    if (gConfigInForcedSoundGroups)
-    {
-        Config_ForcedSoundGroup(key);
-        return SMCParse_Continue;
-    }
-
     if (gConfigInPaidSaysoundGroups)
     {
         Config_PaidSaysoundGroup(key, value);
@@ -474,20 +355,6 @@ static void Config_APIOnlyGroup(const char[] key)
 
     // API-only membership is presence-based; the value is reserved for config compatibility.
     gAPIOnlyGroups.SetValue(groupName, 1);
-}
-
-static void Config_ForcedSoundGroup(const char[] key)
-{
-    char groupName[MAX_GROUP_NAME];
-    strcopy(groupName, sizeof(groupName), key);
-    TrimString(groupName);
-    Strings_ToLower(groupName, sizeof(groupName));
-
-    if (groupName[0] && !StrEqual(groupName, DEFAULT_GROUP))
-    {
-        EnsureGroupRegistered(groupName);
-        gForcedSoundGroups.SetValue(groupName, 1);
-    }
 }
 
 static void Config_PaidSaysoundGroup(const char[] key, const char[] value)
@@ -895,6 +762,69 @@ bool IsGroupPaid(const char[] groupName)
 
     int paid = 0;
     return gPaidSaysoundGroups.GetValue(normalized, paid) && paid != 0;
+}
+
+public void ConVar_ForcedGroupsChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    RefreshForcedSoundGroups();
+}
+
+void RefreshForcedSoundGroups()
+{
+    if (gForcedSoundGroups == null)
+    {
+        return;
+    }
+
+    gForcedSoundGroups.Clear();
+
+    if (g_hForcedGroups == null)
+    {
+        return;
+    }
+
+    char configuredGroups[MAX_GROUP_PREF_VALUE];
+    g_hForcedGroups.GetString(configuredGroups, sizeof(configuredGroups));
+
+    int cursor = 0;
+    while (configuredGroups[cursor] != '\0')
+    {
+        int comma = FindCharInString(configuredGroups[cursor], ',');
+        char groupName[MAX_GROUP_NAME];
+
+        if (comma == -1)
+        {
+            strcopy(groupName, sizeof(groupName), configuredGroups[cursor]);
+        }
+        else
+        {
+            int copyLength = comma;
+            if (copyLength >= sizeof(groupName))
+            {
+                copyLength = sizeof(groupName) - 1;
+            }
+
+            strcopy(groupName, copyLength + 1, configuredGroups[cursor]);
+        }
+
+        TrimString(groupName);
+        Strings_ToLower(groupName, sizeof(groupName));
+
+        char normalized[MAX_GROUP_NAME];
+        if (groupName[0]
+            && !StrEqual(groupName, DEFAULT_GROUP)
+            && ResolveKnownGroupName(groupName, normalized, sizeof(normalized)))
+        {
+            gForcedSoundGroups.SetValue(normalized, 1);
+        }
+
+        if (comma == -1)
+        {
+            break;
+        }
+
+        cursor += comma + 1;
+    }
 }
 
 bool IsGroupForced(const char[] groupName)

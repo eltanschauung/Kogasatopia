@@ -52,6 +52,12 @@ public void OnPluginStart()
     gReadyUnlockGroups = new ArrayList(ByteCountToCells(MAX_GROUP_NAME));
 
     g_hForce = CreateConVar("saysounds_force", "0", "Force everyone to hear saysounds");
+    g_hForcedGroups = CreateConVar(
+        "sm_saysounds_forced_groups",
+        "",
+        "Comma-separated saysound groups that ignore client opt-out preferences."
+    );
+    HookConVarChange(g_hForcedGroups, ConVar_ForcedGroupsChanged);
     g_hDefaultDeathSound = CreateConVar("saysounds_default_death_sound", "doh", "Saysound command/group used when a victim has no death sound set and the attacker has no kill sound.");
     g_hDefaultVolume = CreateConVar("saysounds_default_volume", "0.5", "Default saysound volume for clients with no saved volume preference.", _, true, MIN_VOLUME, true, MAX_VOLUME);
     g_hVolumeCookie = RegClientCookie("saysounds_volume", "Preferred say sound volume", CookieAccess_Public);

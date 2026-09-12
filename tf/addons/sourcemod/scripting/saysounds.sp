@@ -30,7 +30,6 @@
 #define MAX_GROUP_PREF_VALUE 512
 #define DEFAULT_GROUP "all"
 #define API_ONLY_GROUPS_SECTION "apionlygroups"
-#define FORCED_SOUND_GROUPS_SECTION "forcedsoundgroups"
 #define PAID_SAYSOUND_GROUPS_SECTION "paidsaysoundgroups"
 #define GROUP_ALIASES_SECTION "groupaliases"
 #define ROUND_START_SIRENS_SECTION "roundstartsirenreplacements"
@@ -107,7 +106,6 @@ ArrayList gReadyUnlockReplacements;
 ArrayList gReadyUnlockGroups;
 bool gConfigLoaded = false;
 bool gConfigInAPIOnlyGroups = false;
-bool gConfigInForcedSoundGroups = false;
 bool gConfigInPaidSaysoundGroups = false;
 bool gConfigInGroupAliases = false;
 bool gConfigInRoundStartSirens = false;
@@ -118,7 +116,6 @@ bool gConfigInCountdownReplacements = false;
 bool gConfigInUnlockReplacements = false;
 int gConfigSectionDepth = 0;
 int gConfigAPIOnlyGroupsDepth = -1;
-int gConfigForcedSoundGroupsDepth = -1;
 int gConfigPaidSaysoundGroupsDepth = -1;
 int gConfigGroupAliasesDepth = -1;
 int gConfigRoundStartSirensDepth = -1;
@@ -142,6 +139,7 @@ Handle g_hRoundStartAutoCountdownRestoreTimer = INVALID_HANDLE;
 bool gNormalSoundHookAdded = false;
 bool gAmbientSoundHookAdded = false;
 ConVar g_hForce;
+ConVar g_hForcedGroups;
 ConVar g_hDefaultDeathSound;
 ConVar g_hDefaultVolume;
 int g_iSaySoundStatsCounter = 0;
