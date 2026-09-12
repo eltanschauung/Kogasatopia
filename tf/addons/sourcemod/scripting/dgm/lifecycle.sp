@@ -71,6 +71,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_noset", Command_ResetSetup, ADMFLAG_KICK, "Set round setup time to 10 seconds");
 	RegAdminCmd("sm_extend", Command_ExtendTimer, ADMFLAG_KICK, "sm_extend <seconds> - Set round timer time");
 	RegAdminCmd("sm_settime", Command_ExtendTimer, ADMFLAG_KICK, "sm_settime [seconds] - Show or set round timer time");
+	RegAdminCmd("sm_addtime", Command_AddTimer, ADMFLAG_KICK, "sm_addtime <seconds> - Add to the round timer");
 
     g_cHostname = FindConVar("hostname");
     RegConsoleCmd("sm_st", Command_Stats, "Show player count, map and hostname");

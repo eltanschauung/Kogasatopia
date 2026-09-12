@@ -128,19 +128,75 @@ public Action Command_ExtendTimer(int client , int args)
         return Plugin_Handled;
     }
 
-    int timerEnt = FindEntityByClassname(-1, "team_round_timer");
-    if (timerEnt == -1)
+    if (!DGM_ChangeRoundTimerTime(time, false))
     {
         if (client > 0) PrintToChat(client, "No team_round_timer entity found.");
         else PrintToServer("[Kogasa] No team_round_timer entity found.");
         return Plugin_Handled;
     }
 
-    DGM_SetRoundTimerTime(timerEnt, time);
-
     if (client > 0) PrintToChatAll("Round timer set to %i seconds.", time);
 	PrintToServer("[Kogasa] Round timer set to %i seconds.", time);
 	return Plugin_Handled;
+}
+
+public Action Command_AddTimer(int client, int args)
+{
+    int time;
+    if (args < 1 || !GetCmdArgIntEx(1, time) || time <= 0)
+    {
+        ReplyToCommand(client, "Usage: sm_addtime <positive seconds>");
+        return Plugin_Handled;
+    }
+
+    if (!DGM_ChangeRoundTimerTime(time, true))
+    {
+        ReplyToCommand(client, "No team_round_timer entity found.");
+        return Plugin_Handled;
+    }
+
+    if (client > 0) PrintToChatAll("Added %i seconds to the round timer.", time);
+    PrintToServer("[Kogasa] Added %i seconds to the round timer.", time);
+    return Plugin_Handled;
+}
+
+bool DGM_ChangeRoundTimerTime(int seconds, bool add)
+{
+    if (seconds <= 0)
+    {
+        return false;
+    }
+
+    char gamemodeKey[32];
+    if (DGM_CopyCurrentGameModeKey(gamemodeKey, sizeof(gamemodeKey))
+        && StrEqual(gamemodeKey, "koth", false))
+    {
+        int redTimer, blueTimer;
+        DGM_FindKothTimers(redTimer, blueTimer);
+
+        bool changed = DGM_ApplyRoundTimerTime(redTimer, seconds, add);
+        if (blueTimer != redTimer)
+        {
+            changed = DGM_ApplyRoundTimerTime(blueTimer, seconds, add) || changed;
+        }
+        return changed;
+    }
+
+    return DGM_ApplyRoundTimerTime(
+        FindEntityByClassname(-1, "team_round_timer"),
+        seconds,
+        add);
+}
+
+static bool DGM_ApplyRoundTimerTime(int timerEnt, int seconds, bool add)
+{
+    if (timerEnt == -1 || !IsValidEntity(timerEnt))
+    {
+        return false;
+    }
+
+    SetVariantInt(seconds);
+    return AcceptEntityInput(timerEnt, add ? "AddTime" : "SetTime");
 }
 
 void DGM_ReplyCurrentRoundTimers(int client)

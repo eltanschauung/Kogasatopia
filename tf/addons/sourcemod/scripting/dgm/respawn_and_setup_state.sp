@@ -242,12 +242,6 @@ int DGM_FindSetupRoundTimer()
     return firstVisible != -1 ? firstVisible : firstAny;
 }
 
-void DGM_SetRoundTimerTime(int timerEnt, int time)
-{
-    SetVariantInt(time);
-    AcceptEntityInput(timerEnt, "SetTime");
-}
-
 void DGM_SetSetupTimerTime(int timerEnt, int time)
 {
     SetVariantInt(time);
@@ -385,4 +379,3 @@ public Action Timer_CheckSetupStart(Handle timer)
 
     return Plugin_Continue;
 }
-

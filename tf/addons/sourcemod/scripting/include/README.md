@@ -145,6 +145,8 @@ points SourceMod dependency resolution at `weapons.smx`; there is no standalone
 - `DGM_GetRecentControlPointCaptureIntervalSeconds` - Returns the latest capture interval on maps with more than two control points.
 - `DGM_GetObjectiveLeader` - Counts objective ownership and returns the leading side.
 - `DGM_GetObjectiveLeaderTeam` - Returns the team currently leading objective ownership.
+- `DGM_SetTime` - Sets the current round timer; KOTH updates both team timers.
+- `DGM_AddTime` - Adds seconds to the current round timer; KOTH updates both team timers.
 - `DGM_OnSetupTeamRatioReady` - Fires once per round during setup when human RED/BLU players reach 66 percent of `GetClientCount(false)`.
 
 ## filters_api.inc

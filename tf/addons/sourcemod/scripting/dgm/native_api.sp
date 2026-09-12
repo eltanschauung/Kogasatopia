@@ -143,6 +143,16 @@ public any Native_DGM_GetRecentControlPointCaptureIntervalSeconds(Handle plugin,
     return DGM_GetRecentCaptureIntervalSeconds();
 }
 
+public any Native_DGM_SetTime(Handle plugin, int numParams)
+{
+    return DGM_ChangeRoundTimerTime(GetNativeCell(1), false);
+}
+
+public any Native_DGM_AddTime(Handle plugin, int numParams)
+{
+    return DGM_ChangeRoundTimerTime(GetNativeCell(1), true);
+}
+
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
 {
     MarkNativeAsOptional("TF2SetupUber_SetMultiplier");
@@ -173,6 +183,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     CreateNative("DGM_GetRecentControlPointCaptureIntervalSeconds", Native_DGM_GetRecentControlPointCaptureIntervalSeconds);
     CreateNative("DGM_GetObjectiveLeader", Native_DGM_GetObjectiveLeader);
     CreateNative("DGM_GetObjectiveLeaderTeam", Native_DGM_GetObjectiveLeaderTeam);
+    CreateNative("DGM_SetTime", Native_DGM_SetTime);
+    CreateNative("DGM_AddTime", Native_DGM_AddTime);
     return APLRes_Success;
 }
-

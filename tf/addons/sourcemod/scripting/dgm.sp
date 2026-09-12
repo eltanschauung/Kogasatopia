@@ -18,7 +18,7 @@
 
 // Uses the repository's fork of controlpoints by powerlord / babasproke2.
 // Session-owned timers are implemented in dgm/respawn_timers.sp.
-#define PLUGIN_VERSION "4.3"
+#define PLUGIN_VERSION "4.4"
 #include "include/dgm_api.inc"
 #include "include/client_validation.inc"
 #define DGM_MAX_CONTROL_POINTS 8
