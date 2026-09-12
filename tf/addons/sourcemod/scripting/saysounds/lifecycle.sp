@@ -61,6 +61,7 @@ public void OnPluginStart()
     RegConsoleCmd("sm_opt", Command_ToggleSoundOpt);
     RegConsoleCmd("sm_optlist", Command_ListOptedInClients);
     RegConsoleCmd("sm_opts", Command_ShowGroupOptions);
+    RegConsoleCmd("sm_touhouonly", Command_TouhouOnly);
     RegConsoleCmd("sm_sounds", Command_ListSounds);
     RegConsoleCmd("sm_saysounds", Command_ListSounds);
     RegConsoleCmd("sm_groups", Command_ListGroups);

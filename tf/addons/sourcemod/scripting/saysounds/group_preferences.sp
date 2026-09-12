@@ -287,9 +287,45 @@ public Action Command_ShowGroupOptions(int client, int args)
     return Plugin_Handled;
 }
 
+public Action Command_TouhouOnly(int client, int args)
+{
+    if (client <= 0 || !IsClientInGame(client))
+    {
+        return Plugin_Handled;
+    }
+
+    if (!gConfigLoaded || gGroupNames == null || !AreClientCookiesCached(client))
+    {
+        PrintToChat(client, "[SaySounds] Sound preferences are not ready yet. Try again soon.");
+        return Plugin_Handled;
+    }
+
+    static const char touhouGroup[] = "touhou";
+    if (!IsKnownGroup(touhouGroup))
+    {
+        PrintToChat(client, "[SaySounds] The touhou sound group is not configured.");
+        return Plugin_Handled;
+    }
+
+    ResetClientDisabledGroups(client);
+
+    char groupName[MAX_GROUP_NAME];
+    for (int i = 0; i < gGroupNames.Length; i++)
+    {
+        gGroupNames.GetString(i, groupName, sizeof(groupName));
+        if (!StrEqual(groupName, DEFAULT_GROUP) && !StrEqual(groupName, touhouGroup))
+        {
+            SetClientGroupDisabled(client, groupName, true);
+        }
+    }
+
+    SaveDisabledGroupPreferences(client);
+    PrintToChat(client, "[SaySounds] Only the touhou sound group is enabled.");
+    return Plugin_Handled;
+}
+
 enum SaySoundPreferenceType
 {
     SaySoundPreference_Death = 0,
     SaySoundPreference_Kill
 };
-
