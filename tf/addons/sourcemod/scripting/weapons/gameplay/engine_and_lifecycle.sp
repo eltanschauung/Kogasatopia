@@ -443,7 +443,6 @@ public void PreCacheWeaponSounds() {
 	PrecacheSound(BURP_SOUND, true);
 	PrecacheSound(SOUND_CLIP_REFILL_CRIT, true);
 	PrecacheSound(SOUND_SECONDARY_CLIP_REFILL, true);
-	PrecacheSound(SOUND_RESTORE_PRIMARY_SHOT, true);
 }
 
 static int WeaponsGameplay_FindParticleIndex(const char[] name)
