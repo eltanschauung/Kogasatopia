@@ -31,7 +31,7 @@
 #define ATTR_STICKYBOMB_FIZZLE_TIME_WEARER "stickybomb fizzle time wearer"
 #define ATTR_STICKYBOMB_FIZZLE_TIME "stickybomb fizzle time"
 #define ATTR_RESTORE_PRIMARY_SHOT_BY_DAMAGE "restore primary shot by damage"
-#define SOUND_RESTORE_PRIMARY_SHOT "tools/ifm/beep.wav"
+#define SOUND_RESTORE_PRIMARY_SHOT "weapons/dumpster_rocket_reload_fp.wav"
 #define ATTR_RESTORE_PRIMARY_SHOT_KILL "restore primary shot kill"
 #define ATTR_REFILL_PRIMARY_CLIP_ON_KILL "refill primary clip on kill"
 #define ATTR_REFILL_PRIMARY_CLIP_ON_CRIT "refill primary clip on crit"
