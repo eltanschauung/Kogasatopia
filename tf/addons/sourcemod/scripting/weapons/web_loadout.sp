@@ -5,6 +5,7 @@
 #define WEAPONS_WEB_SESSION_LIFETIME 900
 #define WEAPONS_WEB_POLL_INTERVAL 0.25
 #define WEAPONS_WEB_ACTION_LIMIT 8
+#define WEAPONS_WEB_LOCKED_PURCHASES_MAX 2048
 
 static Database g_WeaponsWebDb = null;
 static bool g_WeaponsWebDbReady;
@@ -132,6 +133,7 @@ static void WeaponsWeb_EnsureSessionSchema()
 		"CREATE TABLE IF NOT EXISTS %s (token VARCHAR(32) NOT NULL, "
 		... "steamid64 VARCHAR(32) NOT NULL, server_stamp VARCHAR(32) NOT NULL, "
 		... "class_index INTEGER NOT NULL, equipped_uids VARCHAR(512) NOT NULL DEFAULT '', "
+		... "locked_purchase_keys VARCHAR(2048) NOT NULL DEFAULT '', "
 		... "created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY (token)%s",
 		WEAPONS_WEB_SESSIONS_TABLE, suffix);
 	g_WeaponsWebDb.Query(WeaponsWeb_OnSessionSchemaReady, query,
@@ -148,6 +150,48 @@ public void WeaponsWeb_OnSessionSchemaReady(Database db, DBResultSet results,
 		if (Db_IsTransientError(error)) WeaponsWeb_ScheduleReconnect(DB_RECONNECT_FAST_DELAY);
 		return;
 	}
+	char query[256];
+	FormatEx(query, sizeof(query), "SELECT locked_purchase_keys FROM %s LIMIT 0",
+		WEAPONS_WEB_SESSIONS_TABLE);
+	db.Query(WeaponsWeb_OnSessionPurchaseSchemaChecked, query, generation);
+}
+
+public void WeaponsWeb_OnSessionPurchaseSchemaChecked(Database db, DBResultSet results,
+	const char[] error, any generation)
+{
+	if (!WeaponsWeb_IsCurrentConnection(db, generation)) return;
+	if (!error[0])
+	{
+		WeaponsWeb_EnsureActionSchema(generation);
+		return;
+	}
+	if (Db_IsTransientError(error))
+	{
+		WeaponsWeb_ScheduleReconnect(DB_RECONNECT_FAST_DELAY);
+		return;
+	}
+	char query[256];
+	FormatEx(query, sizeof(query),
+		"ALTER TABLE %s ADD COLUMN locked_purchase_keys VARCHAR(2048) NOT NULL DEFAULT ''",
+		WEAPONS_WEB_SESSIONS_TABLE);
+	db.Query(WeaponsWeb_OnSessionPurchaseSchemaAdded, query, generation);
+}
+
+public void WeaponsWeb_OnSessionPurchaseSchemaAdded(Database db, DBResultSet results,
+	const char[] error, any generation)
+{
+	if (!WeaponsWeb_IsCurrentConnection(db, generation)) return;
+	if (error[0])
+	{
+		LogError("[Weapons] Failed to add web session purchase state: %s", error);
+		if (Db_IsTransientError(error)) WeaponsWeb_ScheduleReconnect(DB_RECONNECT_FAST_DELAY);
+		return;
+	}
+	WeaponsWeb_EnsureActionSchema(generation);
+}
+
+static void WeaponsWeb_EnsureActionSchema(int generation)
+{
 	char query[3072], suffix[768], booleanType[16];
 	strcopy(booleanType, sizeof(booleanType), g_WeaponsWebIsMySql ? "TINYINT(1)" : "INTEGER");
 	if (g_WeaponsWebIsMySql)
@@ -213,22 +257,29 @@ bool WeaponsWeb_TryOpenPanel(int client, int playerClass, const char[] classKey)
 		|| !AreClientCookiesCached(client)) return false;
 	char steamId[KOGASA_STEAMID_MAX];
 	if (!Kogasa_GetClientSteamId64(client, steamId, sizeof(steamId), true)) return false;
-	char token[33], loadout[512];
+	char token[33], loadout[512], lockedPurchaseKeys[WEAPONS_WEB_LOCKED_PURCHASES_MAX];
 	WeaponsWeb_GenerateToken(token, sizeof(token));
 	WeaponsWeb_BuildLoadout(client, playerClass, loadout, sizeof(loadout));
+	WeaponsWeb_BuildLockedPurchaseKeys(client, playerClass, lockedPurchaseKeys,
+		sizeof(lockedPurchaseKeys));
 	char escapedToken[65], escapedSteam[(KOGASA_STEAMID_MAX * 2) + 1];
 	char escapedStamp[65], escapedLoadout[1025];
+	char escapedLockedPurchaseKeys[(WEAPONS_WEB_LOCKED_PURCHASES_MAX * 2) + 1];
 	if (!Db_Escape(g_WeaponsWebDb, token, escapedToken, sizeof(escapedToken), "weapons web")
 		|| !Db_Escape(g_WeaponsWebDb, steamId, escapedSteam, sizeof(escapedSteam), "weapons web")
 		|| !Db_Escape(g_WeaponsWebDb, g_WeaponsWebServerStamp, escapedStamp, sizeof(escapedStamp), "weapons web")
-		|| !Db_Escape(g_WeaponsWebDb, loadout, escapedLoadout, sizeof(escapedLoadout), "weapons web")) return false;
+		|| !Db_Escape(g_WeaponsWebDb, loadout, escapedLoadout, sizeof(escapedLoadout), "weapons web")
+		|| !Db_Escape(g_WeaponsWebDb, lockedPurchaseKeys, escapedLockedPurchaseKeys,
+			sizeof(escapedLockedPurchaseKeys), "weapons web")) return false;
 	int now = GetTime();
-	char query[2048];
+	char query[8192];
 	FormatEx(query, sizeof(query),
-		"INSERT INTO %s (token, steamid64, server_stamp, class_index, equipped_uids, created_at, expires_at) "
-		... "VALUES ('%s', '%s', '%s', %d, '%s', %d, %d)",
+		"INSERT INTO %s (token, steamid64, server_stamp, class_index, equipped_uids, "
+		... "locked_purchase_keys, created_at, expires_at) "
+		... "VALUES ('%s', '%s', '%s', %d, '%s', '%s', %d, %d)",
 		WEAPONS_WEB_SESSIONS_TABLE, escapedToken, escapedSteam, escapedStamp,
-		playerClass, escapedLoadout, now, now + WEAPONS_WEB_SESSION_LIFETIME);
+		playerClass, escapedLoadout, escapedLockedPurchaseKeys, now,
+		now + WEAPONS_WEB_SESSION_LIFETIME);
 	DataPack pack = new DataPack();
 	pack.WriteCell(g_WeaponsWebConnectionGeneration);
 	pack.WriteCell(GetClientSerial(client));
@@ -278,6 +329,31 @@ static void WeaponsWeb_BuildLoadout(int client, int playerClass, char[] buffer, 
 		if (buffer[0]) StrCat(buffer, maxlen, "|");
 		StrCat(buffer, maxlen, uid);
 	}
+}
+
+static void WeaponsWeb_BuildLockedPurchaseKeys(int client, int playerClass,
+	char[] buffer, int maxlen)
+{
+	buffer[0] = '\0';
+	StringMap seen = new StringMap();
+	StringMapSnapshot snapshot = GetCustomItemList();
+	for (int i; i < snapshot.Length; i++)
+	{
+		char uid[MAX_ITEM_IDENTIFIER_LENGTH];
+		snapshot.GetKey(i, uid, sizeof(uid));
+		CustomItemDefinition item;
+		if (!GetCustomItemDefinition(uid, item)
+			|| item.loadoutPosition[playerClass] < 0
+			|| item.loadoutPosition[playerClass] >= NUM_ITEMS
+			|| !item.pointsStorePurchase[0]
+			|| !ItemRequiresPointsStorePurchase(client, item)
+			|| seen.ContainsKey(item.pointsStorePurchase)) continue;
+		seen.SetValue(item.pointsStorePurchase, 1);
+		if (buffer[0]) StrCat(buffer, maxlen, "|");
+		StrCat(buffer, maxlen, item.pointsStorePurchase);
+	}
+	delete snapshot;
+	delete seen;
 }
 
 public Action WeaponsWeb_PollTimer(Handle timer)
