@@ -38,15 +38,36 @@ bool WeaponsCommands_TryShowClassPage(int client, bool customWeapons)
 	if (g_WeaponsHtmlMotdPreference[client] != WeaponsHtmlMotd_Enabled) return false;
 
 	char classKey[16];
-	TF2Classes_GetKey(TF2Classes_GetCurrentOrDesired(client), classKey, sizeof(classKey));
+	TFClassType playerClass = TF2Classes_GetCurrentOrDesired(client);
+	TF2Classes_GetKey(playerClass, classKey, sizeof(classKey));
 	if (!classKey[0]) return false;
+	if (customWeapons && WeaponsWeb_TryOpenPanel(client, view_as<int>(playerClass), classKey))
+	{
+		return true;
+	}
+	WeaponsCommands_ShowClassPage(client, customWeapons, classKey, "");
+	return true;
+}
 
+void WeaponsCommands_ShowClassPage(int client, bool customWeapons, const char[] classKey,
+	const char[] sessionToken)
+{
 	char view[48];
 	FormatEx(view, sizeof(view), "%s-%s-ingame",
 		classKey, customWeapons ? "custom" : "reverts");
 
 	char url[256];
-	FormatEx(url, sizeof(url), "https://kogasa.tf/weapons?view=%s&motd=2#%s", view, view);
+	if (sessionToken[0])
+	{
+		FormatEx(url, sizeof(url),
+			"https://kogasa.tf/weapons?view=%s&motd=3&session=%s#%s",
+			view, sessionToken, view);
+	}
+	else
+	{
+		FormatEx(url, sizeof(url), "https://kogasa.tf/weapons?view=%s&motd=3#%s",
+			view, view);
+	}
 
 	KeyValues panel = new KeyValues("data");
 	panel.SetString("title", customWeapons ? "Custom Weapons" : "Weapon Reverts");
@@ -55,7 +76,6 @@ bool WeaponsCommands_TryShowClassPage(int client, bool customWeapons)
 	panel.SetNum("customsvr", 1);
 	ShowVGUIPanel(client, "info", panel);
 	delete panel;
-	return true;
 }
 
 static KeyValues LoadWeaponsItemClassesConfig()

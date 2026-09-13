@@ -186,7 +186,7 @@ static bool ItemVisibleInEquipMenu(int client, const CustomItemDefinition item) 
 	return CanPlayerViewItem(client, item);
 }
 
-static void QueueEquippedItemDescription(int client, const char[] uid) {
+void WeaponsLoadout_QueueEquippedItemDescription(int client, const char[] uid) {
 	DataPack pack = new DataPack();
 	pack.WriteCell(GetClientUserId(client));
 	pack.WriteString(uid);
@@ -214,7 +214,7 @@ public void Frame_PrintEquippedItemDescription(any data) {
 	}
 }
 
-static void PrintShopPurchaseRequired(int client) {
+void WeaponsLoadout_PrintShopPurchaseRequired(int client) {
 	char currencyColor[32] = "{cyan}";
 	ConVar currencyColorCvar = FindConVar("sm_points_store_currency_color");
 	if (currencyColorCvar != null) {
@@ -356,14 +356,14 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 					return 0;
 				}
 				if (ItemRequiresPointsStorePurchase(client, selectedItem)) {
-					PrintShopPurchaseRequired(client);
+					WeaponsLoadout_PrintShopPurchaseRequired(client);
 					s_EquipMenu.Display(client, 30);
 					return 0;
 				}
 
 				if (SetClientCustomLoadoutItem(client, g_iPlayerClassInMenu[client], uid,
 						LOADOUT_FLAG_UPDATE_BACKEND | LOADOUT_FLAG_ATTEMPT_REGEN)) {
-					QueueEquippedItemDescription(client, uid);
+					WeaponsLoadout_QueueEquippedItemDescription(client, uid);
 				}
 			} else {
 				UnsetClientCustomLoadoutItem(client, g_iPlayerClassInMenu[client],

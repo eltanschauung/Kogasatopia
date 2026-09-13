@@ -120,6 +120,7 @@ int g_attrdef_AllowedInMedievalMode;
 #include "weapons/commands.sp"
 #include "weapons/equip_commands.sp"
 #include "weapons/loadout_controller.sp"
+#include "weapons/web_loadout.sp"
 #include "weapons/statistics_persistence.sp"
 
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
@@ -186,6 +187,7 @@ public void OnPluginStart()
     sm_weapons_validate_repair = CreateConVar("sm_weapons_validate_repair", "1", "Re-assert m_bValidatedAttachedEntity if TF2 clears it after attachment.", _, true, 0.0, true, 1.0);
     sm_weapons_hide_reskin_only = CreateConVar("sm_weapons_hide_reskin_only", "1", "Hide reskin-only weapons from sm_c descriptions.", _, true, 0.0, true, 1.0);
     sm_weapons_free = CreateConVar("sm_weapons_free", "0", "Treat all custom weapons as unlocked in sm_cw.", _, true, 0.0, true, 1.0);
+    WeaponsWeb_OnPluginStart();
     sm_weapons_statistics.AddChangeHook(OnWeaponsStatisticsEnabledChanged);
     sm_weapons_statistics_database.AddChangeHook(OnWeaponsStatisticsDatabaseChanged);
     ConnectWeaponsStatisticsDatabase();
@@ -244,6 +246,7 @@ public void OnPluginEnd()
     WeaponsGameplay_OnPluginEnd();
     WeaponsModels_OnPluginEnd();
     WeaponsSound_OnPluginEnd();
+    WeaponsWeb_OnPluginEnd();
     WeaponsStats_StopConnection();
     delete g_hOnItemRuntimeStateReady;
     WeaponsConfig_Close();
