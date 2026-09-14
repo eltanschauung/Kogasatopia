@@ -220,7 +220,7 @@ void WeaponsSound_PlayOnHit(int victim, int weapon)
 void WeaponsSound_PlayOnKill(int victim, int weapon)
 {
 	WeaponsSound_EmitCustomAttribute(victim, weapon,
-		Weapons_ATTR_EMIT_SOUND_ON_KILL, "on-kill", SNDLEVEL_RAIDSIREN);
+		Weapons_ATTR_EMIT_SOUND_ON_KILL, "on-kill", SNDLEVEL_ROCKET);
 }
 
 void WeaponsSound_PlayWearerOnHit(int victim, int attacker)
