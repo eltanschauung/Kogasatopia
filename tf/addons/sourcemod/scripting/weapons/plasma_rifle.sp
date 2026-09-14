@@ -5,7 +5,7 @@
 #define PLASMA_OVERHEAT_SECONDS 2.33
 #define PLASMA_NO_ATTACK_ATTRIBUTE 821
 #define SOUND_PLASMA_OVERHEAT "weapons/halo_ce/plasrifle_overheat_10b.wav"
-#define SOUND_PLASMA_OVERHEAT_END "weapons/flaregun_tube_closefinish.wav"
+#define SOUND_PLASMA_COOLED "weapons/flaregun_tube_closefinish.wav"
 
 bool g_bPlasmaHooked[MAX_TRACKED_ENTITIES];
 int g_iPlasmaRef[MAX_TRACKED_ENTITIES];
@@ -90,6 +90,16 @@ static void Plasma_SyncAttackLock(int weapon)
 		Plasma_UnlockAttack(weapon);
 }
 
+static void Plasma_PlayCooledSound(int weapon, float previousHeat)
+{
+	if (previousHeat <= 0.0 || g_fPlasmaHeat[weapon] > 0.0)
+		return;
+
+	int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
+	if (Weapons_IsClientInGame(owner))
+		EmitSoundToAll(SOUND_PLASMA_COOLED, owner, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
+}
+
 void Plasma_OnWeaponSwitchPost(int client)
 {
 	// Sync immediately after a successful switch, not just on the next frame.
@@ -128,6 +138,7 @@ void Plasma_ClearAll()
 
 static void Plasma_UpdateHeat(int weapon)
 {
+	float previousHeat = g_fPlasmaHeat[weapon];
 	float now = GetEngineTime();
 	float elapsed = now - g_fPlasmaUpdated[weapon];
 	g_fPlasmaUpdated[weapon] = now;
@@ -140,14 +151,12 @@ static void Plasma_UpdateHeat(int weapon)
 			g_fPlasmaHeat[weapon] = 0.0;
 			g_fPlasmaLockedUntil[weapon] = 0.0;
 			Plasma_UnlockAttack(weapon);
-			int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
-			if (Weapons_IsClientInGame(owner))
-				EmitSoundToAll(SOUND_PLASMA_OVERHEAT_END, owner, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 		}
 		else
 		{
 			g_fPlasmaHeat[weapon] = 100.0 * remaining / PLASMA_OVERHEAT_SECONDS;
 		}
+		Plasma_PlayCooledSound(weapon, previousHeat);
 		Plasma_SyncAttackLock(weapon);
 		return;
 	}
@@ -162,6 +171,8 @@ static void Plasma_UpdateHeat(int weapon)
 		if (g_fPlasmaHeat[weapon] < 0.0)
 			g_fPlasmaHeat[weapon] = 0.0;
 	}
+
+	Plasma_PlayCooledSound(weapon, previousHeat);
 }
 
 static int Plasma_GetAmmo(int weapon)
