@@ -6,6 +6,7 @@
 #define Weapons_ATTR_REPLACE_SOUND "replace sound"
 #define Weapons_ATTR_CUSTOM_DEPLOY_SOUND "custom deploy sound"
 #define Weapons_ATTR_EMIT_SOUND_ON_HIT "emit sound on hit"
+#define Weapons_ATTR_EMIT_SOUND_ON_KILL "emit sound on kill"
 #define Weapons_ATTR_EMIT_SOUND_ON_HIT_WEARER "emit sound on hit wearer"
 #define Weapons_ATTR_CUSTOM_HITSOUND "custom hitsound"
 #define Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND "custom melee swing sound"
@@ -214,6 +215,12 @@ void WeaponsSound_PlayOnHit(int victim, int weapon)
 {
 	WeaponsSound_EmitCustomAttribute(victim, weapon,
 		Weapons_ATTR_EMIT_SOUND_ON_HIT, "on-hit");
+}
+
+void WeaponsSound_PlayOnKill(int victim, int weapon)
+{
+	WeaponsSound_EmitCustomAttribute(victim, weapon,
+		Weapons_ATTR_EMIT_SOUND_ON_KILL, "on-kill");
 }
 
 void WeaponsSound_PlayWearerOnHit(int victim, int attacker)

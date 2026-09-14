@@ -156,6 +156,7 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 			&& GetClientTeam(client) > 1
 			&& GetClientTeam(attacker) != GetClientTeam(client))
 		{
+			WeaponsSound_PlayOnKill(client, killWeapon);
 			WearerRefillSecondaryClipOnKill(attacker);
 		}
 
