@@ -25,39 +25,5 @@
 				"linux"         "386"
 			}
 		}
-
-		"Signatures"
-		{
-			"CBaseObject::CanBeUpgraded"
-			{
-				"library" "server"
-				"linux"   "@_ZN11CBaseObject13CanBeUpgradedEP9CTFPlayer"
-				"linux64" "@_ZN11CBaseObject13CanBeUpgradedEP9CTFPlayer"
-			}
-			"CBaseEntity::StopSound"
-			{
-				"library" "server"
-				"linux"   "@_ZN11CBaseEntity9StopSoundEPKc"
-				"linux64" "@_ZN11CBaseEntity9StopSoundEPKc"
-			}
-		}
-
-		"Functions"
-		{
-			"CBaseObject::CanBeUpgraded"
-			{
-				"signature" "CBaseObject::CanBeUpgraded"
-				"callconv"  "thiscall"
-				"this"      "entity"
-				"return"    "bool"
-				"arguments"
-				{
-					"pPlayer"
-					{
-						"type" "cbaseentity"
-					}
-				}
-			}
-		}
 	}
 }

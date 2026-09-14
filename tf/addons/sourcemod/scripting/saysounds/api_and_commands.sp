@@ -34,6 +34,7 @@ public int Native_PlaySoundToOptedIn(Handle plugin, int numParams)
         strcopy(groupName, sizeof(groupName), DEFAULT_GROUP);
     }
 
+    PrecacheSound(soundPath, true);
     if (PlaySaySound(soundPath, groupName))
     {
         LogSaySoundUsage("saysound_used", 0, 0, "", soundPath, groupName, false, "", true, "api_sound");
@@ -83,6 +84,7 @@ public int Native_PlayCommand(Handle plugin, int numParams)
         return 0;
     }
 
+    PrecacheSound(soundPath, true);
     bool played = PlaySaySoundToTarget(client, soundPath, groupName, forcePlayback);
     if (played)
     {
@@ -138,6 +140,7 @@ public int Native_PlayCommandAs(Handle plugin, int numParams)
         return 0;
     }
 
+    PrecacheSound(soundPath, true);
     bool played = PlaySaySoundToTarget(targetClient, soundPath, groupName, forcePlayback);
     if (played)
     {

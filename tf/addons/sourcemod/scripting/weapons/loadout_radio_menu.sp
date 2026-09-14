@@ -104,6 +104,15 @@ Action DisplayItemsCompat(int client, const char[] command, int argc) {
 }
 
 /**
+ * Resources precached during map start.
+ */
+void PrecacheMenuResources() {
+	PrecacheSound(SOUND_MENU_BUTTON_CLICK);
+	PrecacheSound(SOUND_MENU_BUTTON_CLOSE);
+	PrecacheSound(SOUND_MENU_BUTTON_EQUIP);
+}
+
+/**
  * Initializes our loadout slot selection menu.
  * 
  * This must be called after all plugins are loaded, since we depend on Econ Data.

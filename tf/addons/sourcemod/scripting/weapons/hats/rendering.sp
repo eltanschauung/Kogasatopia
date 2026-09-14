@@ -5,12 +5,7 @@ void ApplyCustomModel(int entity, const char[] modelPath)
 		return;
 	}
 
-	int modelIndex = GetConfiguredModelIndex(modelPath);
-	if (modelIndex <= 0)
-	{
-		LogError("Configured hat model is not precached: %s", modelPath);
-		return;
-	}
+	int modelIndex = PrecacheModel(modelPath, true);
 	SetEntityModel(entity, modelPath);
 	SetEntProp(entity, Prop_Send, "m_nModelIndex", modelIndex);
 	if (HasEntProp(entity, Prop_Send, "m_bValidatedAttachedEntity"))

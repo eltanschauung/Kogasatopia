@@ -9,6 +9,18 @@ void RemoveAllHats()
 	}
 }
 
+void PrecacheConfiguredHats()
+{
+	for (int i = 0; i < g_iHatCount; i++)
+	{
+		if (!IsHatEnabled(i))
+		{
+			continue;
+		}
+		PrecacheModel(g_Hats[i].model, true);
+	}
+}
+
 void LoadConfig()
 {
 	g_iHatCount = 0;

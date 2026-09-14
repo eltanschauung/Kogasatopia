@@ -308,6 +308,7 @@ public void OnMapStart()
     WeaponsModels_OnMapStart();
     CustomHats_OnMapStart();
     LoadWeaponsConfig();
+    PrecacheMenuResources();
     WeaponsGameplay_OnMapStart();
 }
 

@@ -114,7 +114,7 @@ public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)
 
 	int client = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
 	WeaponsSound_EmitCustomMeleeAttribute(
-		client, weapon, Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND);
+		client, weapon, Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND, "melee swing");
 	return MRES_Ignored;
 }
 
@@ -167,7 +167,8 @@ public Action WeaponsSound_Hook(
 
 	char replacement[PLATFORM_MAX_PATH];
 	if (!group.replacements.GetString(oldSound, replacement, sizeof(replacement))
-			|| replacement[0] == '\0')
+			|| replacement[0] == '\0'
+			|| !PrecacheSound(replacement, true))
 	{
 		return Plugin_Continue;
 	}
@@ -202,7 +203,7 @@ static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 	}
 
 	if (WeaponsSound_EmitCustomAttribute(client, weapon,
-			Weapons_ATTR_CUSTOM_DEPLOY_SOUND))
+			Weapons_ATTR_CUSTOM_DEPLOY_SOUND, "custom deploy"))
 	{
 		g_flWeaponsNextDeploySoundTime[client][slot] =
 			now + WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN;
@@ -212,7 +213,7 @@ static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 void WeaponsSound_PlayOnHit(int victim, int weapon)
 {
 	WeaponsSound_EmitCustomAttribute(victim, weapon,
-		Weapons_ATTR_EMIT_SOUND_ON_HIT);
+		Weapons_ATTR_EMIT_SOUND_ON_HIT, "on-hit");
 }
 
 void WeaponsSound_PlayWearerOnHit(int victim, int attacker)
@@ -233,7 +234,8 @@ void WeaponsSound_PlayWearerOnHit(int victim, int attacker)
 		if (WeaponsSound_EmitCustomAttribute(
 				victim,
 				provider,
-				Weapons_ATTR_EMIT_SOUND_ON_HIT_WEARER))
+				Weapons_ATTR_EMIT_SOUND_ON_HIT_WEARER,
+				"wearer on-hit"))
 		{
 			return;
 		}
@@ -243,7 +245,7 @@ void WeaponsSound_PlayWearerOnHit(int victim, int attacker)
 void WeaponsSound_PlayCustomHitsound(int attacker, int weapon)
 {
 	WeaponsSound_EmitCustomAttribute(attacker, weapon,
-		Weapons_ATTR_CUSTOM_HITSOUND);
+		Weapons_ATTR_CUSTOM_HITSOUND, "custom hitsound");
 }
 
 void WeaponsSound_PlayCustomMeleeHit(int attacker, int weapon)
@@ -256,11 +258,11 @@ void WeaponsSound_PlayCustomMeleeHit(int attacker, int weapon)
 	}
 
 	WeaponsSound_EmitCustomMeleeAttribute(
-		attacker, weapon, Weapons_ATTR_CUSTOM_MELEE_HIT_SOUND);
+		attacker, weapon, Weapons_ATTR_CUSTOM_MELEE_HIT_SOUND, "melee hit");
 }
 
 static bool WeaponsSound_EmitCustomMeleeAttribute(
-	int client, int weapon, const char[] attribute)
+	int client, int weapon, const char[] attribute, const char[] context)
 {
 	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon))
 	{
@@ -281,6 +283,13 @@ static bool WeaponsSound_EmitCustomMeleeAttribute(
 			soundEntry, sample, sizeof(sample)))
 	{
 		strcopy(sample, sizeof(sample), soundEntry);
+	}
+
+	if (!PrecacheSound(sample, true))
+	{
+		LogError("Failed to precache %s sample '%s' for weapon %d",
+			context, sample, weapon);
+		return false;
 	}
 
 	EmitSoundToAll(sample, client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
@@ -313,7 +322,7 @@ static bool WeaponsSound_GetRandomMeleeSample(
 }
 
 static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
-		const char[] attribute)
+		const char[] attribute, const char[] context)
 {
 	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon))
 	{
@@ -325,6 +334,13 @@ static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
 	TrimString(sample);
 	if (!sample[0])
 	{
+		return false;
+	}
+
+	if (!PrecacheSound(sample, true))
+	{
+		LogError("Failed to precache %s sound '%s' for weapon %d",
+			context, sample, weapon);
 		return false;
 	}
 
@@ -427,6 +443,59 @@ void WeaponsSound_ValidateItemConfig(const char[] itemUid, KeyValues attributes)
 		}
 	}
 
+	WeaponsSound_ValidateCustomMeleeAttribute(
+		itemUid, attributes, Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND);
+	WeaponsSound_ValidateCustomMeleeAttribute(
+		itemUid, attributes, Weapons_ATTR_CUSTOM_MELEE_HIT_SOUND);
+}
+
+static void WeaponsSound_ValidateCustomMeleeAttribute(
+	const char[] itemUid, KeyValues attributes, const char[] attribute)
+{
+	char soundEntry[PLATFORM_MAX_PATH];
+	attributes.GetString(attribute, soundEntry, sizeof(soundEntry));
+	TrimString(soundEntry);
+	if (!soundEntry[0])
+	{
+		return;
+	}
+
+	if (!WeaponsSound_PrecacheMeleeEntry(soundEntry))
+	{
+		LogError(
+			"Item uid '%s' could not precache melee sound '%s' for attribute '%s'",
+			itemUid, soundEntry, attribute);
+	}
+}
+
+static bool WeaponsSound_PrecacheMeleeEntry(const char[] soundEntry)
+{
+	bool success = true;
+	if (StrEqual(soundEntry, WEAPONS_SOUND_ENTRY_BATSABER_SWING))
+	{
+		for (int i = 0; i < sizeof(g_WeaponsSoundBatSaberSwingSamples); i++)
+		{
+			if (!PrecacheSound(g_WeaponsSoundBatSaberSwingSamples[i], true))
+			{
+				success = false;
+			}
+		}
+		return success;
+	}
+
+	if (StrEqual(soundEntry, WEAPONS_SOUND_ENTRY_BATSABER_HIT_FLESH))
+	{
+		for (int i = 0; i < sizeof(g_WeaponsSoundBatSaberHitFleshSamples); i++)
+		{
+			if (!PrecacheSound(g_WeaponsSoundBatSaberHitFleshSamples[i], true))
+			{
+				success = false;
+			}
+		}
+		return success;
+	}
+
+	return PrecacheSound(soundEntry, true);
 }
 
 void WeaponsSound_LoadGroups(KeyValues config)
@@ -451,7 +520,7 @@ void WeaponsSound_LoadGroups(KeyValues config)
 				char replacement[PLATFORM_MAX_PATH];
 				config.GetSectionName(oldSound, sizeof(oldSound));
 				config.GetString(NULL_STRING, replacement, sizeof(replacement));
-				if (replacement[0] == '\0')
+				if (replacement[0] == '\0' || !PrecacheSound(replacement, true))
 				{
 					continue;
 				}

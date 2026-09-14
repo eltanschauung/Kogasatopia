@@ -12,7 +12,6 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <sdktools_functions>
-#include <dhooks>
 
 #include <tf2>
 #include <tf2_stocks>
@@ -37,30 +36,21 @@
 #define AMPLIFIER_PLUGIN_VERSION "2.5"
 
 // Models and Sounds
-#define AmplifierBuildModel "models/buildables/rayzar/rayzar"
-#define AmplifierActiveModel "models/buildables/rayzar/rayzar_active"
-#define AmplifierMaterialPath "materials/models/buildables/rayzar/"
-#define AMPLIFIER_TOOLBOX_BODYGROUP_VISIBLE 0
-#define AMPLIFIER_PULSE_SOUND "buttons/blip1.wav"
-#define AMPLIFIER_CONSTRUCTION_SOUND "misc/rd_points_return01.wav"
-#define AMPLIFIER_IDLE_SOUND "Building_Dispenser.Idle"
+#define AmplifierModel "models/buildables/amplifier_test/amplifier"
+#define AmplifierTex "materials/models/buildables/amplifier_test/amplifier"
+#define AMPgib "models/buildables/amplifier_test/gibs/amp_gib"
+#define AMPLIFIER_SOUND "misc/rd_finale_beep01.wav"
+#define AMPLIFIER_EMPTY_SOUND "hl1/fvox/beep.wav"
 #define AMPLIFIER_BUFF_SOUND "weapons/dispenser_heal.wav"
+#define AMPLIFIER_FILL_SOUND "weapons/dispenser_generate_metal.wav"
 
 // Gameplay
 #define ATTR_FIRE_RATE "fire rate bonus HIDDEN"
 #define ATTR_RELOAD_RATE "reload time increased hidden" // Set to < 1 for more speed
 #define BEGGARS_BAZOOKA 730
 #define AMPLIFIER_HEALTH 150
-#define AMPLIFIER_MODEL_TOP_Z 66.629
-#define AMPLIFIER_RING_CLEARANCE 3.0
-#define AMPLIFIER_UPDATE_INTERVAL 0.5
-#define AMPLIFIER_PULSE_INTERVAL_MIN 0.8
-#define AMPLIFIER_PULSE_INTERVAL_MAX 1.5
-#define AMPLIFIER_RING_RADIUS 180.0
-#define AMPLIFIER_DAMAGE_RADIUS 180.0
-#define AMPLIFIER_RING_LIFE 3.0
-#define AMPLIFIER_PDA_SLOT_FIRST 3
-#define AMPLIFIER_PDA_SLOT_LAST 4
+#define AMPLIFIER_MINI_HEALTH 100
+#define AMPLIFIER_MINI_MODIFIER 0.75
 #define AMPLIFIER_FORCE_MIN_PLAYERS 3
 
 // Entity classes / commands
@@ -77,12 +67,6 @@
 // Sprites
 int g_BeamSprite;
 int g_HaloSprite;
-int g_AmplifierIdleSoundChannel;
-int g_AmplifierIdleSoundLevel;
-int g_AmplifierIdleSoundPitch;
-float g_AmplifierIdleSoundVolume;
-char g_AmplifierIdleSoundSample[PLATFORM_MAX_PATH];
-bool g_AmplifierIdleSoundResolved;
 
 // Player State
 enum struct AmplifierPlayerState
@@ -97,22 +81,22 @@ enum struct AmplifierPlayerState
 AmplifierPlayerState g_PlayerState[MP];
 
 Handle g_hAmplifierTimer = INVALID_HANDLE;
-Handle g_hAmplifierPulseTimer = INVALID_HANDLE;
-Handle g_hAmplifierStopSound = INVALID_HANDLE;
-DynamicDetour g_hAmplifierCanBeUpgraded = null;
 // Building States
 bool AmplifierOn[ME];
+bool AmplifierMini[ME];
 bool AmplifierSapped[ME];
 bool AmplifierCarried[ME];
-bool AmplifierIdleSoundPlaying[ME];
 bool ConditionApplied[ME][MP];
 float AmplifierDistance[ME];
 TFCond AmplifierCondition[ME];
 int BuildingRef[ME];
+float AmplifierFill[ME];
 int g_ActiveAmplifiers[ME];
 bool g_bAmplifierExplosionActive = false;
 
 // ConVars
+ConVar cvarMetal;
+ConVar cvarMetalMax;
 ConVar cvarDistance;
 ConVar cvarEffectLength;
 ConVar cvarForceAmplifier;
@@ -189,11 +173,12 @@ static void ResetAmplifierBuildingState(int ent)
     }
 
     AmplifierOn[ent] = false;
+    AmplifierMini[ent] = false;
     AmplifierSapped[ent] = false;
     AmplifierCarried[ent] = false;
-    AmplifierIdleSoundPlaying[ent] = false;
     AmplifierDistance[ent] = 0.0;
     AmplifierCondition[ent] = DefaultCondition;
+    AmplifierFill[ent] = 0.0;
     BuildingRef[ent] = 0;
     ClearAmplifierConditionForBuilding(ent);
 }
@@ -227,55 +212,13 @@ void Amplifier_RegisterNatives()
 	RegPluginLibrary("Amplifier");
 }
 
-void InitializeAmplifierHooks()
-{
-	GameData gameData = new GameData("buildings");
-	if (gameData == null)
-	{
-		SetFailState("[Amplifier] Unable to load gamedata file 'buildings.txt'.");
-		return;
-	}
-
-	g_hAmplifierCanBeUpgraded =
-		DynamicDetour.FromConf(gameData, "CBaseObject::CanBeUpgraded");
-
-	StartPrepSDKCall(SDKCall_Entity);
-	if (!PrepSDKCall_SetFromConf(gameData, SDKConf_Signature, "CBaseEntity::StopSound"))
-	{
-		delete gameData;
-		SetFailState("[Amplifier] Missing CBaseEntity::StopSound signature.");
-		return;
-	}
-	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
-	g_hAmplifierStopSound = EndPrepSDKCall();
-	delete gameData;
-
-	if (g_hAmplifierCanBeUpgraded == null)
-	{
-		SetFailState("[Amplifier] Failed to create CBaseObject::CanBeUpgraded detour.");
-		return;
-	}
-	if (g_hAmplifierStopSound == INVALID_HANDLE)
-	{
-		SetFailState("[Amplifier] Failed to prepare CBaseEntity::StopSound SDKCall.");
-		return;
-	}
-
-	if (!g_hAmplifierCanBeUpgraded.Enable(
-		Hook_Pre,
-		Amplifier_CanBeUpgraded_Pre))
-	{
-		SetFailState("[Amplifier] Failed to enable CBaseObject::CanBeUpgraded detour.");
-	}
-}
-
 void Amplifier_OnPluginStart()
 {
-	InitializeAmplifierHooks();
-
 	CreateConVar("amplifier_version", AMPLIFIER_PLUGIN_VERSION, "The Amplifier Version", FCVAR_REPLICATED|FCVAR_NOTIFY);
 	cvarEffectLength = CreateConVar("amplifier_effect_length", "3.0", "Length in seconds for the Amplifier condition to last", FCVAR_PLUGIN);
-	cvarDistance = CreateConVar("amplifier_distance", "220.0", "Distance the amplifier works.", FCVAR_PLUGIN);
+	cvarDistance = CreateConVar("amplifier_distance", "400.0", "Distance the amplifier works.", FCVAR_PLUGIN);
+	cvarMetalMax = CreateConVar("amplifier_max", "200.0", "Maximum amount of metal an amplifier can hold.", FCVAR_PLUGIN);
+	cvarMetal = CreateConVar("amplifier_metal", "5.0", "Amount of metal to use to apply a condition to a player (per second).", FCVAR_PLUGIN);
 	cvarForceAmplifier = CreateConVar("amplifier_force", "0", "Force amplifier mode: 0=nothing, 1=dispenser, 2=sentry, 3=both", FCVAR_PLUGIN, true, 0.0, true, 3.0);
 	cvarForcePlayercount = CreateConVar("amplifier_force_playercount", "0", "If >0 and human player count is below this value, treat amplifier_force as 2 (sentry only).", FCVAR_PLUGIN, true, 0.0);
 	cvarEnableExplosion = CreateConVar("amplifier_explode", "65", "Enable Amplifier death explosions? >0 for damage value.", FCVAR_PLUGIN, true, 0.0);
@@ -283,7 +226,6 @@ void Amplifier_OnPluginStart()
 	cvarEnableZap = CreateConVar("amplifier_zap", "0.0", "Should Amplifier pulses harm the enemy team? 0 to disable, >0 for damage.", FCVAR_PLUGIN, true, 0.0, true, 50.0);
 
 	HookEventEx("player_dropobject", Event_ObjectDropped);
-	HookEvent("object_destroyed", Event_AmplifierObjectDestroyedPre, EventHookMode_Pre);
 
 	RegConsoleCmd("sm_amplifier", CallPanel, "Select engineer's building type");
 	RegConsoleCmd("sm_a", CallPanel, "Select engineer's building type");
@@ -312,29 +254,10 @@ void Amplifier_OnPluginStart()
 
 void Amplifier_OnPluginEnd()
 {
-	if (g_hAmplifierCanBeUpgraded != null)
-	{
-		g_hAmplifierCanBeUpgraded.Disable(
-			Hook_Pre,
-			Amplifier_CanBeUpgraded_Pre);
-		delete g_hAmplifierCanBeUpgraded;
-		g_hAmplifierCanBeUpgraded = null;
-	}
-
 	if (g_hAmplifierTimer != INVALID_HANDLE)
 	{
 		KillTimer(g_hAmplifierTimer);
 		g_hAmplifierTimer = INVALID_HANDLE;
-	}
-	if (g_hAmplifierPulseTimer != INVALID_HANDLE)
-	{
-		KillTimer(g_hAmplifierPulseTimer);
-		g_hAmplifierPulseTimer = INVALID_HANDLE;
-	}
-	if (g_hAmplifierStopSound != INVALID_HANDLE)
-	{
-		delete g_hAmplifierStopSound;
-		g_hAmplifierStopSound = INVALID_HANDLE;
 	}
 
 	if (fwdOnAmplify != null)
@@ -355,37 +278,20 @@ void Amplifier_OnConfigsExecuted()
 {
 	if (g_hAmplifierTimer == INVALID_HANDLE)
 	{
-		g_hAmplifierTimer = CreateTimer(AMPLIFIER_UPDATE_INTERVAL, Timer_amplifier, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		g_hAmplifierTimer = CreateTimer(1.0, Timer_amplifier, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	}
-	if (g_hAmplifierPulseTimer == INVALID_HANDLE)
-	{
-		ScheduleAmplifierPulse();
-	}
-}
-
-void ScheduleAmplifierPulse()
-{
-	g_hAmplifierPulseTimer = CreateTimer(
-		GetRandomFloat(AMPLIFIER_PULSE_INTERVAL_MIN, AMPLIFIER_PULSE_INTERVAL_MAX),
-		Timer_amplifier_pulse,
-		_,
-		TIMER_FLAG_NO_MAPCHANGE);
 }
 
 void Amplifier_OnMapStart()
 {
-	PrecacheScriptSound(AMPLIFIER_IDLE_SOUND);
-	g_AmplifierIdleSoundResolved = GetGameSoundParams(
-		AMPLIFIER_IDLE_SOUND,
-		g_AmplifierIdleSoundChannel,
-		g_AmplifierIdleSoundLevel,
-		g_AmplifierIdleSoundVolume,
-		g_AmplifierIdleSoundPitch,
-		g_AmplifierIdleSoundSample,
-		sizeof(g_AmplifierIdleSoundSample),
-		SOUND_FROM_WORLD);
-	g_BeamSprite = 0;
-	g_HaloSprite = 0;
+	AddToDownload();
+	PrecacheSound(AMPLIFIER_SOUND, true);
+	PrecacheSound(AMPLIFIER_EMPTY_SOUND, true);
+	//PrecacheSound("AMPLIFIER_BUFF_SOUND", true);
+	//PrecacheSound("AMPLIFIER_FILL_SOUND", true);
+	g_BeamSprite = PrecacheModel("materials/sprites/laser.vmt");
+	g_HaloSprite = PrecacheModel("materials/sprites/halo01.vmt");
+	PrecacheGeneric("particles/powerups.pcf", true);
 }
 
 void Amplifier_OnMapEnd()
@@ -396,7 +302,6 @@ void Amplifier_OnMapEnd()
 	}
 
 	g_hAmplifierTimer = INVALID_HANDLE;
-	g_hAmplifierPulseTimer = INVALID_HANDLE;
 }
 
 void Amplifier_OnClientPostAdminCheck(int client)
@@ -549,6 +454,42 @@ bool WouldObjectTypeBecomeAmplifier(int client, int objectType)
 		playerRequestedAmplifier);
 }
 
+public void AddToDownload()
+{
+	char strLine[256];
+	static const char extensions[][] = {".mdl", ".dx80.vtx", ".dx90.vtx", ".sw.vtx", ".vvd", ".phy"};
+	static const char textureExtensions[][] = {".vtf", ".vmt"};
+	static const char textures[][] = {"", "_blue", "_anim", "_anim_blue", "_anim2", "_anim2_blue", "_holo", "_bolt", "_holo_blue", "_radar"};
+
+	for (int i = 0; i < sizeof(extensions); i++)
+	{
+		Format(strLine, sizeof(strLine), "%s%s", AmplifierModel, extensions[i]);
+		AddFileToDownloadsTable(strLine);
+		for (int j = 1; j <= 8; j++)
+		{
+			Format(strLine, sizeof(strLine), "%s%i%s", AMPgib, j, extensions[i]);
+			AddFileToDownloadsTable(strLine);
+		}
+	}
+
+	for (int i = 0; i < sizeof(textureExtensions); i++)
+	{
+		for (int j = 0; j < sizeof(textures); j++)
+		{
+			Format(strLine, sizeof(strLine), "%s%s%s", AmplifierTex, textures[j], textureExtensions[i]);
+			AddFileToDownloadsTable(strLine);
+		}
+	}
+
+	Format(strLine, sizeof(strLine), "%s.mdl", AmplifierModel);
+	PrecacheModel(strLine, true);
+	for (int i = 1; i <= 8; i++)
+	{
+		Format(strLine, sizeof(strLine), "%s%i.mdl", AMPgib, i);
+		PrecacheModel(strLine, true);
+	}
+}
+
 bool GetDestroyCommandForBuilding(const char[] buildingClass, char[] destroyCmd, int destroyCmdSize)
 {
 	if (IsDispenserClass(buildingClass))
@@ -600,10 +541,6 @@ void RemoveBuilding(int client, const char[] buildingClass)
 		{
 			continue;
 		}
-		if (AmplifierOn[ent] || IsAmplifierModel(ent))
-		{
-			StopAmplifierIdleSound(ent);
-		}
 
 		char health[16];
 		IntToString(GetEntProp(ent, Prop_Send, "m_iMaxHealth") + 1, health, sizeof(health));
@@ -620,6 +557,7 @@ void RemoveBuilding(int client, const char[] buildingClass)
 		}
 
 		AcceptEntityInput(ent, "kill");
+		AmplifierFill[ent] = 0.0;
 	}
 }
 
@@ -637,6 +575,7 @@ public Action HelpPanel(int client, int args)
 	SetPanelTitle(panel, "Amplifier Info");
 	DrawPanelText(panel, "Amplifiers buff allies with 40% faster reload speed and health on hit");
 	DrawPanelText(panel, "They zap enemies within range and explode on death");
+	DrawPanelText(panel, "Mini-amplifiers have less health and less potent effects");
 	DrawPanelText(panel, "Ammo is fuel, hit with your wrench to refill");
 	DrawPanelText(panel, "If sentries are disabled, amplifiers replace them. Otherwise, equip amplifiers with !a");
 	DrawPanelItem(panel, "Close");
@@ -822,59 +761,8 @@ bool IsAmplifierModel(int ent)
 		return false;
 
 	char modelname[256];
-	char expectedBuildModel[128];
-	char expectedActiveModel[128];
 	GetEntPropString(ent, Prop_Data, "m_ModelName", modelname, sizeof(modelname));
-	Format(expectedBuildModel, sizeof(expectedBuildModel), "%s.mdl", AmplifierBuildModel);
-	Format(expectedActiveModel, sizeof(expectedActiveModel), "%s.mdl", AmplifierActiveModel);
-	return StrEqual(modelname, expectedBuildModel, false)
-		|| StrEqual(modelname, expectedActiveModel, false);
-}
-
-bool IsAmplifierActiveModel(int ent)
-{
-	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent))
-		return false;
-
-	char modelname[256];
-	char expectedModel[128];
-	GetEntPropString(ent, Prop_Data, "m_ModelName", modelname, sizeof(modelname));
-	Format(expectedModel, sizeof(expectedModel), "%s.mdl", AmplifierActiveModel);
-	return StrEqual(modelname, expectedModel, false);
-}
-
-bool IsAmplifierUpgradeBlockedEntity(int ent)
-{
-	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent)
-		|| BuildingRef[ent] != EntIndexToEntRef(ent))
-	{
-		return false;
-	}
-
-	char buildingClass[64];
-	GetEdictClassname(ent, buildingClass, sizeof(buildingClass));
-	if (!IsDispenserClass(buildingClass) && !IsSentryClass(buildingClass))
-	{
-		return false;
-	}
-
-	// The model identifies an amplifier during construction. AmplifierOn remains
-	// authoritative afterward in case TF2 temporarily overwrites the model.
-	return AmplifierOn[ent] || IsAmplifierModel(ent);
-}
-
-public MRESReturn Amplifier_CanBeUpgraded_Pre(
-	int ent,
-	DHookReturn returnValue,
-	DHookParam parameters)
-{
-	if (!IsAmplifierUpgradeBlockedEntity(ent))
-	{
-		return MRES_Ignored;
-	}
-
-	returnValue.Value = false;
-	return MRES_Supercede;
+	return StrContains(modelname, "plifier") != -1;
 }
 
 bool GetObjectBoolProp(int ent, const char[] propName)
@@ -904,8 +792,8 @@ void SetAmplifierCarriedState(int ent, bool carried)
 	AmplifierCarried[ent] = carried;
 	if (carried)
 	{
-		StopAmplifierIdleSound(ent);
 		ClearAmplifierConditionForBuilding(ent);
+		AmplifierFill[ent] = 0.0;
 	}
 }
 
@@ -918,78 +806,10 @@ bool IsActiveAmplifier(int ent)
 	return IsTrackedEntityIndex(ent) && IsValidEntity(ent) && AmplifierOn[ent] && !AmplifierSapped[ent] && !IsAmplifierBeingCarried(ent);
 }
 
-void StartAmplifierIdleSound(int ent)
-{
-	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent) || AmplifierIdleSoundPlaying[ent])
-		return;
-
-	if (EmitGameSoundToAll(AMPLIFIER_IDLE_SOUND, ent))
-	{
-		AmplifierIdleSoundPlaying[ent] = true;
-	}
-}
-
-void StopAmplifierIdleSound(int ent)
-{
-	if (!IsTrackedEntityIndex(ent))
-		return;
-
-	if (IsValidEntity(ent) && g_hAmplifierStopSound != INVALID_HANDLE)
-	{
-		SDKCall(g_hAmplifierStopSound, ent, AMPLIFIER_IDLE_SOUND);
-	}
-
-	if (g_AmplifierIdleSoundResolved)
-	{
-		StopSound(ent, g_AmplifierIdleSoundChannel, g_AmplifierIdleSoundSample);
-
-		for (int client = 1; client <= MaxClients; client++)
-		{
-			if (!IsClientInGame(client))
-				continue;
-
-			EmitSoundToClient(
-				client,
-				g_AmplifierIdleSoundSample,
-				ent,
-				g_AmplifierIdleSoundChannel,
-				g_AmplifierIdleSoundLevel,
-				SND_STOP,
-				g_AmplifierIdleSoundVolume,
-				g_AmplifierIdleSoundPitch);
-		}
-	}
-
-	AmplifierIdleSoundPlaying[ent] = false;
-}
-
-public Action Event_AmplifierObjectDestroyedPre(Event event, const char[] name, bool dontBroadcast)
-{
-	int ent = event.GetInt("index");
-	if (IsTrackedEntityIndex(ent)
-		&& (AmplifierOn[ent] || AmplifierIdleSoundPlaying[ent]))
-	{
-		StopAmplifierIdleSound(ent);
-	}
-
-	return Plugin_Continue;
-}
-
 void SetAmplifierBuildModel(int ent)
 {
 	char modelname[128];
-	Format(modelname, sizeof(modelname), "%s.mdl", AmplifierBuildModel);
-	SetEntityModel(ent, modelname);
-	SetEntProp(ent, Prop_Send, "m_nBody", AMPLIFIER_TOOLBOX_BODYGROUP_VISIBLE);
-}
-
-void SetAmplifierActiveVisualState(int ent)
-{
-	// Match CObjectDispenser::OnGoActive(): replace the construction model
-	// with the separate finished model. Its ref sequence is marked autoplay,
-	// which starts the active radar animation as soon as the model is set.
-	char modelname[128];
-	Format(modelname, sizeof(modelname), "%s.mdl", AmplifierActiveModel);
+	Format(modelname, sizeof(modelname), "%s.mdl", AmplifierModel);
 	SetEntityModel(ent, modelname);
 }
 
@@ -1009,13 +829,14 @@ bool IsAmplifierConstructionComplete(int ent)
 
 void ClampAmplifierHealthToMax(int ent)
 {
-	SetEntProp(ent, Prop_Send, "m_iMaxHealth", AMPLIFIER_HEALTH);
+	int maxHealth = AmplifierMini[ent] ? AMPLIFIER_MINI_HEALTH : AMPLIFIER_HEALTH;
+	SetEntProp(ent, Prop_Send, "m_iMaxHealth", maxHealth);
 
 	int currentHealth = GetEntProp(ent, Prop_Send, "m_iHealth");
-	if (currentHealth > AMPLIFIER_HEALTH)
+	if (currentHealth > maxHealth)
 	{
 		char sHealth[16];
-		IntToString(AMPLIFIER_HEALTH, sHealth, sizeof(sHealth));
+		IntToString(maxHealth, sHealth, sizeof(sHealth));
 		SetVariantString(sHealth);
 		AcceptEntityInput(ent, "SetHealth");
 	}
@@ -1036,26 +857,144 @@ void ReassertAmplifierRuntimeState(int ent)
 	SetEntProp(ent, Prop_Send, "m_bDisabled", 1);
 	SetEntProp(ent, Prop_Send, "m_iUpgradeLevel", 1);
 	SetEntProp(ent, Prop_Send, "m_iHighestUpgradeLevel", 1);
-	if (HasEntProp(ent, Prop_Send, "m_bMiniBuilding"))
-	{
-		SetEntProp(ent, Prop_Send, "m_bMiniBuilding", 0);
-	}
-	SetEntPropFloat(ent, Prop_Send, "m_flModelScale", 1.0);
-	if (!IsAmplifierActiveModel(ent))
-		SetAmplifierActiveVisualState(ent);
+	if (!IsAmplifierModel(ent))
+		SetAmplifierBuildModel(ent);
 	ClampAmplifierHealthToMax(ent);
-	StartAmplifierIdleSound(ent);
+}
+
+bool GetAmplifierMetal(int ent, int &metal, char[] buildingClass, int classSize)
+{
+	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent))
+	{
+		metal = 0;
+		buildingClass[0] = '\0';
+		return false;
+	}
+
+	GetEdictClassname(ent, buildingClass, classSize);
+
+	if (IsDispenserClass(buildingClass))
+	{
+		metal = GetEntProp(ent, Prop_Send, "m_iAmmoMetal");
+		return true;
+	}
+
+	if (IsSentryClass(buildingClass))
+	{
+		metal = GetEntProp(ent, Prop_Send, "m_iAmmoShells");
+		return true;
+	}
+
+	metal = 0;
+	return false;
+}
+
+void SetAmplifierMetal(int ent, const char[] buildingClass, int metal)
+{
+	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent))
+		return;
+
+	if (IsDispenserClass(buildingClass))
+		SetEntProp(ent, Prop_Send, "m_iAmmoMetal", metal);
+	else if (IsSentryClass(buildingClass))
+		SetEntProp(ent, Prop_Send, "m_iAmmoShells", metal);
+}
+
+bool AbsorbAmplifierUpgradeMetal(int ent, int metalMax)
+{
+	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent))
+		return false;
+
+	int upgradeMetal = GetEntProp(ent, Prop_Send, "m_iUpgradeMetal");
+	if (upgradeMetal <= 0)
+		return false;
+
+	SetEntProp(ent, Prop_Send, "m_iUpgradeMetal", 0);
+	if (metalMax <= 0)
+		return false;
+
+	char buildingClass[64];
+	int oldMetal;
+	if (!GetAmplifierMetal(ent, oldMetal, buildingClass, sizeof(buildingClass)))
+		return false;
+
+	if (oldMetal < 0)
+		oldMetal = 0;
+
+	int refillMetal = (upgradeMetal * metalMax) / 200;
+	int newMetal = oldMetal + refillMetal;
+	if (newMetal > metalMax)
+		newMetal = metalMax;
+
+	SetAmplifierMetal(ent, buildingClass, newMetal);
+	UpdateAmplifierFill(ent, newMetal, metalMax);
+	return refillMetal > 0;
+}
+
+void UpdateAmplifierFill(int ent, int metal, int metalMax)
+{
+	if (!IsTrackedEntityIndex(ent))
+		return;
+
+	if (metalMax <= 0)
+	{
+		AmplifierFill[ent] = 0.0;
+		return;
+	}
+
+	float fill = float(metal) / float(metalMax);
+	if (fill < 0.0)
+		fill = 0.0;
+	if (fill < 0.4)
+		fill = (fill / 0.4) + 0.6; // Taking a percentage and adding a minimum
+	else
+		fill = 1.0;
+	if (fill > 1.0)
+		fill = 1.0;
+
+	AmplifierFill[ent] = fill;
 }
 
 float GetAmplifierEffectiveRadius(int ent)
 {
-	// Keep the gameplay range and visual pulse range in lock-step.
+	// Keep the gameplay range and non-empty visual pulse range in lock-step.
+	// AmplifierFill affects color/pitch only, not the wave's visible reach.
 	return IsTrackedEntityIndex(ent) ? AmplifierDistance[ent] : 0.0;
 }
 
-float GetAmplifierEffectLength()
+float GetAmplifierWaveRadius(int ent)
 {
-	return GetConVarFloat(cvarEffectLength);
+	return GetAmplifierEffectiveRadius(ent);
+}
+
+float GetEmptyAmplifierWaveRadius(int ent)
+{
+	float radius = 144.0;
+	if (ent > 0 && ent < ME && AmplifierMini[ent])
+		radius *= AMPLIFIER_MINI_MODIFIER;
+
+	return radius;
+}
+
+float GetAmplifierEffectLength(int ent)
+{
+	float effectLength = GetConVarFloat(cvarEffectLength);
+	if (IsTrackedEntityIndex(ent) && AmplifierMini[ent])
+	{
+		effectLength = float(RoundToFloor(effectLength * AMPLIFIER_MINI_MODIFIER));
+		if (effectLength < 1.0)
+			effectLength = 1.0;
+	}
+
+	return effectLength;
+}
+
+float GetAmplifierDamage(int ent, float damage)
+{
+	if (IsTrackedEntityIndex(ent) && AmplifierMini[ent])
+		return float(RoundToFloor(damage * AMPLIFIER_MINI_MODIFIER));
+
+	return damage;
 }
 
 void ClearAmplifierConditionForClient(int client, int maxEntities)
@@ -1113,9 +1052,19 @@ int CollectActiveAmplifiers(int maxEntities, int activeAmps[ME])
 	return activeCount;
 }
 
-bool TryApplyAmplifierToClient(int client, int amp)
+bool TryApplyAmplifierToClient(int client, int amp, int metalPerPlayer, int metalMax, float zapDamage)
 {
 	if (!IsActiveAmplifier(amp))
+		return false;
+
+	char buildingClass[64];
+	int metal;
+	if (!GetAmplifierMetal(amp, metal, buildingClass, sizeof(buildingClass)))
+		return false;
+
+	UpdateAmplifierFill(amp, metal, metalMax);
+
+	if (metal < metalPerPlayer && metalPerPlayer > 0)
 		return false;
 
 	float clientPos[3];
@@ -1148,25 +1097,37 @@ bool TryApplyAmplifierToClient(int client, int amp)
 	if (res != Plugin_Continue)
 		return false;
 
-    if (clientTeam != team)
-    {
-        return false;
-    }
+	if (clientTeam == team)
+	{
+		if (!AddAmplifierEffect(client, amp))
+			return false;
 
-    if (!AddAmplifierEffect(client))
-        return false;
+		if (!ConditionApplied[amp][client])
+		{
+			EmitSoundToClient(client, AMPLIFIER_BUFF_SOUND, amp, _, SNDLEVEL_NORMAL, SND_NOFLAGS, 0.5, SNDPITCH_HIGH);
+		}
+		ConditionApplied[amp][client] = true;
+		g_PlayerState[client].nearAmplifier = true;
+	}
+	else if (zapDamage > 0.0)
+	{
+		DealElectricDamage(client, builder, amplifierPos, GetAmplifierDamage(amp, zapDamage), GetAmplifierEffectiveRadius(amp));
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 
-    if (!ConditionApplied[amp][client])
-    {
-        EmitSoundToClient(client, AMPLIFIER_BUFF_SOUND, amp, _, SNDLEVEL_NORMAL, SND_NOFLAGS, 0.5, SNDPITCH_HIGH);
-    }
-    ConditionApplied[amp][client] = true;
-    g_PlayerState[client].nearAmplifier = true;
+	if (metalPerPlayer > 0)
+	{
+		SetAmplifierMetal(amp, buildingClass, metal - metalPerPlayer);
+	}
 
-    return true;
+	return true;
 }
 
-void ApplyAmplifierEffectsToPlayers(int activeAmps[ME], int activeCount, int maxEntities)
+void ApplyAmplifierEffectsToPlayers(int activeAmps[ME], int activeCount, int maxEntities, int metalPerPlayer, int metalMax, float zapDamage)
 {
 	for (int client = 1; client <= MaxClients; client++)
 	{
@@ -1181,8 +1142,8 @@ void ApplyAmplifierEffectsToPlayers(int activeAmps[ME], int activeCount, int max
 		for (int slot = 0; slot < activeCount; slot++)
 		{
 			int amp = activeAmps[slot];
-            if (TryApplyAmplifierToClient(client, amp))
-                break;
+			if (TryApplyAmplifierToClient(client, amp, metalPerPlayer, metalMax, zapDamage))
+				break;
 		}
 
 		if (!g_PlayerState[client].nearAmplifier)
@@ -1192,69 +1153,22 @@ void ApplyAmplifierEffectsToPlayers(int activeAmps[ME], int activeCount, int max
 	}
 }
 
-void DamageEnemiesFromAmplifierPulse(int amp, float amplifierPos[3])
-{
-    float zapDamage = GetConVarFloat(cvarEnableZap);
-    if (zapDamage <= 0.0)
-        return;
-
-    TFTeam amplifierTeam = view_as<TFTeam>(GetEntProp(amp, Prop_Send, "m_iTeamNum"));
-    int builder = GetEntPropEnt(amp, Prop_Send, "m_hBuilder");
-
-    for (int client = 1; client <= MaxClients; client++)
-    {
-        if (!Client_IsInGame(client) || !IsPlayerAlive(client))
-            continue;
-
-        float clientPos[3];
-        GetEntPropVector(client, Prop_Send, "m_vecOrigin", clientPos);
-        if (GetVectorDistance(clientPos, amplifierPos) > AMPLIFIER_DAMAGE_RADIUS)
-            continue;
-        if (!TraceTargetIndex(amp, client, amplifierPos, clientPos))
-            continue;
-
-        TFTeam clientTeam = view_as<TFTeam>(GetClientTeam(client));
-        if (clientTeam == amplifierTeam)
-            continue;
-        if (TF2_GetPlayerClass(client) == TFClass_Spy
-            && TF2_IsPlayerInCondition(client, TFCond_Disguised)
-            && !TF2_IsPlayerInCondition(client, TFCond_Cloaked))
-        {
-            continue;
-        }
-
-        TFCond condition = DefaultCondition;
-        Action result = Plugin_Continue;
-        if (fwdOnAmplify != null)
-        {
-            Call_StartForward(fwdOnAmplify);
-            Call_PushCell(builder);
-            Call_PushCell(client);
-            Call_PushCell(condition);
-            Call_Finish(result);
-        }
-        if (result != Plugin_Continue)
-            continue;
-
-        DealElectricDamage(client, builder, amplifierPos, zapDamage, AMPLIFIER_DAMAGE_RADIUS);
-    }
-}
-
-void PulseAmplifierBuilding(int ent)
+void PulseAmplifierBuilding(int ent, int metalPerPlayer, int metalMax)
 {
 	if (!IsActiveAmplifier(ent))
 		return;
 
+	ReassertAmplifierRuntimeState(ent);
+	bool absorbedUpgradeMetal = AbsorbAmplifierUpgradeMetal(ent, metalMax);
+
+	char buildingClass[64];
+	int oldMetal;
+	if (!GetAmplifierMetal(ent, oldMetal, buildingClass, sizeof(buildingClass)))
+		return;
+	UpdateAmplifierFill(ent, oldMetal, metalMax);
+
 	float pos[3];
 	GetEntPropVector(ent, Prop_Send, "m_vecOrigin", pos);
-
-	float ringPos[3];
-	GetEntPropVector(ent, Prop_Send, "m_vecOrigin", ringPos);
-	float modelScale = GetEntPropFloat(ent, Prop_Send, "m_flModelScale");
-	if (modelScale <= 0.0)
-		modelScale = 1.0;
-	ringPos[2] += (AMPLIFIER_MODEL_TOP_Z * modelScale) + AMPLIFIER_RING_CLEARANCE;
-
 	pos[2] += 90;
 
 	int beamColor[4];
@@ -1263,64 +1177,60 @@ void PulseAmplifierBuilding(int ent)
 	else
 		beamColor = {75, 75, 255, 255};
 
-	EmitAmbientSound(AMPLIFIER_PULSE_SOUND, pos, ent, SNDLEVEL_CAR, SND_NOFLAGS, 0.6, SNDPITCH_NORMAL);
+	float colorScale = AmplifierFill[ent];
+	beamColor[0] = RoundFloat(float(beamColor[0]) * colorScale);
+	beamColor[1] = RoundFloat(float(beamColor[1]) * colorScale);
+	beamColor[2] = RoundFloat(float(beamColor[2]) * colorScale);
+	beamColor[3] = RoundFloat(float(beamColor[3]) * colorScale);
 
-	if (g_BeamSprite <= 0)
+	if (oldMetal > metalPerPlayer)
 	{
-		g_BeamSprite = FindStringIndex(
-			FindStringTable("modelprecache"),
-			"materials/sprites/laser.vmt");
+		EmitAmbientSound(AMPLIFIER_SOUND, pos, ent, SNDLEVEL_CAR, SND_NOFLAGS, 0.6, RoundToCeil(SNDPITCH_NORMAL * colorScale));
 	}
-	if (g_HaloSprite <= 0)
+	else
 	{
-		g_HaloSprite = FindStringIndex(
-			FindStringTable("modelprecache"),
-			"materials/sprites/halo01.vmt");
-	}
-	if (g_BeamSprite <= 0 || g_HaloSprite <= 0)
-	{
-		LogError("Amplifier beam materials were not precached by precachefiles.cfg");
-		return;
+		EmitAmbientSound(AMPLIFIER_EMPTY_SOUND, pos, ent, SNDLEVEL_CAR, SND_NOFLAGS, 0.5, SNDPITCH_NORMAL);
 	}
 
-    TE_SetupBeamRingPoint(ringPos, 0.0, AMPLIFIER_RING_RADIUS, g_BeamSprite, g_HaloSprite, 0, 15, AMPLIFIER_RING_LIFE, 5.0, 0.0, beamColor, 3, 0);
-    TE_SendToAll();
+	if (oldMetal > 0)
+	{
+		TE_SetupBeamRingPoint(pos, 10.0, GetAmplifierWaveRadius(ent), g_BeamSprite, g_HaloSprite, 0, 15, 3.0, 5.0, 0.0, beamColor, 3, 0);
+		TE_SendToAll();
+	}
+	else
+	{
+		int emptyColor[4] = {75, 75, 75, 100};
+		TE_SetupBeamRingPoint(pos, 10.0, GetEmptyAmplifierWaveRadius(ent), g_BeamSprite, g_HaloSprite, 0, 15, 3.0, 5.0, 0.0, emptyColor, 3, 0); // 144 is the final non-mini value at colorscale 0.
+		TE_SendToAll();
+	}
 
-    float amplifierPos[3];
-    GetEntPropVector(ent, Prop_Send, "m_vecOrigin", amplifierPos);
-    DamageEnemiesFromAmplifierPulse(ent, amplifierPos);
+	if (absorbedUpgradeMetal)
+	{
+		EmitAmbientSound(AMPLIFIER_FILL_SOUND, pos);
+	}
 }
 
-void PulseAmplifierBuildings()
+void PulseAmplifierBuildings(int activeAmps[ME], int activeCount, int metalPerPlayer, int metalMax)
 {
-	int maxEntities = GetTrackedEntityLimit();
-	for (int slot = 1; slot < maxEntities; slot++)
+	for (int slot = 0; slot < activeCount; slot++)
 	{
-		int ref = BuildingRef[slot];
-		if (ref == 0)
-			continue;
-
-		int ent = EntRefToEntIndex(ref);
-		PulseAmplifierBuilding(ent);
+		int ent = activeAmps[slot];
+		PulseAmplifierBuilding(ent, metalPerPlayer, metalMax);
 	}
 }
 
 public Action Timer_amplifier(Handle hTimer)
 {
-    int maxEntities = GetTrackedEntityLimit();
-    int activeCount = CollectActiveAmplifiers(maxEntities, g_ActiveAmplifiers);
+	int maxEntities = GetTrackedEntityLimit();
+	int metalPerPlayer = GetConVarInt(cvarMetal);
+	int metalMax = GetConVarInt(cvarMetalMax);
+	float zapDamage = GetConVarFloat(cvarEnableZap);
+	int activeCount = CollectActiveAmplifiers(maxEntities, g_ActiveAmplifiers);
 
-    ApplyAmplifierEffectsToPlayers(g_ActiveAmplifiers, activeCount, maxEntities);
+	ApplyAmplifierEffectsToPlayers(g_ActiveAmplifiers, activeCount, maxEntities, metalPerPlayer, metalMax, zapDamage);
+	PulseAmplifierBuildings(g_ActiveAmplifiers, activeCount, metalPerPlayer, metalMax);
 
 	return Plugin_Continue;
-}
-
-public Action Timer_amplifier_pulse(Handle hTimer)
-{
-	g_hAmplifierPulseTimer = INVALID_HANDLE;
-	PulseAmplifierBuildings();
-	ScheduleAmplifierPulse();
-	return Plugin_Stop;
 }
 
 public Action event_player_death(Event event, const char[] name, bool dontBroadcast)
@@ -1410,6 +1320,7 @@ public Action Event_ObjectDestroyed(Event event, const char[] name, bool dontBro
 	if (!AmplifierOn[entindex] && !AmplifierCarried[entindex] && !IsAmplifierModel(entindex))
 		return Plugin_Continue;
 
+	bool wasMini = AmplifierMini[entindex];
 	float amplifierDistance = GetAmplifierEffectiveRadius(entindex);
 	int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	bool entwasbuilding = event.GetBool("was_building"); // building in progress
@@ -1419,10 +1330,12 @@ public Action Event_ObjectDestroyed(Event event, const char[] name, bool dontBro
 	int explosionDamage = GetConVarInt(cvarEnableExplosion);
 	if (explosionDamage > 0 && !wasCarried && !g_bAmplifierExplosionActive)
 	{
+		if (wasMini)
+			explosionDamage = RoundToFloor(float(explosionDamage) * AMPLIFIER_MINI_MODIFIER);
+
 		CreateAmplifierExplosion(position, attacker, entwasbuilding, explosionDamage, amplifierDistance);
 	}
 
-	StopAmplifierIdleSound(entindex);
 	ResetAmplifierBuildingState(entindex);
 	return Plugin_Changed;
 }
@@ -1455,14 +1368,16 @@ void CheckBuilding(int ent)
     if (shouldConvert)
     {
         AmplifierOn[ent] = false;
+		AmplifierMini[ent] = false;
         SetEntProp(ent, Prop_Send, "m_bDisabled", 1);
-		SetEntPropFloat(ent, Prop_Send, "m_flModelScale", 1.0);
-		if (HasEntProp(ent, Prop_Send, "m_bMiniBuilding"))
+		if (GetEntPropFloat(ent, Prop_Send, "m_flModelScale") != 1.0)
 		{
-			SetEntProp(ent, Prop_Send, "m_bMiniBuilding", 0);
+			SetEntPropFloat(ent, Prop_Send, "m_flModelScale", 0.85); // Minis use 0.75... too small
+			AmplifierMini[ent] = true;
 		}
 
 		AmplifierSapped[ent] = false;
+		AmplifierFill[ent] = 0.0;
 
 		if (NativeControl)
 		{
@@ -1475,7 +1390,14 @@ void CheckBuilding(int ent)
 			AmplifierCondition[ent] = DefaultCondition;
 		}
 
-		SetAmplifierBuildModel(ent);
+		if (AmplifierMini[ent])
+		{
+			AmplifierDistance[ent] *= AMPLIFIER_MINI_MODIFIER;
+		}
+
+		char s[128];
+		Format(s, sizeof(s), "%s.mdl", AmplifierModel);
+		SetEntityModel(ent, s);
 		SetEntProp(ent, Prop_Send, "m_nSkin", GetEntProp(ent, Prop_Send, "m_nSkin") + 2);
         // Build-rate modifiers can complete a sentry before a one-second
         // delayed check runs, so start the construction watchdog almost
@@ -1529,22 +1451,39 @@ public Action BuildingCheckStage2(Handle hTimer, any ref)
 		AmplifierOn[ent] = true;
 		SetEntProp(ent, Prop_Send, "m_iUpgradeLevel", 1);
 		SetEntProp(ent, Prop_Send, "m_iHighestUpgradeLevel", 1);
-		SetAmplifierActiveVisualState(ent);
+		SetAmplifierBuildModel(ent);
 
-		SetAmplifierHealth(ent, AMPLIFIER_HEALTH);
+		if (AmplifierMini[ent])
+		{
+			SetAmplifierHealth(ent, AMPLIFIER_MINI_HEALTH);
+		}
+		else
+		{
+			SetAmplifierHealth(ent, AMPLIFIER_HEALTH);
+		}
 
+		char buildingClass[64];
+		GetEdictClassname(ent, buildingClass, sizeof(buildingClass));
+		int metalMax = GetConVarInt(cvarMetalMax);
+		int startingFuel = (metalMax * 75) / 200;
+		if (startingFuel < 0)
+			startingFuel = 0;
+
+		if (IsDispenserClass(buildingClass))
+			SetEntProp(ent, Prop_Send, "m_iAmmoMetal", startingFuel);
+		else if (IsSentryClass(buildingClass))
+			SetEntProp(ent, Prop_Send, "m_iAmmoShells", startingFuel);
+
+		UpdateAmplifierFill(ent, startingFuel, metalMax);
+		SetEntProp(ent, Prop_Send, "m_iUpgradeMetal", 0);
 		SetEntProp(ent, Prop_Send, "m_nSkin", GetEntProp(ent, Prop_Send, "m_nSkin") - 2);
 		ReassertAmplifierRuntimeState(ent);
-		EmitSoundToAll(
-			AMPLIFIER_CONSTRUCTION_SOUND,
-			ent,
-			SNDCHAN_AUTO,
-			SNDLEVEL_NORMAL);
 
 		return Plugin_Continue;
 	}
 
 	ReassertAmplifierRuntimeState(ent);
+	AbsorbAmplifierUpgradeMetal(ent, GetConVarInt(cvarMetalMax));
 
 	return Plugin_Continue;
 }
@@ -1596,14 +1535,14 @@ public Action SapperCheckStage2(Handle hTimer, any ref)
 	return Plugin_Continue;
 }
 
-stock bool AddAmplifierEffect(int client)
+stock bool AddAmplifierEffect(int client, int amp)
 {
     if (client < 1 || client > MaxClients || !IsClientInGame(client))
         return false;
 
     StopAmplifierEffect(client, false);
 
-	float effectLength = GetAmplifierEffectLength();
+	float effectLength = GetAmplifierEffectLength(amp);
 	TF2ConchNoSpeed_AddRegenBuff(client, effectLength, client);
     // Apply to first 3 slots
     for (int slot = 0; slot < 3; slot++)
@@ -1686,36 +1625,28 @@ public Action Timer_RemoveAmplifierEffect(Handle timer, int userid)
     return Plugin_Stop;
 }
 
-stock bool ClientHasAmplifierAttribute(int client, const char[] attribute)
+stock int CheckAmpAttributesDisp(int client)
 {
-    if (!Client_IsInGame(client))
-        return false;
+	if (!Client_IsInGame(client))
+		return 0;
 
-    for (int slot = AMPLIFIER_PDA_SLOT_FIRST; slot <= AMPLIFIER_PDA_SLOT_LAST; slot++)
-    {
-        int weapon = GetPlayerWeaponSlot(client, slot);
-        if (weapon <= MaxClients || !IsValidEntity(weapon))
-        {
-            continue;
-        }
+	int weapon = GetPlayerWeaponSlot(client, 4);
+	if (weapon <= MaxClients || !IsValidEntity(weapon))
+		return 0;
 
-        if (TF2CustAttr_GetInt(weapon, attribute) != 0)
-        {
-            return true;
-        }
-    }
-
-    return false;
+	return (TF2CustAttr_GetInt(weapon, "amplifier attributes") != 0) ? 1 : 0;
 }
 
-stock bool CheckAmpAttributesDisp(int client)
+stock int CheckAmpAttributesSentry(int client)
 {
-    return ClientHasAmplifierAttribute(client, "amplifier attributes");
-}
+	if (!Client_IsInGame(client))
+		return 0;
 
-stock bool CheckAmpAttributesSentry(int client)
-{
-    return ClientHasAmplifierAttribute(client, "amplifier attributes sentry");
+	int weapon = GetPlayerWeaponSlot(client, 4);
+	if (weapon <= MaxClients || !IsValidEntity(weapon))
+		return 0;
+
+	return (TF2CustAttr_GetInt(weapon, "amplifier attributes sentry") != 0) ? 1 : 0;
 }
 
 void ConvertAllAmplifiersToBuildings()
@@ -1730,8 +1661,9 @@ void ConvertAllAmplifiersToBuildings()
 			GetEdictClassname(ent, buildingClass, sizeof(buildingClass));
 
 			AmplifierOn[ent] = false;
-			StopAmplifierIdleSound(ent);
 			SetEntProp(ent, Prop_Send, "m_bDisabled", 0);
+			AmplifierFill[ent] = 0.0;
+
 			char modelname[128];
 			if (IsDispenserClass(buildingClass))
 				Format(modelname, sizeof(modelname), "models/buildables/dispenser.mdl");

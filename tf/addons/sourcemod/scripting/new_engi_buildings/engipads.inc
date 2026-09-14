@@ -252,6 +252,7 @@ void EngiPads_OnMapStart()
 	g_hPadTimerAnnounce = INVALID_HANDLE;
 	
 	/* Precache Sounds */
+	PrecacheSound(")items/powerup_pickup_haste.wav", true);	//For some reason, using PrecacheScriptSound doesn't work for this sound.
 	PrecacheScriptSound("Passtime.BallSmack");
 	//The other gamesounds I emit should already be precached by the game
 	
