@@ -43,10 +43,6 @@ public void SunlightSpear_Call(const int client, const Perk perk, const bool app
 }
 public void SunlightSpear_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_CONJURE);
-	PrecacheSound(g_sSoundZap[0]);
-	PrecacheSound(g_sSoundZap[1]);
-	PrecacheSound(g_sSoundZap[2]);
 
 	Events.OnVoice(perk, SunlightSpear_OnVoice);
 }

@@ -257,7 +257,6 @@ stock void ResetClientArrays(int client)
 void WeaponsGameplay_OnPluginStart(GameData conf) {
 	g_bPluginEnding = false;
 	WeaponsGameplayEvents_Init();
-	PreCacheWeaponSounds();
 	g_hGameplayEnabled = CreateConVar("sm_weapons_gameplay_enabled", "1",
 		"Enable gameplay changes while keeping custom weapon loadouts, models, and sounds active.");
 	g_hGameplayEnabled.AddChangeHook(WeaponsGameplay_OnEnabledChanged);
@@ -428,23 +427,6 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 		}
 }
 
-public void PreCacheWeaponSounds() {
-	AddFileToDownloadsTable("sound/weapons/halo_ce/plasrifle_overheat_10b.wav");
-	PrecacheSound(SOUND_PLASMA_OVERHEAT, true);
-	PrecacheSound(SOUND_PLASMA_OVERHEAT_END, true);
-	PrecacheSound(SOUND_ARROW_HEAL, true);
-	PrecacheSound(SOUND_NEON_SIGN, true);
-	PrecacheSound(SOUND_FLAME_OUT, true);
-	PrecacheSound(SOUND_AMBASSADOR_CRIT_RECEIVED, true);
-	PrecacheSound(SOUND_AMBASSADOR_CRIT_HIT, true);
-	PrecacheSound(FLS_EXPLODE_SOUND, true);
-	PrecacheSound(FLS_NOTIFY_SOUND, true);
-	PrecacheSound(FLS_NOTIFY_2, true);
-	PrecacheSound(BURP_SOUND, true);
-	PrecacheSound(SOUND_CLIP_REFILL_CRIT, true);
-	PrecacheSound(SOUND_SECONDARY_CLIP_REFILL, true);
-}
-
 static int WeaponsGameplay_FindParticleIndex(const char[] name)
 {
 	int table = FindStringTable("ParticleEffectNames");
@@ -480,7 +462,6 @@ void WeaponsGameplay_OnMapStart() {
 		BlastJumpJarate_ClearPending(client);
 	}
 	Escampette_RecalculateAllSpeeds();
-	PreCacheWeaponSounds();
 	WeaponsGameplay_CacheParticles();
 }
 

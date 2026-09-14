@@ -86,7 +86,7 @@ void WeaponsModels_PrecacheItemAssets(KeyValues attributes) {
 		char model[PLATFORM_MAX_PATH];
 		attributes.GetString(modelAttributes[i], model, sizeof(model));
 		if (model[0] && FileExistsAndLog(model, true)) {
-			PrecacheModelAndLog(model);
+			GetConfiguredModelIndex(model);
 		}
 	}
 }
@@ -141,7 +141,7 @@ void WeaponsModels_ApplyProjectileModelFrame(any projectileRef) {
 		return;
 	}
 
-	PrecacheModelAndLog(model);
+	GetConfiguredModelIndex(model);
 	SetEntityModel(projectile, model);
 }
 
@@ -370,7 +370,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 	if (TF2CustAttr_GetString(weapon, "viewmodel override", vm, sizeof(vm), cm)
 			&& FileExistsAndLog(vm, true)) {
 		// override viewmodel by attaching arm and weapon viewmodels
-		PrecacheModelAndLog(vm);
+		GetConfiguredModelIndex(vm);
 		
 		int weaponvm = TF2_SpawnWearableViewmodel();
 		if (IsValidEntity(weaponvm)) {
@@ -488,7 +488,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		if (IsValidEntity(shield) && TF2Util_IsEntityWearable(shield)
 				&& TF2CustAttr_GetString(shield, "clientmodel override", ohvm, sizeof(ohvm))
 				&& FileExistsAndLog(ohvm, true)) {
-			PrecacheModelAndLog(ohvm);
+			GetConfiguredModelIndex(ohvm);
 			SetEntityModel(shield, ohvm);
 			Weapons_MarkValidatedAttachedEntity(shield, client, "demoman_shield", true, weapon);
 			
@@ -522,7 +522,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			&& FileExistsAndLog(armvmPath, true)) {
 		// armvmPath might not be precached on the server
 		// mainly an issue with the gunslinger variation of the arm model for stock
-		PrecacheModelAndLog(armvmPath);
+		GetConfiguredModelIndex(armvmPath);
 		
 		int armvm = TF2_SpawnWearableViewmodel();
 		if (!IsValidEntity(armvm)) {
@@ -551,7 +551,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 				return;
 			}
 			
-			PrecacheModelAndLog(vm);
+			GetConfiguredModelIndex(vm);
 			
 			int weaponvm = TF2_SpawnWearableViewmodel();
 			if (IsValidEntity(weaponvm)) {
@@ -663,7 +663,7 @@ bool ApplyWearableModelOverride(int wearable, const char[] model) {
 		return false;
 	}
 
-	PrecacheModelAndLog(model);
+	GetConfiguredModelIndex(model);
 	SetEntityModel(wearable, model);
 	Weapons_MarkValidatedAttachedEntity(wearable, GetEntityOwner(wearable),
 		"wearable_model_override", true, wearable);
@@ -750,7 +750,7 @@ bool EntityRefHasModel(int entityRef, const char[] expectedModel) {
 		return false;
 	}
 
-	int expectedModelIndex = PrecacheModelAndLog(expectedModel);
+	int expectedModelIndex = GetConfiguredModelIndex(expectedModel);
 	return expectedModelIndex > 0
 			&& GetEntProp(entity, Prop_Send, "m_nModelIndex") == expectedModelIndex;
 }
@@ -809,7 +809,7 @@ bool SetWeaponWorldModel(int weapon, const char[] worldmodel) {
 		return false;
 	}
 	
-	int model = PrecacheModelAndLog(worldmodel);
+	int model = GetConfiguredModelIndex(worldmodel);
 	if (HasEntProp(weapon, Prop_Send, "m_iWorldModelIndex")) {
 		SetEntProp(weapon, Prop_Send, "m_iWorldModelIndex", model);
 	}
@@ -987,10 +987,14 @@ bool FileExistsAndLog(const char[] path, bool use_valve_fs = false,
 	return false;
 }
 
-int PrecacheModelAndLog(const char[] model, bool preload = false) {
-	int modelIndex = PrecacheModel(model, preload);
-	if (!modelIndex) {
-		LogError("Failed to precache model '%s'", model);
+int GetConfiguredModelIndex(const char[] model) {
+	int modelPrecache = FindStringTable("modelprecache");
+	int modelIndex = modelPrecache == INVALID_STRING_TABLE
+		? INVALID_STRING_INDEX
+		: FindStringIndex(modelPrecache, model);
+	if (modelIndex == INVALID_STRING_INDEX) {
+		LogError("Configured model is not precached: '%s'", model);
+		return 0;
 	}
 	return modelIndex;
 }

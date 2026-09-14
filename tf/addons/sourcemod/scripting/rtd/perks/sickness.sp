@@ -37,8 +37,6 @@ public void Sickness_Call(const int client, const Perk perk, const bool apply)
 }
 public void Sickness_Init(const Perk perk)
 {
-	for (int i = 0; i < 4; ++i)
-		PrecacheSound(g_sSoundCough[i]);
 }
 
 void Sickness_ApplyPerk(const int client, const Perk perk)

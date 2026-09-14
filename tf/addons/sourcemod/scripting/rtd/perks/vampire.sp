@@ -35,8 +35,6 @@ public void Vampire_Call(const int client, const Perk perk, const bool apply)
 }
 public void Vampire_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_HEARTBEAT_1);
-	PrecacheSound(SOUND_HEARTBEAT_2);
 
 	Events.OnPlayerAttacked(perk, Vampire_OnPlayerAttacked);
 }

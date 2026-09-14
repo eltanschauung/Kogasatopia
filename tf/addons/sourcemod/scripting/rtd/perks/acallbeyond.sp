@@ -38,10 +38,6 @@ public void ACallBeyond_Call(const int client, const Perk perk, const bool apply
 }
 public void ACallBeyond_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_ACALLBEYOND_CONJURE);
-	PrecacheSound(g_sSoundAirStrikeFire[0]);
-	PrecacheSound(g_sSoundAirStrikeFire[1]);
-	PrecacheSound(g_sSoundAirStrikeFire[2]);
 
 	Events.OnVoice(perk, ACallBeyond_OnVoice);
 }

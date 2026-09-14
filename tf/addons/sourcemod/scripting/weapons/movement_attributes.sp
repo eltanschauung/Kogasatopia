@@ -87,7 +87,6 @@ g_WeaponsMovementNextClimbCvar.AddChangeHook(WeaponsMovement_OnConVarChanged);
 g_WeaponsMovementAirblastVelocityCvar.AddChangeHook(WeaponsMovement_OnConVarChanged);
 WeaponsMovement_CacheConVars();
 
-PrecacheSound(MOVEMENT_CLIMB_SOUND, true);
 for (int client = 1; client <= MaxClients; client++)
 {
 if (WeaponsMovement_IsUsableClient(client))
@@ -104,7 +103,6 @@ WeaponsMovement_CacheConVars();
 
 void WeaponsMovement_OnMapStart()
 {
-PrecacheSound(MOVEMENT_CLIMB_SOUND, true);
 for (int client = 1; client <= MaxClients; client++)
 {
 WeaponsMovement_ResetClient(client);

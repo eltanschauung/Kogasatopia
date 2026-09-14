@@ -40,7 +40,6 @@ public void Invisibility_Call(const int client, const Perk perk, const bool appl
 }
 public void Invisibility_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_PING);
 
 	Events.OnAttackCritCheck(perk, Invisiblity_OnAttackCritCheck);
 	Events.OnResupply(perk, Invisibility_OnResupply);

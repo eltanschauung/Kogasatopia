@@ -30,7 +30,6 @@ public void SpringShoes_Call(const int client, const Perk perk, const bool apply
 }
 public void SpringShoes_Init(const Perk perk)
 {
-	PrecacheSound(SPRING_JUMP);
 }
 
 public void SpringShoes_ApplyPerk(const int client, const Perk perk)

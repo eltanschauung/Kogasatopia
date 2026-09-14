@@ -41,9 +41,6 @@ public void EldenStars_Call(const int client, const Perk perk, const bool apply,
 }
 public void EldenStars_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_FIRE);
-	PrecacheSound(SOUND_LOOP);
-	PrecacheSound(SOUND_CHANGE);
 
 	Events.OnVoice(perk, EldenStars_OnVoice);
 }

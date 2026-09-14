@@ -439,7 +439,7 @@ static void Config_ReplacementSound(const char[] configuredPath, ArrayList repla
     }
 }
 
-static void PrecacheReplacementSounds(
+static void PrepareReplacementSounds(
     ArrayList replacements,
     ArrayList groups,
     ArrayList readyReplacements,
@@ -464,72 +464,54 @@ static void PrecacheReplacementSounds(
             continue;
         }
 
-        AddFileToDownloadsTable(downloadPath);
-        if (PrecacheSound(soundPath, true))
-        {
-            readyReplacements.PushString(soundPath);
-            readyGroups.PushString(groupName);
-        }
+        readyReplacements.PushString(soundPath);
+        readyGroups.PushString(groupName);
     }
 }
 
-void PrecacheConfiguredSounds()
+void PrepareConfiguredSounds()
 {
     if (!gConfigLoaded)
     {
         return;
     }
 
-    char commandName[MAX_COMMAND_NAME];
-    char soundPath[PLATFORM_MAX_PATH];
-
-    for (int i = 0; i < gCommandNames.Length; i++)
-    {
-        gCommandNames.GetString(i, commandName, sizeof(commandName));
-        if (!gSoundMap.GetString(commandName, soundPath, sizeof(soundPath)))
-        {
-            continue;
-        }
-
-        PrecacheSound(soundPath, true);
-    }
-
-    PrecacheReplacementSounds(
+    PrepareReplacementSounds(
         gRoundStartSirenReplacements,
         gRoundStartSirenGroups,
         gReadyRoundStartSirenReplacements,
         gReadyRoundStartSirenGroups,
         "Round-start siren"
     );
-    PrecacheReplacementSounds(
+    PrepareReplacementSounds(
         gRoundWinReplacements,
         gRoundWinGroups,
         gReadyRoundWinReplacements,
         gReadyRoundWinGroups,
         "Round-win"
     );
-    PrecacheReplacementSounds(
+    PrepareReplacementSounds(
         gRoundLoseReplacements,
         gRoundLoseGroups,
         gReadyRoundLoseReplacements,
         gReadyRoundLoseGroups,
         "Round-loss"
     );
-    PrecacheReplacementSounds(
+    PrepareReplacementSounds(
         gAnnouncerMiscReplacements,
         gAnnouncerMiscGroups,
         gReadyAnnouncerMiscReplacements,
         gReadyAnnouncerMiscGroups,
         "Miscellaneous announcer"
     );
-    PrecacheReplacementSounds(
+    PrepareReplacementSounds(
         gCountdownReplacements,
         gCountdownGroups,
         gReadyCountdownReplacements,
         gReadyCountdownGroups,
         "Setup countdown"
     );
-    PrecacheReplacementSounds(
+    PrepareReplacementSounds(
         gUnlockReplacements,
         gUnlockGroups,
         gReadyUnlockReplacements,

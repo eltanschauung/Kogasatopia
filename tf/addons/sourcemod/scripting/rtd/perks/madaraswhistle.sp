@@ -43,11 +43,7 @@ public void MadarasWhistle_Call(const int client, const Perk perk, const bool ap
 }
 public void MadarasWhistle_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_WHISTLE);
-	PrecacheModel(MODEL_GATOR);
 
-	for (int i = 0; i < 5; ++i)
-		PrecacheSound(g_sGatorRumble[i]);
 
 	Events.OnVoice(perk, MadarasWhistle_OnVoice);
 }

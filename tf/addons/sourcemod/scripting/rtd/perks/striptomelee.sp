@@ -38,10 +38,6 @@ public void StripToMelee_Call(const int client, const Perk perk, const bool appl
 }
 public void StripToMelee_Init(const Perk perk)
 {
-	PrecacheSound(SOUND_RESUPPLY_DENY);
-	PrecacheSound(SOUND_BOX_DESTROY);
-	PrecacheSound(SOUND_BOX_EXPLODE);
-	PrecacheModel(MODEL_BOX);
 
 	Events.OnResupply(perk, StripToMelee_OnResupply);
 }

@@ -143,8 +143,6 @@ public void Godmode_Call(const int client, const Perk perk, const bool apply, co
 }
 public void Godmode_Init(const Perk perk)
 {
-	for (int i = 0; i < sizeof(g_sResistanceHeavy); ++i)
-		PrecacheSound(g_sResistanceHeavy[i]);
 
 	Events.OnConditionAdded(perk, Godmode_OnConditionAdded_Any, SubscriptionType_Any);
 	Events.OnConditionRemoved(perk, Godmode_OnConditionRemoved_Any, SubscriptionType_Any);

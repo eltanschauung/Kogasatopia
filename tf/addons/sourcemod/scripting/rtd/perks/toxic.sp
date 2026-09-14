@@ -35,7 +35,6 @@ public void Toxic_Call(const int client, const Perk perk, const bool apply, cons
 }
 public void Toxic_Init()
 {
-	PrecacheSound(SOUND_TOXIC);
 }
 
 void Toxic_ApplyPerk(const int client, const Perk perk)

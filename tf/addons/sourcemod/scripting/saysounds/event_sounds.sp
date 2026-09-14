@@ -200,7 +200,6 @@ static bool PlayWeaponKillSaySound(int attacker, int victim)
         return false;
     }
 
-    PrecacheSound(soundPath, true);
     if (!PlaySaySoundToTarget(0, soundPath, groupName))
     {
         return false;

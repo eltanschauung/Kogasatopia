@@ -206,13 +206,6 @@ public void OnMapStart()
         g_bOverhealWarningShown[client] = false;
     }
 
-    char sSound[32];
-    for (int i = 1; i < sizeof(g_sSounds); i++)
-    {
-        Format(sSound, sizeof(sSound), "sound/%s", g_sSounds[i]);
-        PrecacheSound(g_sSounds[i]);
-        AddFileToDownloadsTable(sSound);
-    }
 }
 
 public void OnPluginEnd()

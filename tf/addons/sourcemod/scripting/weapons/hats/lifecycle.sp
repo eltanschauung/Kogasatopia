@@ -46,13 +46,11 @@ void CustomHats_OnConfigsExecuted()
 {
 	LoadConfig();
 	RecalculateAllClientEnabledHatCounts();
-	PrecacheConfiguredHats();
 	RefreshAllClientHats();
 }
 
 void CustomHats_OnMapStart()
 {
-	PrecacheConfiguredHats();
 }
 
 void CustomHats_OnLibraryAdded(const char[] name)

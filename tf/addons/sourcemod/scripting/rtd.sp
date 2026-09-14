@@ -266,7 +266,6 @@ public void OnMapStart()
 
 	Storage_Precache();
 	Stocks_OnMapStart(); // rtd/stocks.sp
-	PrecachePerkSounds();
 
 	Events.Init();
 	InitPerks();
@@ -1400,7 +1399,6 @@ void ParseCustomEffects()
 {
 	if (!g_bCustomConfigFound)
 	{
-		PrecachePerkSounds();
 		return;
 	}
 
@@ -1409,21 +1407,6 @@ void ParseCustomEffects()
 	if (g_iCvarLogging & view_as<int>(LogFlag_System))
 		LogMessage("Customized %d perk%s", iPerksCustomized, iPerksCustomized == 1 ? "" : "s");
 
-	PrecachePerkSounds();
-}
-
-void PrecachePerkSounds()
-{
-	char sBuffer[64];
-	PerkIter iter = new PerkContainerIter(-1);
-
-	while ((++iter).Perk())
-	{
-		iter.Perk().GetSound(sBuffer, 64);
-		PrecacheSound(sBuffer);
-	}
-
-	delete iter;
 }
 
 void InitPerks()

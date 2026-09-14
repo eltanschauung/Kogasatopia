@@ -151,7 +151,20 @@ static void AddConfiguredDownloads()
             }
             else if (type == PRECACHE_ASSET_SOUND)
             {
-                PrecacheSound(path, true);
+                char soundPath[PLATFORM_MAX_PATH];
+                if (StrContains(path, "sound/", false) == 0)
+                {
+                    strcopy(soundPath, sizeof(soundPath), path[6]);
+                }
+                else
+                {
+                    strcopy(soundPath, sizeof(soundPath), path);
+                }
+                PrecacheSound(soundPath, true);
+            }
+            else if (type == PRECACHE_ASSET_GENERIC)
+            {
+                PrecacheGeneric(path, true);
             }
         }
     }

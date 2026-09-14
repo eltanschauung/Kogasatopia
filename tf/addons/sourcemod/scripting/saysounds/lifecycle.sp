@@ -245,7 +245,7 @@ public void OnConfigsExecuted()
             LoadDisabledGroupPreferences(client);
         }
     }
-    PrecacheConfiguredSounds();
+    PrepareConfiguredSounds();
 }
 
 public void OnMapStart()
@@ -256,7 +256,7 @@ public void OnMapStart()
     ResetRoundStartSirenTracking();
     ResetRoundResultPairing();
     g_fLastRoundStartSirenTime = -9999.0;
-    PrecacheConfiguredSounds();
+    PrepareConfiguredSounds();
     SaySounds_StartCountdownMonitor();
 }
 
