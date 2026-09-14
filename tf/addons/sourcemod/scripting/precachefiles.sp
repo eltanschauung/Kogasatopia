@@ -65,6 +65,7 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
+    LoadPrecacheConfig();
     AddConfiguredDownloads();
 }
 
