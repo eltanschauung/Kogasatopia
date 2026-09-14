@@ -220,7 +220,7 @@ void WeaponsSound_PlayOnHit(int victim, int weapon)
 void WeaponsSound_PlayOnKill(int victim, int weapon)
 {
 	WeaponsSound_EmitCustomAttribute(victim, weapon,
-		Weapons_ATTR_EMIT_SOUND_ON_KILL, "on-kill");
+		Weapons_ATTR_EMIT_SOUND_ON_KILL, "on-kill", SNDLEVEL_RAIDSIREN);
 }
 
 void WeaponsSound_PlayWearerOnHit(int victim, int attacker)
@@ -329,7 +329,8 @@ static bool WeaponsSound_GetRandomMeleeSample(
 }
 
 static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
-		const char[] attribute, const char[] context)
+		const char[] attribute, const char[] context,
+		int soundLevel = SNDLEVEL_NORMAL)
 {
 	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon))
 	{
@@ -351,7 +352,7 @@ static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
 		return false;
 	}
 
-	EmitSoundToAll(sample, client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
+	EmitSoundToAll(sample, client, SNDCHAN_AUTO, soundLevel);
 	return true;
 }
 
