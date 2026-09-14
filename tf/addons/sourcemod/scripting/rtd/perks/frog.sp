@@ -41,6 +41,10 @@ public void Frog_Call(const int client, const Perk perk, const bool apply, const
 }
 public void Frog_Init(const Perk perk)
 {
+	PrecacheSound(g_sCritters[0]);
+	PrecacheSound(g_sCritters[1]);
+	PrecacheSound(g_sCritters[2]);
+	PrecacheSound(g_sCritters[3]);
 
 	Events.OnPlayerRunCmd(perk, Frog_OnPlayerRunCmd);
 }

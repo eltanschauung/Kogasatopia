@@ -50,6 +50,12 @@ public void Explode_Call(const int client, const Perk perk, const bool apply, co
 }
 public void Explode_Init(const Perk perk)
 {
+	PrecacheModel(MODEL_BOMB);
+	PrecacheSound(BOMB_HIT_SOUND);
+	PrecacheSound(BOMB_FUSE_SOUND);
+	PrecacheSound(BOMB_DESTROY_SOUND);
+	PrecacheSound(BOMB_BEAM_DRAG);
+	PrecacheSound(SOUND_EXPLODE);
 }
 
 void Explode_ApplyPerk(const int client, const Perk perk)

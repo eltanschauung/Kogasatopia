@@ -34,6 +34,8 @@ public void ForcedTaunt_Call(const int client, const Perk perk, const bool apply
 }
 public void ForcedTaunt_Init(const Perk perk)
 {
+	for (int i = 0; i < sizeof(g_sSoundScoutBB); ++i)
+		PrecacheSound(g_sSoundScoutBB[i]);
 
 	Events.OnConditionAdded(perk, ForcedTaunt_OnConditionAdded);
 	Events.OnConditionRemoved(perk, ForcedTaunt_OnConditionRemoved);

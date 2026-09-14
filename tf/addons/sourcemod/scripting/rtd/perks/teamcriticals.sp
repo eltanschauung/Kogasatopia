@@ -39,6 +39,7 @@ public void TeamCriticals_Call(const int client, const Perk perk, const bool app
 }
 public void TeamCriticals_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_BUFF);
 
 	Events.OnConditionRemoved(perk, TeamCriticals_OnConditionRemoved);
 }

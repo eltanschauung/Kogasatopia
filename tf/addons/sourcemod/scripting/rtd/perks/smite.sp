@@ -49,6 +49,10 @@ public void Smite_Call(const int client, const Perk perk, const bool apply, cons
 }
 public void Smite_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_ELECTRIC_MIST);
+	PrecacheSound(g_sSoundZap[0]);
+	PrecacheSound(g_sSoundZap[1]);
+	PrecacheSound(g_sSoundZap[2]);
 }
 
 void Smite_ApplyPerk(const int client, const Perk perk)

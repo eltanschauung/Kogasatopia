@@ -30,6 +30,7 @@ public void FireBreath_Call(const int client, const Perk perk, const bool apply)
 }
 public void FireBreath_Init(const Perk perk)
 {
+	PrecacheSound(FIREBREATH_SOUND_ATTACK);
 
 	Events.OnVoice(perk, FireBreath_OnVoice);
 }

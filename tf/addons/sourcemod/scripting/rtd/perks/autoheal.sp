@@ -35,6 +35,8 @@ public void Autoheal_Call(const int client, const Perk perk, const bool apply, c
 }
 public void Autoheal_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_HEALING);
+	PrecacheSound(SOUND_ENDHEAL);
 }
 
 public void Autoheal_ApplyPerk(const int client, const Perk perk)

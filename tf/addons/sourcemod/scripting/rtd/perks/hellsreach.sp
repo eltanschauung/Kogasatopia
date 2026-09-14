@@ -40,6 +40,8 @@ public void HellsReach_Call(const int client, const Perk perk, const bool apply,
 }
 public void HellsReach_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_SLOWDOWN);
+	PrecacheSound(SOUND_HELL_DAMAGE);
 }
 
 void HellsReach_ApplyPerk(const int client, const Perk perk)

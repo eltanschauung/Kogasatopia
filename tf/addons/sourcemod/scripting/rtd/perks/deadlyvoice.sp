@@ -37,6 +37,7 @@ public void DeadlyVoice_Call(const int client, const Perk perk, const bool apply
 }
 public void DeadlyVoice_Init(const Perk perk)
 {
+	PrecacheSound(DEADLYVOICE_SOUND_ATTACK);
 
 	Events.OnVoice(perk, DeadlyVoice_OnVoice);
 }

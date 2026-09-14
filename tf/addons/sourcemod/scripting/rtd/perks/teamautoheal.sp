@@ -40,6 +40,8 @@ public void TeamAutoheal_Call(const int client, const Perk perk, const bool appl
 }
 public void TeamAutoheal_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_HEALING);
+	PrecacheSound(SOUND_ENDHEAL);
 }
 
 public void TeamAutoheal_ApplyPerk(const int client, const Perk perk)

@@ -69,6 +69,7 @@ public void PowerPlay_Call(const int client, const Perk perk, const bool apply, 
 }
 public void PowerPlay_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_BUFF);
 
 	Events.OnAttackCritCheck(perk, PowerPlay_OnAttack);
 	Events.OnPlayerAttacked(perk, PowerPlay_OnPlayerAttacked);

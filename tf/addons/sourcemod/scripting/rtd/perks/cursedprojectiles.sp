@@ -29,6 +29,7 @@ public void CursedProjectiles_Call(const int client, const Perk perk, const bool
 }
 public void CursedProjectiles_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_COURSE_PROJECTILE);
 
 	Events.OnEntitySpawned(perk, CursedProjectiles_OnProjectileSpawn, Homing_AptClass, Retriever_OwnerEntity);
 }

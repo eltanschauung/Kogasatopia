@@ -92,6 +92,7 @@ public void Paranoia_Call(const int client, const Perk perk, const bool apply)
 }
 public void Paranoia_Init(const Perk perk)
 {
+	PrecacheModel(MODEL_SPY); // does this really need precaching?
 }
 
 public void Paranoia_ApplyPerk(const int client, const Perk perk)

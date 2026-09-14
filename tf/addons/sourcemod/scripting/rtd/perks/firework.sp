@@ -27,6 +27,7 @@ public void Firework_Call(const int client, const Perk perk, const bool apply)
 }
 public void Firework_Init(const Perk perk)
 {
+	PrecacheSound(FIREWORK_EXPLOSION);
 }
 
 void Firework_ApplyPerk(const int client, const Perk perk)

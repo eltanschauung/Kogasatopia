@@ -68,6 +68,10 @@ public void Frozen_Init(const Perk perk)
 	// Cannot store in Cache[client], the frozen perk needs to be known file-wide.
 	g_ePerkFrozen = perk;
 
+	PrecacheSound(SOUND_FREEZE);
+	PrecacheSound(SOUND_ICE_IMPACT);
+	PrecacheSound(SOUND_ICE_BREAK);
+	PrecacheModel(ICE_STATUE);
 
 	Events.OnResupply(perk, Frozen_OnResupply_Any, SubscriptionType_Any);
 	Events.OnSound(perk, Frozen_OnSound);

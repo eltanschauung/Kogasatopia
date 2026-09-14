@@ -199,6 +199,9 @@ NotifyMessages Notify;
 
 void Stocks_OnMapStart()
 {
+	PrecacheModel(LASERBEAM);
+	PrecacheModel(EMPTY_MODEL);
+	PrecacheModel(MODEL_PROJECTILE);
 
 	g_hHoming = new ArrayList(4);
 	HookEvent("teamplay_round_start", Event_Homing_RoundStart);

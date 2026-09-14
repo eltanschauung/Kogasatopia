@@ -394,9 +394,8 @@ enum struct MaterialsCache
 
 	void Init()
 	{
-		int modelPrecache = FindStringTable("modelprecache");
-		this.Laser = FindStringIndex(modelPrecache, "materials/sprites/laser.vmt");
-		this.Halo = FindStringIndex(modelPrecache, "materials/sprites/halo01.vmt");
+		this.Laser = PrecacheModel("materials/sprites/laser.vmt");
+		this.Halo = PrecacheModel("materials/sprites/halo01.vmt");
 	}
 }
 

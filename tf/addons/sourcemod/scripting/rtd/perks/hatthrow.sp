@@ -43,6 +43,13 @@ public void HatThrow_Call(const int client, const Perk perk, const bool apply)
 }
 public void HatThrow_Init(const Perk perk)
 {
+	PrecacheModel(MODEL_HAT);
+	PrecacheSound(SOUND_HAT_IMPACT);
+	PrecacheSound(g_sSoundSwoosh[0]);
+	PrecacheSound(g_sSoundSwoosh[1]);
+	PrecacheSound(g_sSoundHatHit[0]);
+	PrecacheSound(g_sSoundHatHit[1]);
+	PrecacheSound(g_sSoundHatHit[2]);
 
 	Events.OnVoice(perk, HatThrow_OnVoice);
 }

@@ -30,7 +30,15 @@ public void NecroMash_Call(const int client, const Perk perk, const bool apply)
 }
 public void NecroMash_Init(const Perk perk)
 {
+	PrecacheModel("models/props_halloween/hammer_gears_mechanism.mdl");
+	PrecacheModel("models/props_halloween/hammer_mechanism.mdl");
+	PrecacheModel("models/props_halloween/bell_button.mdl");
 
+	PrecacheSound("misc/halloween/strongman_fast_impact_01.wav");
+	PrecacheSound("ambient/explosions/explode_1.wav");
+	PrecacheSound("misc/halloween/strongman_fast_whoosh_01.wav");
+	PrecacheSound("misc/halloween/strongman_fast_swing_01.wav");
+	PrecacheSound("doors/vent_open2.wav");
 }
 
 public void NecroMash_ApplyPerk(const int client, const Perk perk)

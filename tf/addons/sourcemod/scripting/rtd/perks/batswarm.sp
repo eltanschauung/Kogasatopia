@@ -97,6 +97,7 @@ public void BatSwarm_Call(const int client, const Perk perk, const bool apply, c
 }
 public void BatSwarm_Init(const Perk perk)
 {
+	PrecacheSound(BAT_START_SOUND);
 
 	Events.OnVoice(perk, BatSwarm_OnVoice);
 }

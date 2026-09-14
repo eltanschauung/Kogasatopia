@@ -51,7 +51,15 @@ public void FireTimebomb_Call(const int client, const Perk perk, const bool appl
 }
 public void FireTimebomb_Init(const Perk perk)
 {
+	PrecacheModel(MODEL_BOMB);
+	PrecacheSound(SOUND_EXPLODE);
+	PrecacheSound(SOUND_TIMEBOMB_TICK);
+	PrecacheSound(SOUND_TIMEBOMB_GOFF);
 
+	PrecacheSound(g_sResistanceMedium[0]);
+	PrecacheSound(g_sResistanceMedium[1]);
+	PrecacheSound(g_sResistanceMedium[2]);
+	PrecacheSound(g_sResistanceMedium[3]);
 }
 
 void FireTimebomb_ApplyPerk(const int client, const Perk perk)

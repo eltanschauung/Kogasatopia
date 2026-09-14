@@ -35,6 +35,9 @@ public void PumpkinTrail_Call(const int client, const Perk perk, const bool appl
 }
 public void PumpkinTrail_Init(const Perk perk)
 {
+	PrecacheModel(MODEL_PUMPKIN);
+	PrecacheSound(SOUND_PUMPKIN_EXPLODE);
+	PrecacheSound(SOUND_PUMPKIN_SPAWN);
 
 	Events.OnVoice(perk, PumpkinTrail_OnVoice);
 }

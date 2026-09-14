@@ -28,6 +28,7 @@ public void Beacon_Call(const int client, const Perk perk, const bool apply)
 }
 public void Beacon_Init(const Perk perk)
 {
+	PrecacheSound(SOUND_BEEP);
 }
 
 void Beacon_ApplyPerk(const int client, const Perk perk)
