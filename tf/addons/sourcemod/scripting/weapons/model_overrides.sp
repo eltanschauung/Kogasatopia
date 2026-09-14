@@ -348,6 +348,33 @@ static void EquipWeaponModelWearable(int client, int wearable, int weapon) {
 	}
 }
 
+static void AssociateWorldModelWearable(int weapon, int wearable) {
+	if (!IsValidEntity(weapon) || !IsValidEntity(wearable)
+			|| !HasEntProp(weapon, Prop_Send, "m_hExtraWearable")) {
+		return;
+	}
+
+	int existingWearable = GetEntPropEnt(weapon, Prop_Send, "m_hExtraWearable");
+	if (existingWearable > MaxClients && IsValidEntity(existingWearable)) {
+		return;
+	}
+
+	SetEntPropEnt(weapon, Prop_Send, "m_hExtraWearable", wearable);
+}
+
+static void ClearWorldModelWearableAssociation(int client) {
+	int weapon = EntRefToEntIndex(g_iAppliedWeaponRef[client]);
+	int wearable = EntRefToEntIndex(g_iLastWorldModelRef[client]);
+	if (!IsValidEntity(weapon) || !IsValidEntity(wearable)
+			|| !HasEntProp(weapon, Prop_Send, "m_hExtraWearable")) {
+		return;
+	}
+
+	if (GetEntPropEnt(weapon, Prop_Send, "m_hExtraWearable") == wearable) {
+		SetEntPropEnt(weapon, Prop_Send, "m_hExtraWearable", -1);
+	}
+}
+
 /**
  * Called on weapon switch.  Detaches any old viewmodel overrides and attaches replacements.
  */
@@ -409,6 +436,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			EquipWeaponModelWearable(client, weaponwm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponwm, client, "worldmodel_wearable", true, weapon);
 			g_iLastWorldModelRef[client] = EntIndexToEntRef(weaponwm);
+			AssociateWorldModelWearable(weapon, weaponwm);
 			
 			SetEntityRenderMode(weapon, RENDER_TRANSCOLOR);
 			SetEntityRenderColor(weapon, 0, 0, 0, 0);
@@ -854,6 +882,7 @@ void DetachVMs(int client) {
 		ResetClientModelRefs(client);
 		return;
 	}
+	ClearWorldModelWearableAssociation(client);
 	g_iAppliedWeaponRef[client] = INVALID_ENT_REFERENCE;
 
 	MaybeRemoveWearable(client, g_iLastViewmodelRef[client]);
