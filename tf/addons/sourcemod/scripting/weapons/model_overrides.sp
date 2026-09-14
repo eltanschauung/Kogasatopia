@@ -339,6 +339,15 @@ static void CopyKillstreakSheen(int weapon, int wearable) {
 	);
 }
 
+static void EquipWeaponModelWearable(int client, int wearable, int weapon) {
+	TF2Util_EquipPlayerWearable(client, wearable);
+
+	if (IsValidEntity(weapon)
+			&& HasEntProp(wearable, Prop_Send, "m_hWeaponAssociatedWith")) {
+		SetEntPropEnt(wearable, Prop_Send, "m_hWeaponAssociatedWith", weapon);
+	}
+}
+
 /**
  * Called on weapon switch.  Detaches any old viewmodel overrides and attaches replacements.
  */
@@ -376,7 +385,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		if (IsValidEntity(weaponvm)) {
 			SetEntityModel(weaponvm, vm);
 			CopyKillstreakSheen(weapon, weaponvm);
-			TF2Util_EquipPlayerWearable(client, weaponvm);
+			EquipWeaponModelWearable(client, weaponvm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponvm, client, "viewmodel_wearable_vm", true, weapon);
 			
 			g_iLastViewmodelRef[client] = EntIndexToEntRef(weaponvm);
@@ -397,7 +406,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			SetEntityModel(weaponwm, wm);
 			CopyKillstreakSheen(weapon, weaponwm);
 			
-			TF2Util_EquipPlayerWearable(client, weaponwm);
+			EquipWeaponModelWearable(client, weaponwm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponwm, client, "worldmodel_wearable", true, weapon);
 			g_iLastWorldModelRef[client] = EntIndexToEntRef(weaponwm);
 			
@@ -498,7 +507,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 				if (IsValidEntity(offhandwearable)) {
 					SetEntityModel(offhandwearable, ohvm);
 					
-					TF2Util_EquipPlayerWearable(client, offhandwearable);
+					EquipWeaponModelWearable(client, offhandwearable, weapon);
 					Weapons_MarkValidatedAttachedEntity(offhandwearable, client, "demoman_offhand_vm", true, weapon);
 					g_iLastOffHandViewmodelRef[client] = EntIndexToEntRef(offhandwearable);
 					
@@ -530,7 +539,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		}
 		
 		SetEntityModel(armvm, armvmPath);
-		TF2Util_EquipPlayerWearable(client, armvm);
+		EquipWeaponModelWearable(client, armvm, weapon);
 		Weapons_MarkValidatedAttachedEntity(armvm, client, "arm_viewmodel", true, weapon);
 		
 		g_iLastArmModelRef[client] = EntIndexToEntRef(armvm);
@@ -557,7 +566,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			if (IsValidEntity(weaponvm)) {
 				SetEntityModel(weaponvm, vm);
 				CopyKillstreakSheen(weapon, weaponvm);
-				TF2Util_EquipPlayerWearable(client, weaponvm);
+				EquipWeaponModelWearable(client, weaponvm, weapon);
 				Weapons_MarkValidatedAttachedEntity(weaponvm, client, "fallback_weapon_viewmodel", true, weapon);
 				
 				g_iLastViewmodelRef[client] = EntIndexToEntRef(weaponvm);
