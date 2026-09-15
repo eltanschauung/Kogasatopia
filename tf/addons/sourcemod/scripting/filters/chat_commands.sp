@@ -187,6 +187,7 @@ void BuildChatContext(int client, const char[] sArgs, ChatContext context,
     context.isFilterWhitelisted = g_PlayerState[client].isFilterWhitelisted;
     context.hasBlacklistedTerm = CheckBlacklistedTerms(sArgs);
     context.isGagged = Filters_IsClientGagged(client) || blacklistRateLimited;
+    context.isBlacklistRateLimited = blacklistRateLimited;
 }
 
 static void LogBlacklistedMessage(int client, const char[] message, bool hasBlacklistedTerm, bool isBlacklistedClient)
@@ -919,7 +920,14 @@ bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs,
         CPrintToChatEx(client, client, "%s", senderOutput[0] ? senderOutput : output);
         PrintToServer("x: %s", output);
         SendToWhitelistedAdmins(client, output, "x:");
-        Filters_RelayChatToServers(client, output);
+        if (blacklistRateLimited)
+        {
+            Filters_LogChatMessage(client, output);
+        }
+        else
+        {
+            Filters_RelayChatToServers(client, output);
+        }
         return true;
     }
 

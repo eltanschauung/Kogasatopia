@@ -169,7 +169,11 @@ bool HandleRestrictedMessage(int client, const char[] message, const ChatContext
         CPrintToChatEx(client, client, "%s", senderMessage[0] ? senderMessage : message);
         PrintToServer("x: %s", message);
         SendToWhitelistedAdmins(client, message, "x:");
-        if (context.isGagged)
+        if (context.isBlacklistRateLimited)
+        {
+            Filters_LogChatMessage(client, message);
+        }
+        else if (context.isGagged)
         {
             Filters_RelayChatToServers(client, message);
         }

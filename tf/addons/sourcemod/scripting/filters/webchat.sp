@@ -563,6 +563,7 @@ enum struct ChatContext
     bool isFilterWhitelisted;
     bool hasBlacklistedTerm;
     bool isGagged;
+    bool isBlacklistRateLimited;
 }
 
 enum FilterStatusList
