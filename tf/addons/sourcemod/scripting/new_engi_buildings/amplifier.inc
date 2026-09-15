@@ -46,6 +46,8 @@
 #define AMPLIFIER_IDLE_SOUND "Building_Dispenser.Idle"
 #define AMPLIFIER_BUFF_SOUND "weapons/dispenser_heal.wav"
 #define AMPLIFIER_RAYZAR_GIB_COUNT 6
+#define AMPLIFIER_EXPLOSION_DAMAGE 120
+#define AMPLIFIER_EXPLOSION_RADIUS 146.0
 
 static const char g_AmplifierModelExtensions[][] =
 {
@@ -305,7 +307,9 @@ void Amplifier_OnPluginStart()
 	cvarDistance = CreateConVar("amplifier_distance", "220.0", "Distance the amplifier works.", FCVAR_PLUGIN);
 	cvarForceAmplifier = CreateConVar("amplifier_force", "0", "Force amplifier mode: 0=nothing, 1=dispenser, 2=sentry, 3=both", FCVAR_PLUGIN, true, 0.0, true, 3.0);
 	cvarForcePlayercount = CreateConVar("amplifier_force_playercount", "0", "If >0 and human player count is below this value, treat amplifier_force as 2 (sentry only).", FCVAR_PLUGIN, true, 0.0);
-	cvarEnableExplosion = CreateConVar("amplifier_explode", "65", "Enable Amplifier death explosions? >0 for damage value.", FCVAR_PLUGIN, true, 0.0);
+	char defaultExplosionDamage[12];
+	IntToString(AMPLIFIER_EXPLOSION_DAMAGE, defaultExplosionDamage, sizeof(defaultExplosionDamage));
+	cvarEnableExplosion = CreateConVar("amplifier_explode", defaultExplosionDamage, "Amplifier death explosion damage. Set to 0 to disable.", FCVAR_PLUGIN, true, 0.0);
 	SetConVarBounds(cvarEnableExplosion, ConVarBound_Upper, false);
 	cvarEnableZap = CreateConVar("amplifier_zap", "0.0", "Should Amplifier pulses harm the enemy team? 0 to disable, >0 for damage.", FCVAR_PLUGIN, true, 0.0, true, 50.0);
 
@@ -1485,27 +1489,56 @@ public Action Timer_ReassertAmplifierAfterDrop(Handle timer, any ref)
 
 public Action Event_ObjectDestroyed(Event event, const char[] name, bool dontBroadcast)
 {
-    int entindex = event.GetInt("index"); // the destroyed entity
-    if (!IsTrackedEntityIndex(entindex) || !IsValidEntity(entindex))
-        return Plugin_Continue;
-	if (!AmplifierOn[entindex] && !AmplifierCarried[entindex] && !IsAmplifierModel(entindex))
-		return Plugin_Continue;
+	HandleAmplifierDestruction(event, false);
+	return Plugin_Continue;
+}
 
-	float amplifierDistance = GetAmplifierEffectiveRadius(entindex);
-	int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
-	bool entwasbuilding = event.GetBool("was_building"); // building in progress
-	bool wasCarried = IsAmplifierBeingCarried(entindex);
-	float position[3];
-	GetEntPropVector(entindex, Prop_Send, "m_vecOrigin", position);
-	int explosionDamage = GetConVarInt(cvarEnableExplosion);
-	if (explosionDamage > 0 && !wasCarried && !g_bAmplifierExplosionActive)
+void Event_AmplifierObjectDetonated(Event event)
+{
+	HandleAmplifierDestruction(event, true);
+}
+
+void HandleAmplifierDestruction(Event event, bool wasPdaDetonation)
+{
+	int ent = event.GetInt("index");
+	if (!IsTrackedEntityIndex(ent) || !IsValidEntity(ent))
 	{
-		CreateAmplifierExplosion(position, attacker, entwasbuilding, explosionDamage, amplifierDistance);
+		return;
 	}
 
-	StopAmplifierIdleSound(entindex);
-	ResetAmplifierBuildingState(entindex);
-	return Plugin_Changed;
+	if (!AmplifierOn[ent] && !AmplifierCarried[ent] && !IsAmplifierModel(ent))
+	{
+		return;
+	}
+
+	bool wasCarried = IsAmplifierBeingCarried(ent);
+	bool wasBuilding = GetObjectBoolProp(ent, "m_bBuilding");
+	float position[3];
+	GetEntPropVector(ent, Prop_Send, "m_vecOrigin", position);
+
+	int explosionDamage = GetConVarInt(cvarEnableExplosion);
+	if (explosionDamage > 0
+		&& (wasCarried || !wasBuilding)
+		&& !g_bAmplifierExplosionActive)
+	{
+		// Carried destruction always takes precedence and is environmental so
+		// both teams are vulnerable. A PDA detonation is builder-owned so TF2
+		// protects teammates while still damaging the Engineer and enemies.
+		int explosionOwner = 0;
+		if (wasPdaDetonation && !wasCarried)
+		{
+			explosionOwner = GetClientOfUserId(event.GetInt("userid"));
+		}
+
+		CreateAmplifierExplosion(
+			position,
+			explosionOwner,
+			explosionDamage,
+			AMPLIFIER_EXPLOSION_RADIUS);
+	}
+
+	StopAmplifierIdleSound(ent);
+	ResetAmplifierBuildingState(ent);
 }
 
 void CheckBuilding(int ent)
@@ -1964,39 +1997,38 @@ void DealElectricDamage(int client, int builder, const float amplifierPos[3], fl
 }
 
 
-void CreateAmplifierExplosion(float position[3], int attacker = 0, bool entwasbuilding = false, int damage = 0, float radiusUnits = 0.0)
+void CreateAmplifierExplosion(
+	const float position[3],
+	int owner,
+	int damage,
+	float radiusUnits)
 {
-	if (entwasbuilding) return;
-    int explosion = CreateEntityByName("env_explosion");
-    if (explosion == -1) {
-        return;
-    }
+	int explosion = CreateEntityByName("env_explosion");
+	if (explosion == -1)
+	{
+		return;
+	}
 
-    if (radiusUnits <= 0.0)
-        radiusUnits = GetConVarFloat(cvarDistance);
 	int radius = RoundFloat(radiusUnits);
-    char sDamage[16], sRadius[16];
-    IntToString(damage, sDamage, sizeof(sDamage));
-    IntToString(radius, sRadius, sizeof(sRadius));
+	char sDamage[16], sRadius[16];
+	IntToString(damage, sDamage, sizeof(sDamage));
+	IntToString(radius, sRadius, sizeof(sRadius));
 
-    // Set explosion properties
-    DispatchKeyValue(explosion, "iMagnitude", sDamage);
-    DispatchKeyValue(explosion, "iRadiusOverride", sRadius);
-    DispatchKeyValue(explosion, "spawnflags", "828");
+	DispatchKeyValue(explosion, "iMagnitude", sDamage);
+	DispatchKeyValue(explosion, "iRadiusOverride", sRadius);
+	DispatchKeyValue(explosion, "spawnflags", "828");
+	TeleportEntity(explosion, position, NULL_VECTOR, NULL_VECTOR);
 
-    TeleportEntity(explosion, position, NULL_VECTOR, NULL_VECTOR);
+	bool hasPlayerOwner = Client_IsInGame(owner);
+	if (hasPlayerOwner)
+	{
+		SetEntPropEnt(explosion, Prop_Send, "m_hOwnerEntity", owner);
+	}
 
-    // Set attacker if valid
-    bool validAttacker = Client_IsInGame(attacker);
-    if (validAttacker)
-    {
-        SetEntPropEnt(explosion, Prop_Send, "m_hOwnerEntity", attacker);
-    }
-
-    DispatchSpawn(explosion);
-    g_bAmplifierExplosionActive = true;
-    AcceptEntityInput(explosion, "Explode");
-    CreateTimer(0.2, Timer_ClearAmplifierExplosionActive, _, TIMER_NO_MAPCHANGE);
+	DispatchSpawn(explosion);
+	g_bAmplifierExplosionActive = true;
+	AcceptEntityInput(explosion, "Explode");
+	CreateTimer(0.2, Timer_ClearAmplifierExplosionActive, _, TIMER_NO_MAPCHANGE);
 
 	// Create visual explosion effect
 	TE_SetupExplosion(position, 0, 10.0, 1, 0, radius, 5000);
@@ -2005,7 +2037,7 @@ void CreateAmplifierExplosion(float position[3], int attacker = 0, bool entwasbu
 	int particle = CreateEntityByName("info_particle_system");
 	if (particle != -1)
 	{
-		int team = validAttacker ? GetClientTeam(attacker) : 0;
+		int team = hasPlayerOwner ? GetClientTeam(owner) : 0;
 		TeleportEntity(particle, position, NULL_VECTOR, NULL_VECTOR);
 		char storedParticle[64];
 		strcopy(storedParticle, sizeof(storedParticle), "powerup_supernova_explode_red_spikes");
