@@ -65,6 +65,8 @@ int g_iPendingFullRoundWinningTeam = 0;
 bool g_bScrambledThisRound = false;
 bool g_bLastRoundHadScramble = false;
 bool g_bStackRedPayloadAttempted = false;
+Handle g_hStackRedPayloadWaitTimer = null;
+#define WHALEBALANCE_SETUP_TEAM_RATIO_PERCENT 75
 int g_iRoundStartTimestamp = 0;
 
 #define TEAM_BLU  3
@@ -161,6 +163,7 @@ public void OnLibraryRemoved(const char[] name)
 
 void WhaleScramble_OnMapStart()
 {
+    StopStackRedPayloadWaitTimer();
     g_bStackRedPayloadAttempted = false;
     ResetVotes();
     ClearAutoScramblePending();
@@ -172,6 +175,7 @@ void WhaleScramble_OnMapStart()
 
 void WhaleScramble_OnMapEnd()
 {
+    StopStackRedPayloadWaitTimer();
     ResetVotes();
     ClearAutoScramblePending();
     g_iRoundsSinceAuto = 0;
@@ -181,6 +185,7 @@ void WhaleScramble_OnMapEnd()
 
 void WhaleScramble_OnPluginEnd()
 {
+    StopStackRedPayloadWaitTimer();
     ResetVotes();
     TeamBalance_CancelScramble();
     ClearAutoScramblePending();
@@ -283,6 +288,74 @@ public void DGM_OnSetupTeamRatioReady(int realTeamPlayers, int connectedClients)
         return;
     }
 
+    if (connectedClients <= 0
+        || realTeamPlayers * 100 < connectedClients * WHALEBALANCE_SETUP_TEAM_RATIO_PERCENT)
+    {
+        if (g_hStackRedPayloadWaitTimer == null)
+        {
+            g_hStackRedPayloadWaitTimer = CreateTimer(
+                1.0,
+                Timer_WaitForStackRedPayloadRatio,
+                _,
+                TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+        }
+        LogWhale(
+            "Payload setup team ratio waiting: realTeamPlayers=%d connectedClients=%d required=%d%%.",
+            realTeamPlayers,
+            connectedClients,
+            WHALEBALANCE_SETUP_TEAM_RATIO_PERCENT);
+        return;
+    }
+
+    StartStackRedPayloadBalance(realTeamPlayers, connectedClients);
+}
+
+void StopStackRedPayloadWaitTimer()
+{
+    if (g_hStackRedPayloadWaitTimer != null)
+    {
+        delete g_hStackRedPayloadWaitTimer;
+        g_hStackRedPayloadWaitTimer = null;
+    }
+}
+
+public Action Timer_WaitForStackRedPayloadRatio(Handle timer)
+{
+    if (timer != g_hStackRedPayloadWaitTimer
+        || g_bStackRedPayloadAttempted
+        || g_hStackRedPayload == null
+        || !g_hStackRedPayload.BoolValue
+        || GetFeatureStatus(FeatureType_Native, "DGM_IsSetupActive") != FeatureStatus_Available
+        || !DGM_IsSetupActive())
+    {
+        g_hStackRedPayloadWaitTimer = null;
+        return Plugin_Stop;
+    }
+
+    int connectedClients = GetClientCount(false);
+    int realTeamPlayers = 0;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && !IsFakeClient(client)
+            && (GetClientTeam(client) == TEAM_RED || GetClientTeam(client) == TEAM_BLU))
+        {
+            realTeamPlayers++;
+        }
+    }
+
+    if (connectedClients <= 0
+        || realTeamPlayers * 100 < connectedClients * WHALEBALANCE_SETUP_TEAM_RATIO_PERCENT)
+    {
+        return Plugin_Continue;
+    }
+
+    g_hStackRedPayloadWaitTimer = null;
+    StartStackRedPayloadBalance(realTeamPlayers, connectedClients);
+    return Plugin_Stop;
+}
+
+void StartStackRedPayloadBalance(int realTeamPlayers, int connectedClients)
+{
     g_bStackRedPayloadAttempted = true;
     LogWhale(
         "Payload setup team ratio ready: realTeamPlayers=%d connectedClients=%d; starting RED-favored WhaleTracker balance.",
