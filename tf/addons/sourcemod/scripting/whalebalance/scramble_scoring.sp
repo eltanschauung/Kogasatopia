@@ -1,3 +1,113 @@
+bool StartFavoredWhaleRankPairSwap(int issuer, int favoredTeam)
+{
+    if (GetFeatureStatus(FeatureType_Native, "WhaleTracker_AreStatsLoaded") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "WhaleTracker_GetWhalePoints") != FeatureStatus_Available)
+    {
+        ReplyToCommand(issuer, "[whalebalance] WhaleTracker rank data is unavailable.");
+        return false;
+    }
+
+    int opposingTeam = favoredTeam == TEAM_RED ? TEAM_BLU : TEAM_RED;
+    int highestRankedOpponent = 0;
+    int lowestFavoredClient = 0;
+    int highestPoints = 0;
+    int lowestPoints = 0;
+    bool lowestIsUnranked = false;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client))
+        {
+            continue;
+        }
+
+        int team = GetClientTeam(client);
+        if (team != favoredTeam && team != opposingTeam)
+        {
+            continue;
+        }
+
+        if (!TeamBalance_IsScrambleCandidate(client, team, false, false)
+            || TeamBalance_HasScramblePurchaseImmunity(client))
+        {
+            continue;
+        }
+
+        bool ranked = WhaleTracker_AreStatsLoaded(client);
+        bool unranked = !ranked;
+        int points = ranked ? WhaleTracker_GetWhalePoints(client) : 0;
+        if (team == opposingTeam)
+        {
+            // An unranked player cannot be considered the highest ranked.
+            if (ranked && (highestRankedOpponent == 0 || points > highestPoints))
+            {
+                highestRankedOpponent = client;
+                highestPoints = points;
+            }
+        }
+        else if (lowestFavoredClient == 0
+            || (unranked && !lowestIsUnranked)
+            || (unranked == lowestIsUnranked && points < lowestPoints))
+        {
+            lowestFavoredClient = client;
+            lowestPoints = points;
+            lowestIsUnranked = unranked;
+        }
+    }
+
+    if (highestRankedOpponent == 0 || lowestFavoredClient == 0)
+    {
+        ReplyToCommand(
+            issuer,
+            "[whalebalance] Need a ranked, eligible opponent and an eligible player on the favored team.");
+        LogWhaleStat(
+            "scramble_result",
+            "mode=whaletracker_rank_pair|result=aborted|reason=no_eligible_pair|favored_team=%d",
+            favoredTeam);
+        return false;
+    }
+
+    if (!TeamBalance_BeginScramble(true))
+    {
+        ReplyToCommand(issuer, "[whalebalance] Team balancing is busy; try again in a moment.");
+        return false;
+    }
+
+    int redClient = favoredTeam == TEAM_RED ? lowestFavoredClient : highestRankedOpponent;
+    int bluClient = favoredTeam == TEAM_BLU ? lowestFavoredClient : highestRankedOpponent;
+    if (GetFeatureStatus(FeatureType_Native, "FilterAlerts_SuppressTeamAlertWindow") == FeatureStatus_Available)
+    {
+        FilterAlerts_SuppressTeamAlertWindow(2.0);
+    }
+
+    if (!TeamBalance_MoveScramblePair(redClient, bluClient, false, false, false))
+    {
+        TeamBalance_CancelScramble();
+        ReplyToCommand(issuer, "[whalebalance] The selected pair could not be swapped.");
+        LogWhaleStat(
+            "scramble_result",
+            "mode=whaletracker_rank_pair|result=aborted|reason=move_rejected|favored_team=%d",
+            favoredTeam);
+        return false;
+    }
+
+    TeamBalance_FinishScramble(true, false);
+    SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
+    CPrintToChatAll(
+        "{tomato}[{purple}Gap{tomato}]{default} Whale rank swap: {gold}%N{default} to %s for {gold}%N{default}.",
+        highestRankedOpponent,
+        favoredTeam == TEAM_RED ? "RED" : "BLU",
+        lowestFavoredClient);
+    LogWhaleStat(
+        "scramble_result",
+        "mode=whaletracker_rank_pair|result=executed|favored_team=%d|source_points=%d|target_points=%d|target_unranked=%d",
+        favoredTeam,
+        highestPoints,
+        lowestPoints,
+        lowestIsUnranked ? 1 : 0);
+    return true;
+}
+
 bool StartWhaleRankBalanceScramble(int issuer, bool broadcastFailures, bool allowLowPop, bool forced, int favoredTeam)
 {
     if (GetFeatureStatus(FeatureType_Native, "WhaleTracker_AreStatsLoaded") != FeatureStatus_Available

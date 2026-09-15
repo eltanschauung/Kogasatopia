@@ -121,7 +121,7 @@ void WhaleScramble_OnPluginStart()
     RegConsoleCmd("sm_itsover", Command_SurrenderRound);
     RegAdminCmd("sm_forcescramble", Command_WhaleScramble, ADMFLAG_GENERIC, "Immediately perform a whale scramble.");
     RegAdminCmd("sm_forcewhalescramble", Command_WhaleScramble, ADMFLAG_GENERIC, "Immediately perform a whale scramble.");
-    RegAdminCmd("sm_whalebalance", Command_WhaleBalance, ADMFLAG_GENERIC, "Balance by WhaleTracker rank; optionally favor red/blu 60:40.");
+    RegAdminCmd("sm_whalebalance", Command_WhaleBalance, ADMFLAG_GENERIC, "Balance by WhaleTracker rank; red/blu swaps the opposing team's highest-ranked eligible player for the favored team's lowest-ranked or unranked eligible player.");
     RegAdminCmd("sm_whalescramblevote", Command_ForceScrambleVote, ADMFLAG_GENERIC, "Force a whale scramble vote.");
     RegAdminCmd("sm_forcescramblevote", Command_ForceScrambleVote, ADMFLAG_GENERIC, "Force a whale scramble vote.");
 
@@ -269,7 +269,14 @@ public Action Command_WhaleBalance(int client, int args)
     {
         LogWhale("WhaleTracker rank balance requested by server console, favoredTeam=%d.", favoredTeam);
     }
-    StartWhaleRankBalanceScramble(client, true, true, true, favoredTeam);
+    if (favoredTeam != 0)
+    {
+        StartFavoredWhaleRankPairSwap(client, favoredTeam);
+    }
+    else
+    {
+        StartWhaleRankBalanceScramble(client, true, true, true, 0);
+    }
     return Plugin_Handled;
 }
 
