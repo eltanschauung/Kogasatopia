@@ -112,14 +112,15 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     }
 
     Filters_ScheduleArchivedMessageTriggers(client, sArgs);
+    bool blacklistRateLimited = Filters_IsBlacklistChatRateLimited(client);
 
-    if (TryHandleTeamChat(client, command, sArgs, dead))
+    if (TryHandleTeamChat(client, command, sArgs, dead, blacklistRateLimited))
     {
         return Plugin_Stop;
     }
 
     ChatContext context;
-    BuildChatContext(client, sArgs, context);
+    BuildChatContext(client, sArgs, context, blacklistRateLimited);
 
     char publicBody[256];
     bool hasPrivateOriginal = Filters_FindGoodnightStopperReplacement(client, sArgs, publicBody, sizeof(publicBody));
@@ -175,7 +176,8 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     return Plugin_Stop;
 }
 
-void BuildChatContext(int client, const char[] sArgs, ChatContext context)
+void BuildChatContext(int client, const char[] sArgs, ChatContext context,
+    bool blacklistRateLimited)
 {
     Filters_RefreshAdminDbStatus(client);
     context.pluginEnabled = GetConVarInt(g_sEnabled) != 0;
@@ -184,7 +186,7 @@ void BuildChatContext(int client, const char[] sArgs, ChatContext context)
     context.isWhitelisted = g_PlayerState[client].isWhitelisted;
     context.isFilterWhitelisted = g_PlayerState[client].isFilterWhitelisted;
     context.hasBlacklistedTerm = CheckBlacklistedTerms(sArgs);
-    context.isGagged = Filters_IsClientGagged(client);
+    context.isGagged = Filters_IsClientGagged(client) || blacklistRateLimited;
 }
 
 static void LogBlacklistedMessage(int client, const char[] message, bool hasBlacklistedTerm, bool isBlacklistedClient)
@@ -876,7 +878,8 @@ bool HandleListStatusCommand(int client, const char[] sArgs)
     return true;
 }
 
-bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs, const char[] deadPrefix)
+bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs,
+    const char[] deadPrefix, bool blacklistRateLimited)
 {
     if (!StrEqual(command, "say_team"))
     {
@@ -911,7 +914,7 @@ bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs, con
         Format(senderOutput, sizeof(senderOutput), "%s%s%s %s%s : %s", messageColorTag, deadPrefix, tag, displayName, messageColorTag, sArgs);
     }
 
-    if (Filters_IsClientGagged(client))
+    if (Filters_IsClientGagged(client) || blacklistRateLimited)
     {
         CPrintToChatEx(client, client, "%s", senderOutput[0] ? senderOutput : output);
         PrintToServer("x: %s", output);

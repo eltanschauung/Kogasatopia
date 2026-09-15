@@ -25,6 +25,51 @@ bool Filters_IsClientGagged(int client)
             || (Filters_MuteDeafenEnabled() && g_MuteDeafened[client]));
 }
 
+void Filters_ResetBlacklistChatRateLimit(int client)
+{
+	if (!Filters_IsClientIndex(client))
+	{
+		return;
+	}
+
+	g_iBlacklistChatMessageCount[client] = 0;
+	for (int i = 0; i < FILTERS_BLACKLIST_CHAT_LIMIT; i++)
+	{
+		g_iBlacklistChatMessageTimes[client][i] = 0;
+	}
+}
+
+bool Filters_IsBlacklistChatRateLimited(int client)
+{
+	if (!Filters_IsRealClientInGame(client)
+		|| Filters_GetAdminsDbLevel(client) > -2)
+	{
+		Filters_ResetBlacklistChatRateLimit(client);
+		return false;
+	}
+
+	int now = GetTime();
+	int retained = 0;
+	for (int i = 0; i < g_iBlacklistChatMessageCount[client]; i++)
+	{
+		int timestamp = g_iBlacklistChatMessageTimes[client][i];
+		if (timestamp > 0 && now - timestamp < FILTERS_BLACKLIST_CHAT_WINDOW_SECONDS)
+		{
+			g_iBlacklistChatMessageTimes[client][retained++] = timestamp;
+		}
+	}
+	g_iBlacklistChatMessageCount[client] = retained;
+
+	if (retained >= FILTERS_BLACKLIST_CHAT_LIMIT)
+	{
+		return true;
+	}
+
+	g_iBlacklistChatMessageTimes[client][retained] = now;
+	g_iBlacklistChatMessageCount[client]++;
+	return false;
+}
+
 int Filters_GetFilterMode()
 {
     if (g_sChatMode2 == INVALID_HANDLE)

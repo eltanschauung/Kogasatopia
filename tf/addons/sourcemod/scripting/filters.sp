@@ -32,6 +32,8 @@
 #define FILTERS_OUTBOX_POLL_INTERVAL 2.0
 #define FILTERS_MUTE_CHECK_INTERVAL 1.0
 #define FILTERS_CONNECT_QUEUE_DELAY 3.0
+#define FILTERS_BLACKLIST_CHAT_LIMIT 5
+#define FILTERS_BLACKLIST_CHAT_WINDOW_SECONDS 180
 #define FILTERS_DEFAULT_DB_CONFIG "default"
 #define FILTERS_DEFAULT_HOST_IP "0.0.0.0"
 #define FILTERS_PUBLIC_HOST_IP "173.255.237.230"
@@ -101,6 +103,8 @@ bool g_AutoRedlistGotKills[MAXPLAYERS + 1];
 bool g_AutoRedlistGotRapes[MAXPLAYERS + 1];
 bool g_TidyChatSuppressNextTeamAlert[MAXPLAYERS + 1];
 float g_TidyChatSuppressTeamAlertsUntil = 0.0;
+int g_iBlacklistChatMessageTimes[MAXPLAYERS + 1][FILTERS_BLACKLIST_CHAT_LIMIT];
+int g_iBlacklistChatMessageCount[MAXPLAYERS + 1];
 
 #include "filters/mutecheck.inc"
 

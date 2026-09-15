@@ -436,6 +436,7 @@ public void Filters_OnMemomanChanged(ConVar convar, const char[] oldValue, const
 public void OnClientPutInServer(int client)
 {
     g_bMuteArchivedSpeakers[client] = false;
+    Filters_ResetBlacklistChatRateLimit(client);
     Filters_ResetArchivedMessageCooldowns(client);
     Filters_ResetExternalStats(client);
 }
@@ -443,6 +444,7 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
     g_bMuteArchivedSpeakers[client] = false;
+    Filters_ResetBlacklistChatRateLimit(client);
     g_TidyChatSuppressNextTeamAlert[client] = false;
     Filters_ResetArchivedMessageCooldowns(client);
     Filters_ClearClientState(client);
