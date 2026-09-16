@@ -17,7 +17,8 @@ Action ChatCommandListener(int client, const char[] command, int argc)
 
     char payload[256];
     strcopy(payload, sizeof(payload), message);
-    if (payload[0] == '!')
+    bool silentTrigger = payload[0] == '/';
+    if (payload[0] == '!' || silentTrigger)
     {
         Strings_ShiftLeft(payload, sizeof(payload), 1);
     }
@@ -25,7 +26,7 @@ Action ChatCommandListener(int client, const char[] command, int argc)
 
     if (!payload[0])
     {
-        return Plugin_Continue;
+        return silentTrigger ? Plugin_Handled : Plugin_Continue;
     }
 
     char commandName[MAX_COMMAND_NAME * 4];
@@ -101,6 +102,6 @@ Action ChatCommandListener(int client, const char[] command, int argc)
         LogSaySoundUsage("saysound_used", initiator, 0, selectedCommand, soundPath, groupName, fromGroup, sourceGroup, false, "chat");
     }
 
-    return Plugin_Continue;
+    return silentTrigger ? Plugin_Handled : Plugin_Continue;
 }
 
