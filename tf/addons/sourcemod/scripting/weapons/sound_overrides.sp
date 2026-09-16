@@ -7,6 +7,7 @@
 #define Weapons_ATTR_CUSTOM_DEPLOY_SOUND "custom deploy sound"
 #define Weapons_ATTR_EMIT_SOUND_ON_HIT "emit sound on hit"
 #define Weapons_ATTR_EMIT_SOUND_ON_KILL "emit sound on kill"
+#define Weapons_ATTR_EMIT_LOUD_SOUND_ON_KILL "emit loud sound on kill"
 #define Weapons_ATTR_EMIT_SOUND_ON_HIT_WEARER "emit sound on hit wearer"
 #define Weapons_ATTR_CUSTOM_HITSOUND "custom hitsound"
 #define Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND "custom melee swing sound"
@@ -221,6 +222,9 @@ void WeaponsSound_PlayOnKill(int victim, int weapon)
 {
 	WeaponsSound_EmitCustomAttribute(victim, weapon,
 		Weapons_ATTR_EMIT_SOUND_ON_KILL, "on-kill", SNDLEVEL_NORMAL, true);
+	WeaponsSound_EmitCustomAttribute(victim, weapon,
+		Weapons_ATTR_EMIT_LOUD_SOUND_ON_KILL, "loud on-kill",
+		SNDLEVEL_NORMAL, true, 3);
 }
 
 void WeaponsSound_PlayWearerOnHit(int victim, int attacker)
@@ -330,7 +334,8 @@ static bool WeaponsSound_GetRandomMeleeSample(
 
 static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
 		const char[] attribute, const char[] context,
-		int soundLevel = SNDLEVEL_NORMAL, bool emitFromWorld = false)
+		int soundLevel = SNDLEVEL_NORMAL, bool emitFromWorld = false,
+		int emissionCount = 1)
 {
 	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon))
 	{
@@ -356,8 +361,11 @@ static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
 	{
 		float origin[3];
 		GetClientAbsOrigin(client, origin);
-		EmitSoundToAll(sample, SOUND_FROM_WORLD, SNDCHAN_AUTO, soundLevel,
-			SND_NOFLAGS, SNDVOL_NORMAL, SNDPITCH_NORMAL, -1, origin);
+		for (int emission = 0; emission < emissionCount; emission++)
+		{
+			EmitSoundToAll(sample, SOUND_FROM_WORLD, SNDCHAN_AUTO, soundLevel,
+				SND_NOFLAGS, SNDVOL_NORMAL, SNDPITCH_NORMAL, -1, origin);
+		}
 	}
 	else
 	{
