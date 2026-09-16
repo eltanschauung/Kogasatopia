@@ -347,14 +347,20 @@ public void SQL_OnPurchaseInserted(Database db, DBResultSet results, const char[
         {
             CPrintToChatAllEx(client, "%s[!shop]{default} %s bought {gold}%s{default} for %d %s%s{default}",
                 colorTag, displayName, itemName, price, colorTag, currencyShort);
-            PlayPurchaseSound();
+            PlayPurchaseSound(price);
         }
     }
 }
 
-static void PlayPurchaseSound()
+static void PlayPurchaseSound(int price)
 {
-    SaySounds_TryPlayCommand(0, "xp_gain");
+    if (price > BP_PURCHASE_LEVEL_UP_THRESHOLD)
+    {
+        SaySounds_TryPlayCommand(0, BP_LEVEL_UP_SOUND_COMMAND);
+        return;
+    }
+
+    SaySounds_TryPlayCommand(0, BP_SOUND_COMMAND);
 }
 
 void BuildPurchaseDisplayName(int client, char[] buffer, int maxlen)
