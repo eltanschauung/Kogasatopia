@@ -1,7 +1,8 @@
 //KoTH
-koth_harvest_winter_v3
+koth_harvest_final
 koth_bagel_rc13
-koth_soot_final1
+koth_proot_b7
+koth_lumberyard_pro
 koth_kemptown_rc4
 workshop/koth_rocktop_rc2.ugc454207393
 
@@ -12,22 +13,18 @@ cp_gullywash_final1
 cp_snakewater_final1
 cp_powerhouse_no_timer
 
+//PL
+pl_badwater
+pl_upward
+pl_snowycoast
+pl_silverline_rc12
+
 //PLR
 plr_hightower
 
-//PL
-pl_badwater
-pl_borneo
-pl_silverline_rc12
-pl_vigil_rc10
-
 //AD
 cp_steel_trad
-cp_mojave_b2
-cp_gravelpit
 
 //CTF
 ctf_turbine_festive
-
-//PD
-pd_selbyen
+ctf_well
