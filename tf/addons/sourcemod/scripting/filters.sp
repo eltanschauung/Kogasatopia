@@ -130,6 +130,7 @@ ConVar g_hRedlistEnabled = null;
 ConVar g_hPChat = null;
 ConVar g_hMuteDeafenEnabled = null;
 ConVar g_hParseeEnabled = null;
+ConVar g_hParseeMode = null;
 ConVar g_hMemomanEnabled = null;
 ConVar g_hTidyChatEnabled = null;
 ConVar g_hTidyChatVoice = null;

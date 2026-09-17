@@ -74,6 +74,7 @@ static void Filters_CreateConVars()
     g_hPChat = CreateConVar("sm_pchat", "1", "If 0, filtered/monitored chat is only printed to server console and not shown to whitelisted clients.", _, true, 0.0, true, 1.0);
     g_hMuteDeafenEnabled = CreateConVar("sm_filters_mute_deafen", "0", "If 1, clients who mute another connected player cannot hear voice chat or send chat until no connected players are muted.", _, true, 0.0, true, 1.0);
     g_hParseeEnabled = CreateConVar("sm_filters_parsee", "0", "Enable Parsee archived messages and webchat impersonation.", _, true, 0.0, true, 1.0);
+    g_hParseeMode = CreateConVar("sm_parseemode", "0", "If 1, replace every eligible message from the connected Parsee client with an archived Parsee message.", _, true, 0.0, true, 1.0);
     g_hMemomanEnabled = CreateConVar("sm_filters_memoman", "0", "Enable Memoman archived messages and the Memoman event.", _, true, 0.0, true, 1.0);
     g_hFiltersCaseSensitive = CreateConVar("filters_case_sensitive", "1", "If 1, chat filters are case-sensitive (exact casing must match)");
     CreateConVar("sm_tidychat_version", TIDYCHAT_VERSION, "Tidy Chat Version", FCVAR_SPONLY | FCVAR_REPLICATED | FCVAR_NOTIFY);

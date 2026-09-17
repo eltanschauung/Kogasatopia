@@ -290,7 +290,8 @@ bool Filters_TryReplaceConnectedParseeMessage(
         || GetConVarInt(g_sEnabled) == 0
         || !Filters_DbAvailable()
         || g_iArchivedMessageCounts[ArchivedSpeaker_Parsee] <= 0
-        || GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT)
+        || (!g_hParseeMode.BoolValue
+            && GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT))
     {
         return false;
     }
