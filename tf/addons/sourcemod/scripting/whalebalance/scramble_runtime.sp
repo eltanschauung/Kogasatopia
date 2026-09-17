@@ -102,7 +102,7 @@ void WhaleScramble_OnPluginStart()
     g_hRandom = CreateConVar("sm_ws_random", "1", "Enable random scramble mode.", _, true, 0.0, true, 1.0);
     g_hFragBalance = CreateConVar("sm_ws_frags", "1", "Enable frag-balanced random scramble mode.", _, true, 0.0, true, 1.0);
     g_hWhaleRankBalance = CreateConVar("sm_ws_whaletracker_ranks", "0", "Enable WhaleTracker rank-balanced scramble mode.", _, true, 0.0, true, 1.0);
-    g_hStackRedPayload = CreateConVar("whalescramble_stack_red_pl", "1", "Run one RED-favored 60:40 WhaleTracker balance per payload map when setup teams become ready.", _, true, 0.0, true, 1.0);
+    g_hStackRedPayload = CreateConVar("whalescramble_stack_red_pl", "1", "Swap one highest-ranked BLU player for one lowest-ranked or unranked RED player per payload map when setup teams become ready.", _, true, 0.0, true, 1.0);
     g_hDisableTfAuto = CreateConVar("sm_whalescramble_disable_tf_auto", "1", "Disable TF2's built-in mp_scrambleteams_auto while WhaleScramble owns auto scrambles.", _, true, 0.0, true, 1.0);
     g_hShortRoundAutoSeconds = CreateConVar("sm_whalescramble_short_round_seconds", "60", "Automatically whale scramble when the previous round duration is under this many seconds. 0 disables.", _, true, 0.0, true, 600.0);
     g_hKothNoCapAuto = CreateConVar("sm_whalescramble_koth_no_cap", "1", "Automatically whale scramble when a full KOTH round ends with either team never capturing the point.", _, true, 0.0, true, 1.0);
@@ -365,16 +365,16 @@ void StartStackRedPayloadBalance(int realTeamPlayers, int connectedClients)
 {
     g_bStackRedPayloadAttempted = true;
     LogWhale(
-        "Payload setup team ratio ready: realTeamPlayers=%d connectedClients=%d; starting RED-favored WhaleTracker balance.",
+        "Payload setup team ratio ready: realTeamPlayers=%d connectedClients=%d; starting RED-favored WhaleTracker pair swap.",
         realTeamPlayers,
         connectedClients);
     LogWhaleStat(
         "auto_scramble_decision",
-        "trigger=setup_team_ratio|result=triggered|mode=whaletracker_rank|favored_team=%d|real_team_players=%d|connected_clients=%d",
+        "trigger=setup_team_ratio|result=triggered|mode=whaletracker_rank_pair|favored_team=%d|real_team_players=%d|connected_clients=%d",
         TEAM_RED,
         realTeamPlayers,
         connectedClients);
-    StartWhaleRankBalanceScramble(0, false, true, true, TEAM_RED);
+    StartFavoredWhaleRankPairSwap(0, TEAM_RED);
 }
 
 public Action Command_ForceScrambleVote(int client, int args)
