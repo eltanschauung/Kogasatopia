@@ -187,8 +187,8 @@ public Action Command_Colors(int client, int args)
 
 bool CheckCommands(const char[] sArgs)
 {
-    // Allow any message starting with !
-    if (strncmp(sArgs, "!", 1) == 0) {
+    // Leave public and silent SourceMod command triggers to their command handlers.
+    if (sArgs[0] == '!' || sArgs[0] == '/') {
         return true;
     }
     
