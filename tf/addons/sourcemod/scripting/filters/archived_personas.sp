@@ -274,7 +274,37 @@ void Filters_ResetArchivedMessageCooldowns(int client)
     }
 }
 
-static void Filters_QueryRandomArchivedMessage(ArchivedSpeaker speaker)
+static bool Filters_IsConnectedParseeClient(int client)
+{
+    char steamId64[KOGASA_STEAMID_MAX];
+    return client > 0 && client <= MaxClients && IsClientInGame(client)
+        && Kogasa_GetClientSteamId64(client, steamId64, sizeof(steamId64), true)
+        && StrEqual(steamId64, PARSEE_STEAMID64);
+}
+
+bool Filters_TryReplaceConnectedParseeMessage(
+    int client, const char[] message, const char[] senderMessage = "")
+{
+    if (!Filters_IsConnectedParseeClient(client)
+        || !g_hParseeEnabled.BoolValue
+        || GetConVarInt(g_sEnabled) == 0
+        || !Filters_DbAvailable()
+        || g_iArchivedMessageCounts[ArchivedSpeaker_Parsee] <= 0
+        || GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT)
+    {
+        return false;
+    }
+
+    Filters_SendChatToReceiver(client, client, message, senderMessage);
+    PrintToServer("%s", message);
+    Filters_LogChatMessage(client, senderMessage[0] ? senderMessage : message);
+    Filters_QueryRandomArchivedMessage(
+        ArchivedSpeaker_Parsee, GetClientUserId(client), false);
+    return true;
+}
+
+static void Filters_QueryRandomArchivedMessage(
+    ArchivedSpeaker speaker, int skipUserId = 0, bool logAttributed = true)
 {
     if (speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
     {
@@ -301,12 +331,21 @@ static void Filters_QueryRandomArchivedMessage(ArchivedSpeaker speaker)
         offset,
         steam64,
         steam64);
-    g_hFiltersDb.Query(Filters_RandomArchivedMessageCallback, query, speaker);
+    DataPack pack = new DataPack();
+    pack.WriteCell(speaker);
+    pack.WriteCell(skipUserId);
+    pack.WriteCell(logAttributed);
+    g_hFiltersDb.Query(Filters_RandomArchivedMessageCallback, query, pack);
 }
 
 public void Filters_RandomArchivedMessageCallback(Database db, DBResultSet results, const char[] error, any data)
 {
-    ArchivedSpeaker speaker = view_as<ArchivedSpeaker>(data);
+    DataPack pack = view_as<DataPack>(data);
+    pack.Reset();
+    ArchivedSpeaker speaker = view_as<ArchivedSpeaker>(pack.ReadCell());
+    int skipUserId = pack.ReadCell();
+    bool logAttributed = pack.ReadCell();
+    delete pack;
     if ((speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
         || (speaker == ArchivedSpeaker_Memoman && !g_hMemomanEnabled.BoolValue))
     {
@@ -335,7 +374,8 @@ public void Filters_RandomArchivedMessageCallback(Database db, DBResultSet resul
     results.FetchString(1, displayName, sizeof(displayName));
     results.FetchString(2, color, sizeof(color));
     results.FetchString(3, pattern, sizeof(pattern));
-    Filters_RenderArchivedSpeakerMessage(speaker, message, displayName, color, pattern, false);
+    Filters_RenderArchivedSpeakerMessage(
+        speaker, message, displayName, color, pattern, false, skipUserId, logAttributed);
 }
 
 void Filters_QueryArchivedSpeakerRelay(ArchivedSpeaker speaker, const char[] message)
@@ -436,7 +476,9 @@ public void Filters_ArchivedSpeakerRelayCallback(Database db, DBResultSet result
     Filters_RenderArchivedSpeakerMessage(speaker, message, displayName, color, pattern, true);
 }
 
-static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker, const char[] message, char[] displayName, char[] color, char[] pattern, bool webRelay)
+static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker,
+    const char[] message, char[] displayName, char[] color, char[] pattern,
+    bool webRelay, int skipUserId = 0, bool logAttributed = true)
 {
     if (speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
     {
@@ -493,12 +535,25 @@ static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker, const 
     {
         Filters_PrintOutboxToClients(output, true);
     }
-    else
+    else if (skipUserId == 0)
     {
         Filters_PrintToChatAll(output, true);
     }
+    else
+    {
+        int skipClient = GetClientOfUserId(skipUserId);
+        for (int client = 1; client <= MaxClients; client++)
+        {
+            if (client == skipClient || !Filters_ShouldReceiveChat(client, 0)
+                || g_bMuteArchivedSpeakers[client])
+            {
+                continue;
+            }
+            CPrintToChat(client, "%s", output);
+        }
+    }
     PrintToServer("%s", output);
-    if (!webRelay)
+    if (!webRelay && logAttributed)
     {
         Filters_LogAttributedChat(steam64, displayName, message, output);
     }

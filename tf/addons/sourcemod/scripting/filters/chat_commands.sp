@@ -167,6 +167,11 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
         return Plugin_Stop;
     }
 
+    if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput))
+    {
+        return Plugin_Stop;
+    }
+
     if (HandleEnabledChat(client, output, context, senderOutput))
     {
         return Plugin_Stop;
@@ -928,6 +933,11 @@ bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs,
         {
             Filters_RelayChatToServers(client, output);
         }
+        return true;
+    }
+
+    if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput))
+    {
         return true;
     }
 
