@@ -1,3 +1,5 @@
+#define PARSEE_AUTOMATIC_MESSAGE_MAX_LENGTH 64
+
 static void Filters_GetArchivedSpeakerDetails(
     ArchivedSpeaker speaker,
     char[] table,
@@ -300,12 +302,13 @@ bool Filters_TryReplaceConnectedParseeMessage(
     PrintToServer("%s", message);
     Filters_LogChatMessage(client, senderMessage[0] ? senderMessage : message);
     Filters_QueryRandomArchivedMessage(
-        ArchivedSpeaker_Parsee, GetClientUserId(client), false);
+        ArchivedSpeaker_Parsee, GetClientUserId(client), false, true);
     return true;
 }
 
 static void Filters_QueryRandomArchivedMessage(
-    ArchivedSpeaker speaker, int skipUserId = 0, bool logAttributed = true)
+    ArchivedSpeaker speaker, int skipUserId = 0, bool logAttributed = true,
+    bool shortMessagesOnly = false)
 {
     if (speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
     {
@@ -315,21 +318,32 @@ static void Filters_QueryRandomArchivedMessage(
     char table[32], steam64[32], steam2[32], fallbackName[PRENAME_MAX_RENAME];
     Filters_GetArchivedSpeakerDetails(speaker, table, sizeof(table), steam64, sizeof(steam64), steam2, sizeof(steam2), fallbackName, sizeof(fallbackName));
 
-    int offset = GetRandomInt(0, g_iArchivedMessageCounts[speaker] - 1);
+    char messageSelection[160];
+    if (shortMessagesOnly)
+    {
+        FormatEx(messageSelection, sizeof(messageSelection),
+            "SELECT message FROM %s WHERE CHAR_LENGTH(message) < %d ORDER BY RAND() LIMIT 1",
+            table, PARSEE_AUTOMATIC_MESSAGE_MAX_LENGTH);
+    }
+    else
+    {
+        int offset = GetRandomInt(0, g_iArchivedMessageCounts[speaker] - 1);
+        FormatEx(messageSelection, sizeof(messageSelection),
+            "SELECT message FROM %s LIMIT 1 OFFSET %d", table, offset);
+    }
     char query[1536];
     Format(query, sizeof(query),
         "SELECT p.message, "
         ... "COALESCE((SELECT newname FROM prename_rules WHERE pattern IN ('%s', '%s') ORDER BY (pattern = '%s') DESC LIMIT 1), NULLIF(sn.last_name, ''), '%s'), "
         ... "COALESCE(nc.color, ''), COALESCE(nc.pattern, '') "
-        ... "FROM (SELECT message FROM %s LIMIT 1 OFFSET %d) p "
+        ... "FROM (%s) p "
         ... "LEFT JOIN filters_steam_names sn ON sn.steamid64 = '%s' "
         ... "LEFT JOIN filters_namecolors nc ON nc.steamid = '%s' LIMIT 1",
         steam64,
         steam2,
         steam64,
         fallbackName,
-        table,
-        offset,
+        messageSelection,
         steam64,
         steam64);
     DataPack pack = new DataPack();
