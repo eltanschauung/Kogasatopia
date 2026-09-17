@@ -252,6 +252,9 @@
 
 #define PLUGIN_VERSION "5.8a"
 #define SPRAY_SOUND "player/sprayer.wav"
+#define SPRAY_MUTE_DATABASE "default"
+#define SPRAY_MUTE_TABLE "spray_mutes"
+#define SPRAY_MUTE_DURATION (7 * 24 * 60 * 60)
 #define MAXDIS 0
 #define REFRESHRATE 1
 #define TBANTIME 2
@@ -284,6 +287,7 @@ new String:g_arrSprayName[MAXPLAYERS + 1][64];
 new String:g_arrSprayID[MAXPLAYERS + 1][32];
 new String:g_arrMenuSprayID[MAXPLAYERS + 1][32];
 new g_arrSprayTime[MAXPLAYERS + 1];
+new g_arrSprayEntity[MAXPLAYERS + 1];
 
 // Misc. globals
 new Handle:g_arrCVars[NUMCVARS];
@@ -295,6 +299,10 @@ new bool:g_bCanUseHUD;
 new g_PrecacheRedGlow;
 new Handle:g_hMuteSpraySoundsCookie = INVALID_HANDLE;
 new bool:g_bMuteSpraySounds[MAXPLAYERS + 1];
+new Handle:g_hSprayMuteDatabase = INVALID_HANDLE;
+new Handle:g_hSprayMuteMap = INVALID_HANDLE;
+new bool:g_bSprayMutesLoaded;
+new bool:g_bResendingSprayDecal;
 
 public Plugin:myinfo =
 {
@@ -307,11 +315,14 @@ public Plugin:myinfo =
 
 public OnPluginStart() {
         RegConsoleCmd("sm_mutesprays", ToggleSpraySounds, "Toggle spray sound effects.");
-        RegConsoleCmd("sm_spraymute", ToggleSpraySounds, "Toggle spray sound effects.");
+        RegConsoleCmd("sm_spraymute", Command_SprayMute, "Mute spray sounds, or hide a player's sprays for seven days.");
+        RegConsoleCmd("sm_sprayunmute", Command_SprayUnmute, "Stop hiding a player's sprays.");
 
         g_hMuteSpraySoundsCookie = RegClientCookie("spraytrace_mute_sounds", "Mute spray sound effects", CookieAccess_Private);
+        g_hSprayMuteMap = CreateTrie();
+        ConnectSprayMuteDatabase();
         AddNormalSoundHook(HookSprayer);
-        AddTempEntHook("Player Decal", QueueSpraySound);
+        AddTempEntHook("Player Decal", FilterPlayerSpray);
 
         for(new client = 1; client <= MaxClients; client++) {
                 if(IsClientInGame(client) && AreClientCookiesCached(client))
@@ -373,6 +384,14 @@ public OnPluginStart() {
 	Also prechaches the model.
 */
 
+public OnPluginEnd() {
+        if(g_hSprayMuteDatabase != INVALID_HANDLE)
+                CloseHandle(g_hSprayMuteDatabase);
+
+        if(g_hSprayMuteMap != INVALID_HANDLE)
+                CloseHandle(g_hSprayMuteMap);
+}
+
 public OnMapStart() {
         PrecacheSound(SPRAY_SOUND, true);
 
@@ -431,7 +450,260 @@ public Action:ToggleSpraySounds(client, args) {
         return Plugin_Handled;
 }
 
+public Action:Command_SprayMute(client, args) {
+        if(args < 1)
+                return ToggleSpraySounds(client, args);
+
+        if(!IsValidClient(client))
+                return Plugin_Handled;
+
+        if(!g_bSprayMutesLoaded) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 Spray mute data is not ready yet.");
+                return Plugin_Handled;
+        }
+
+        new target = FindSprayMuteTarget(client);
+        if(target <= 0)
+                return Plugin_Handled;
+
+        if(target == client) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 You cannot hide your own spray.");
+                return Plugin_Handled;
+        }
+
+        new String:viewerSteamId64[32];
+        new String:sprayerSteamId64[32];
+        if(!GetSprayMuteSteamId64(client, viewerSteamId64, sizeof(viewerSteamId64))
+                || !GetSprayMuteSteamId64(target, sprayerSteamId64, sizeof(sprayerSteamId64))) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 Steam authentication is not ready yet.");
+                return Plugin_Handled;
+        }
+
+        new expiresAt = GetTime() + SPRAY_MUTE_DURATION;
+        new String:key[72];
+        BuildSprayMuteKey(viewerSteamId64, sprayerSteamId64, key, sizeof(key));
+        SetTrieValue(g_hSprayMuteMap, key, expiresAt);
+        PersistSprayMute(viewerSteamId64, sprayerSteamId64, expiresAt);
+
+        new Float:zero[3];
+        SendPlayerDecalToClient(target, client, 0, zero);
+        PrintToChat(client, "\x04[Spray Trace]\x01 You will not see \x04%N\x01's sprays for seven days.", target);
+        return Plugin_Handled;
+}
+
+public Action:Command_SprayUnmute(client, args) {
+        if(!IsValidClient(client))
+                return Plugin_Handled;
+
+        if(args < 1) {
+                ReplyToCommand(client, "[Spray Trace] Usage: sm_sprayunmute <name>");
+                return Plugin_Handled;
+        }
+
+        if(!g_bSprayMutesLoaded) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 Spray mute data is not ready yet.");
+                return Plugin_Handled;
+        }
+
+        new target = FindSprayMuteTarget(client);
+        if(target <= 0)
+                return Plugin_Handled;
+
+        new String:viewerSteamId64[32];
+        new String:sprayerSteamId64[32];
+        if(!GetSprayMuteSteamId64(client, viewerSteamId64, sizeof(viewerSteamId64))
+                || !GetSprayMuteSteamId64(target, sprayerSteamId64, sizeof(sprayerSteamId64))) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 Steam authentication is not ready yet.");
+                return Plugin_Handled;
+        }
+
+        new String:key[72];
+        new expiresAt;
+        BuildSprayMuteKey(viewerSteamId64, sprayerSteamId64, key, sizeof(key));
+        if(!GetTrieValue(g_hSprayMuteMap, key, expiresAt) || expiresAt <= GetTime()) {
+                RemoveFromTrie(g_hSprayMuteMap, key);
+                DeleteSprayMute(viewerSteamId64, sprayerSteamId64);
+                PrintToChat(client, "\x04[Spray Trace]\x01 %N's sprays are not muted.", target);
+                return Plugin_Handled;
+        }
+
+        RemoveFromTrie(g_hSprayMuteMap, key);
+        DeleteSprayMute(viewerSteamId64, sprayerSteamId64);
+
+        if(SprayPositionIsSet(target))
+                SendPlayerDecalToClient(target, client, g_arrSprayEntity[target], g_arrSprayTrace[target]);
+
+        PrintToChat(client, "\x04[Spray Trace]\x01 You can now see \x04%N\x01's sprays again.", target);
+        return Plugin_Handled;
+}
+
+stock FindSprayMuteTarget(client) {
+        new String:pattern[MAX_TARGET_LENGTH];
+        GetCmdArgString(pattern, sizeof(pattern));
+        StripQuotes(pattern);
+
+        new targets[1];
+        new String:targetName[MAX_TARGET_LENGTH];
+        new bool:targetNameIsMl;
+        new targetCount = ProcessTargetString(
+                pattern,
+                client,
+                targets,
+                sizeof(targets),
+                COMMAND_FILTER_NO_BOTS | COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY,
+                targetName,
+                sizeof(targetName),
+                targetNameIsMl);
+
+        if(targetCount != 1) {
+                ReplyToTargetError(client, targetCount);
+                return 0;
+        }
+
+        return targets[0];
+}
+
+stock bool:GetSprayMuteSteamId64(client, String:steamId64[], maxLength) {
+        return IsValidClient(client)
+                && GetClientAuthId(client, AuthId_SteamID64, steamId64, maxLength, true);
+}
+
+stock BuildSprayMuteKey(const String:viewerSteamId64[], const String:sprayerSteamId64[], String:key[], maxLength) {
+        Format(key, maxLength, "%s|%s", viewerSteamId64, sprayerSteamId64);
+}
+
+stock bool:IsSprayerMutedForViewer(viewer, sprayer) {
+        if(!g_bSprayMutesLoaded || !IsValidClient(viewer) || !IsValidClient(sprayer))
+                return false;
+
+        new String:viewerSteamId64[32];
+        new String:sprayerSteamId64[32];
+        if(!GetSprayMuteSteamId64(viewer, viewerSteamId64, sizeof(viewerSteamId64))
+                || !GetSprayMuteSteamId64(sprayer, sprayerSteamId64, sizeof(sprayerSteamId64)))
+                return false;
+
+        new String:key[72];
+        new expiresAt;
+        BuildSprayMuteKey(viewerSteamId64, sprayerSteamId64, key, sizeof(key));
+        if(!GetTrieValue(g_hSprayMuteMap, key, expiresAt))
+                return false;
+
+        if(expiresAt > GetTime())
+                return true;
+
+        RemoveFromTrie(g_hSprayMuteMap, key);
+        DeleteSprayMute(viewerSteamId64, sprayerSteamId64);
+        return false;
+}
+
+stock PersistSprayMute(const String:viewerSteamId64[], const String:sprayerSteamId64[], expiresAt) {
+        if(g_hSprayMuteDatabase == INVALID_HANDLE)
+                return;
+
+        new String:query[256];
+        Format(query, sizeof(query),
+                "REPLACE INTO %s (viewer_steamid64, sprayer_steamid64, expires_at) VALUES ('%s', '%s', %d)",
+                SPRAY_MUTE_TABLE, viewerSteamId64, sprayerSteamId64, expiresAt);
+        SQL_TQuery(g_hSprayMuteDatabase, SQL_SprayMuteNoop, query);
+}
+
+stock DeleteSprayMute(const String:viewerSteamId64[], const String:sprayerSteamId64[]) {
+        if(g_hSprayMuteDatabase == INVALID_HANDLE)
+                return;
+
+        new String:query[256];
+        Format(query, sizeof(query),
+                "DELETE FROM %s WHERE viewer_steamid64 = '%s' AND sprayer_steamid64 = '%s'",
+                SPRAY_MUTE_TABLE, viewerSteamId64, sprayerSteamId64);
+        SQL_TQuery(g_hSprayMuteDatabase, SQL_SprayMuteNoop, query);
+}
+
+stock bool:SprayPositionIsSet(client) {
+        return g_arrSprayTrace[client][0] != 0.0
+                || g_arrSprayTrace[client][1] != 0.0
+                || g_arrSprayTrace[client][2] != 0.0;
+}
+
+stock ConnectSprayMuteDatabase() {
+        g_bSprayMutesLoaded = false;
+
+        if(g_hSprayMuteDatabase != INVALID_HANDLE) {
+                CloseHandle(g_hSprayMuteDatabase);
+                g_hSprayMuteDatabase = INVALID_HANDLE;
+        }
+
+        SQL_TConnect(SQL_OnSprayMuteConnected, SPRAY_MUTE_DATABASE);
+}
+
+public SQL_OnSprayMuteConnected(Handle:owner, Handle:database, const String:error[], any:data) {
+        if(database == INVALID_HANDLE) {
+                LogError("[Spray Trace] Could not connect to the '%s' database: %s", SPRAY_MUTE_DATABASE, error);
+                CreateTimer(10.0, Timer_ReconnectSprayMuteDatabase);
+                return;
+        }
+
+        g_hSprayMuteDatabase = database;
+
+        new String:query[512];
+        Format(query, sizeof(query),
+                "CREATE TABLE IF NOT EXISTS %s (viewer_steamid64 VARCHAR(20) NOT NULL, sprayer_steamid64 VARCHAR(20) NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY (viewer_steamid64, sprayer_steamid64))",
+                SPRAY_MUTE_TABLE);
+        SQL_TQuery(g_hSprayMuteDatabase, SQL_OnSprayMuteTableCreated, query);
+}
+
+public Action:Timer_ReconnectSprayMuteDatabase(Handle:timer) {
+        ConnectSprayMuteDatabase();
+        return Plugin_Stop;
+}
+
+public SQL_OnSprayMuteTableCreated(Handle:owner, Handle:queryHandle, const String:error[], any:data) {
+        if(queryHandle == INVALID_HANDLE) {
+                LogError("[Spray Trace] Could not create %s: %s", SPRAY_MUTE_TABLE, error);
+                CreateTimer(10.0, Timer_ReconnectSprayMuteDatabase);
+                return;
+        }
+
+        new now = GetTime();
+        new String:query[256];
+        Format(query, sizeof(query), "DELETE FROM %s WHERE expires_at <= %d", SPRAY_MUTE_TABLE, now);
+        SQL_TQuery(g_hSprayMuteDatabase, SQL_SprayMuteNoop, query);
+
+        Format(query, sizeof(query), "SELECT viewer_steamid64, sprayer_steamid64, expires_at FROM %s WHERE expires_at > %d", SPRAY_MUTE_TABLE, now);
+        SQL_TQuery(g_hSprayMuteDatabase, SQL_OnSprayMutesLoaded, query);
+}
+
+public SQL_OnSprayMutesLoaded(Handle:owner, Handle:queryHandle, const String:error[], any:data) {
+        if(queryHandle == INVALID_HANDLE) {
+                LogError("[Spray Trace] Could not load spray mutes: %s", error);
+                return;
+        }
+
+        ClearTrie(g_hSprayMuteMap);
+
+        new String:viewerSteamId64[32];
+        new String:sprayerSteamId64[32];
+        new String:key[72];
+        new loadedCount;
+
+        while(SQL_FetchRow(queryHandle)) {
+                SQL_FetchString(queryHandle, 0, viewerSteamId64, sizeof(viewerSteamId64));
+                SQL_FetchString(queryHandle, 1, sprayerSteamId64, sizeof(sprayerSteamId64));
+                BuildSprayMuteKey(viewerSteamId64, sprayerSteamId64, key, sizeof(key));
+                SetTrieValue(g_hSprayMuteMap, key, SQL_FetchInt(queryHandle, 2));
+                loadedCount++;
+        }
+
+        g_bSprayMutesLoaded = true;
+        LogMessage("[Spray Trace] Loaded %d active spray mutes.", loadedCount);
+}
+
+public SQL_SprayMuteNoop(Handle:owner, Handle:queryHandle, const String:error[], any:data) {
+        if(queryHandle == INVALID_HANDLE)
+                LogError("[Spray Trace] Spray mute database query failed: %s", error);
+}
+
 public ClearVariables(client) {
+        g_arrSprayEntity[client] = 0;
 	g_arrSprayTrace[client][0] = 0.0;
 	g_arrSprayTrace[client][1] = 0.0;
 	g_arrSprayTrace[client][2] = 0.0;
@@ -446,6 +718,9 @@ Records the location, name, ID, and time of all sprays
 */
 
 public Action:PlayerSpray(const String:szTempEntName[], const arrClients[], iClientCount, Float:flDelay) {
+        if(g_bResendingSprayDecal)
+                return Plugin_Continue;
+
 	new client = TE_ReadNum("m_nPlayer");
 
 	if(IsValidClient(client)) {
@@ -461,13 +736,25 @@ public Action:PlayerSpray(const String:szTempEntName[], const arrClients[], iCli
 sm_spray_refresh handlers for tracing to HUD or hint message
 */
 
-public Action:QueueSpraySound(const String:tempEntName[], const clients[], clientCount, Float:delay) {
+public Action:FilterPlayerSpray(const String:tempEntName[], const clients[], clientCount, Float:delay) {
+        if(g_bResendingSprayDecal)
+                return Plugin_Continue;
+
         new client = TE_ReadNum("m_nPlayer");
         if(!IsValidClient(client))
                 return Plugin_Continue;
 
         new Float:position[3];
         TE_ReadVector("m_vecOrigin", position);
+        new entity = TE_ReadNum("m_nEntity");
+
+        g_arrSprayTrace[client][0] = position[0];
+        g_arrSprayTrace[client][1] = position[1];
+        g_arrSprayTrace[client][2] = position[2];
+        g_arrSprayEntity[client] = entity;
+        g_arrSprayTime[client] = RoundFloat(GetGameTime());
+        GetClientName(client, g_arrSprayName[client], sizeof(g_arrSprayName[]));
+        GetClientAuthId(client, AuthId_Steam2, g_arrSprayID[client], sizeof(g_arrSprayID[]), true);
 
         new Handle:data = CreateDataPack();
         WritePackFloat(data, position[0]);
@@ -475,7 +762,30 @@ public Action:QueueSpraySound(const String:tempEntName[], const clients[], clien
         WritePackFloat(data, position[2]);
         RequestFrame(FrameAfterSpray, data);
 
-        return Plugin_Continue;
+        new allowedClients[MAXPLAYERS];
+        new allowedCount;
+        new bool:filtered;
+
+        for(new i = 0; i < clientCount; i++) {
+                new viewer = clients[i];
+                if(!IsValidClient(viewer))
+                        continue;
+
+                if(IsSprayerMutedForViewer(viewer, client)) {
+                        filtered = true;
+                        continue;
+                }
+
+                allowedClients[allowedCount++] = viewer;
+        }
+
+        if(!filtered)
+                return Plugin_Continue;
+
+        for(new i = 0; i < allowedCount; i++)
+                SendPlayerDecalToClient(client, allowedClients[i], entity, position, delay);
+
+        return Plugin_Handled;
 }
 
 public FrameAfterSpray(any:data) {
@@ -1113,6 +1423,22 @@ public GlowEffect(client, Float:vecPos[3], Float:flLife, Float:flSize, bright, m
 	arrClients[0] = client;
 	TE_SetupGlowSprite(vecPos, model, flLife, flSize, bright);
 	TE_Send(arrClients,1);
+}
+
+stock SendPlayerDecalToClient(client, viewer, entIndex, const Float:vecPos[3], Float:delay = 0.0) {
+        if(!IsValidClient(client) || !IsValidClient(viewer))
+                return;
+
+        new bool:wasResending = g_bResendingSprayDecal;
+        g_bResendingSprayDecal = true;
+
+        TE_Start("Player Decal");
+        TE_WriteVector("m_vecOrigin", vecPos);
+        TE_WriteNum("m_nEntity", entIndex);
+        TE_WriteNum("m_nPlayer", client);
+        TE_SendToClient(viewer, delay);
+
+        g_bResendingSprayDecal = wasResending;
 }
 
 public SprayDecal(client, entIndex, Float:vecPos[3]) {
