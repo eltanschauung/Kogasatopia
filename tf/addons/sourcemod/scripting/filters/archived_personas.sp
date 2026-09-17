@@ -286,7 +286,7 @@ bool Filters_TryReplaceConnectedParseeMessage(
     int client, const char[] message, const char[] senderMessage = "")
 {
     if (!Filters_IsConnectedParseeClient(client)
-        || !g_hParseeEnabled.BoolValue
+        || (!g_hParseeEnabled.BoolValue && !g_hParseeMode.BoolValue)
         || GetConVarInt(g_sEnabled) == 0
         || !Filters_DbAvailable()
         || g_iArchivedMessageCounts[ArchivedSpeaker_Parsee] <= 0
