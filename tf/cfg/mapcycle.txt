@@ -3,11 +3,11 @@ koth_harvest_final
 koth_bagel_rc13
 koth_soot_final1
 koth_lumberyard_pro
+koth_cascade
 koth_kemptown_rc4
 workshop/koth_rocktop_rc2.ugc454207393
 koth_slaughterhouse_72_rc1
 workshop/koth_brine_rc3a.ugc2965195337
-2koth_abbey
 
 //3CP
 cp_powerhouse_no_timer
@@ -31,6 +31,8 @@ plr_bananabay
 
 //AD
 cp_steel_trad
+cp_mercenarypark
+cp_mossrock
 
 //CTF
 ctf_turbine_festive
