@@ -1,3 +1,22 @@
+	bool RejectDisabledAllInteractionTarget(int client, const char[] targetArg)
+	{
+		if (!StrEqual(targetArg, "@all", false))
+		{
+			return false;
+		}
+
+		if (client > 0 && client <= MaxClients && IsClientInGame(client))
+		{
+			CPrintToChat(client, "{gold}[Hugs]{default} Raping and feeding all clients has been disabled.");
+		}
+		else
+		{
+			ReplyToCommand(client, "[Hugs] Raping and feeding all clients has been disabled.");
+		}
+
+		return true;
+	}
+
 	public Action Command_Hug(int client, int args)
 	{
 		if (args < 1)
@@ -107,6 +126,13 @@
 			return Plugin_Handled;
 		}
 
+		char arg1[32];
+		GetCmdArg(1, arg1, sizeof(arg1));
+		if (RejectDisabledAllInteractionTarget(client, arg1))
+		{
+			return Plugin_Handled;
+		}
+
 		if (IsSpecialClient(client))
 		{
 			return Plugin_Handled;
@@ -124,9 +150,6 @@
 			ReplyToCommand(client, "[SM] You must wait %.1f seconds before feeding again.", remaining);
 			return Plugin_Handled;
 		}
-
-		char arg1[32];
-		GetCmdArg(1, arg1, sizeof(arg1));
 
 		char target_name[MAX_TARGET_LENGTH];
 		int target_list[MAXPLAYERS], target_count;
@@ -208,6 +231,13 @@
 			return Plugin_Handled;
 		}
 
+		char arg1[32];
+		GetCmdArg(1, arg1, sizeof(arg1));
+		if (RejectDisabledAllInteractionTarget(client, arg1))
+		{
+			return Plugin_Handled;
+		}
+
 		if (IsSpecialClient(client))
 		{
 			return Plugin_Handled;
@@ -225,9 +255,6 @@
 			ReplyToCommand(client, "[SM] You must wait %.1f seconds before raping again.", remaining);
 			return Plugin_Handled;
 		}
-
-		char arg1[32];
-		GetCmdArg(1, arg1, sizeof(arg1));
 
 		char target_name[MAX_TARGET_LENGTH];
 		int target_list[MAXPLAYERS], target_count;
