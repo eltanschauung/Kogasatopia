@@ -4,25 +4,25 @@ int g_MailReminderGeneration[MAXPLAYERS + 1];
 
 public void OnPluginStart()
 {
-    RegConsoleCmd("sm_mail", Command_Mail, "Open mail or send mail to a ranked player.");
-    RegConsoleCmd("sm_dm", Command_Mail, "Open mail or send mail to a ranked player.");
+    RegConsoleCmd("sm_mail", Command_Mail, "Open mail or send mail to a player.");
+    RegConsoleCmd("sm_dm", Command_Mail, "Open mail or send mail to a player.");
     RegConsoleCmd("sm_inbox", Command_Inbox, "Open your mail inbox.");
     RegConsoleCmd("sm_unread", Command_Unread, "Open unread mail.");
     RegConsoleCmd("sm_readall", Command_ReadAll, "Mark all received mail as read.");
     RegConsoleCmd("sm_redeem", Command_RedeemAll, "Redeem every unclaimed Gem attachment in your inbox.");
     RegConsoleCmd("sm_redeemall", Command_RedeemAll, "Redeem every unclaimed Gem attachment in your inbox.");
-    RegConsoleCmd("sm_gift", Command_Gift, "Mail Gems to a ranked player.");
-    RegConsoleCmd("sm_mailhug", Command_MailHug, "Mail a one-use hug to a ranked player.");
-    RegConsoleCmd("sm_hugmail", Command_MailHug, "Mail a one-use hug to a ranked player.");
-    RegConsoleCmd("sm_gifthug", Command_MailHug, "Mail a one-use hug to a ranked player.");
-    RegConsoleCmd("sm_mailfeed", Command_MailFeed, "Mail a one-use feed to a ranked player.");
-    RegConsoleCmd("sm_feedmail", Command_MailFeed, "Mail a one-use feed to a ranked player.");
-    RegConsoleCmd("sm_mailrape", Command_MailRape, "Mail a one-use rape to a ranked player.");
-    RegConsoleCmd("sm_rapemail", Command_MailRape, "Mail a one-use rape to a ranked player.");
-    RegConsoleCmd("sm_giftrape", Command_MailRape, "Mail a one-use rape to a ranked player.");
-    RegConsoleCmd("sm_mailrtd", Command_MailRtd, "Mail a prepaid RTD roll to a ranked player.");
-    RegConsoleCmd("sm_sendrtd", Command_MailRtd, "Mail a prepaid RTD roll to a ranked player.");
-    RegConsoleCmd("sm_giftrtd", Command_MailRtd, "Mail a prepaid RTD roll to a ranked player.");
+    RegConsoleCmd("sm_gift", Command_Gift, "Mail Gems to a player.");
+    RegConsoleCmd("sm_mailhug", Command_MailHug, "Mail a one-use hug to a player.");
+    RegConsoleCmd("sm_hugmail", Command_MailHug, "Mail a one-use hug to a player.");
+    RegConsoleCmd("sm_gifthug", Command_MailHug, "Mail a one-use hug to a player.");
+    RegConsoleCmd("sm_mailfeed", Command_MailFeed, "Mail a one-use feed to a player.");
+    RegConsoleCmd("sm_feedmail", Command_MailFeed, "Mail a one-use feed to a player.");
+    RegConsoleCmd("sm_mailrape", Command_MailRape, "Mail a one-use rape to a player.");
+    RegConsoleCmd("sm_rapemail", Command_MailRape, "Mail a one-use rape to a player.");
+    RegConsoleCmd("sm_giftrape", Command_MailRape, "Mail a one-use rape to a player.");
+    RegConsoleCmd("sm_mailrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
+    RegConsoleCmd("sm_sendrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
+    RegConsoleCmd("sm_giftrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
     HookEvent("player_team", Event_MailPlayerTeam, EventHookMode_Post);
     g_MailUnreadReminderCookie = new Cookie("server_mail_unread_reminder_day",
         "Last date the unread-mail reminder was displayed.", CookieAccess_Private);

@@ -12,6 +12,18 @@ bool g_MailStimulusDeploymentPending[MAXPLAYERS + 1];
 bool g_MailStimulusCheckPending[MAXPLAYERS + 1];
 bool g_MailStimulusChecked[MAXPLAYERS + 1];
 
+int GetRankMinimumKillsDeaths()
+{
+    ConVar convar = FindConVar("sm_whaletracker_rank_min_kd_sum");
+    return convar != null ? convar.IntValue : 200;
+}
+
+int GetRankMinimumPlaytime()
+{
+    ConVar convar = FindConVar("sm_whaletracker_rank_min_playtime_seconds");
+    return convar != null ? convar.IntValue : 10800;
+}
+
 void Stimulus_OnPluginStart()
 {
     g_MailStimulusExpiryDays = CreateConVar(

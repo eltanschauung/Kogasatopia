@@ -10,7 +10,6 @@
 #include <points_store_api>
 #include <rtd_api>
 #include <saysounds>
-#include <whaletracker_api>
 #define REQUIRE_PLUGIN
 #include "include/steam_identity.inc"
 
@@ -108,7 +107,6 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     MarkNativeAsOptional("PointsStore_RefundBonusPointsSteamId");
     MarkNativeAsOptional("SaySounds_PlayCommand");
     MarkNativeAsOptional("RTD_ApplyGiftedRoll");
-    MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeHours");
     g_MailSendResultForward = new GlobalForward("ServerMail_OnMailSendResult",
         ET_Ignore, Param_String, Param_Cell, Param_Cell, Param_Cell);
     return APLRes_Success;

@@ -81,18 +81,6 @@ void BeginMailCommand(int client)
     RequestMailPlayerSearch(client);
 }
 
-int GetRankMinimumKillsDeaths()
-{
-    ConVar convar = FindConVar("sm_whaletracker_rank_min_kd_sum");
-    return convar != null ? convar.IntValue : 200;
-}
-
-int GetRankMinimumPlaytime()
-{
-    ConVar convar = FindConVar("sm_whaletracker_rank_min_playtime_seconds");
-    return convar != null ? convar.IntValue : 10800;
-}
-
 void RequestMailPlayerSearch(int client)
 {
     char escapedSearch[(MAIL_NAME_MAX * 2) + 1];
@@ -114,16 +102,12 @@ void RequestMailPlayerSearch(int client)
         ... "FROM whaletracker w "
         ... "LEFT JOIN filters_steam_names fs ON fs.steamid64 = w.steamid "
         ... "LEFT JOIN prename_rules pr ON pr.pattern COLLATE utf8mb4_uca1400_ai_ci = w.steamid "
-        ... "WHERE (GREATEST(COALESCE(w.kills, 0), 0) + GREATEST(COALESCE(w.deaths, 0), 0)) >= %d "
-        ... "AND GREATEST(COALESCE(w.playtime, 0), 0) >= %d "
-        ... "AND (COALESCE(pr.newname, '') LIKE '%%%s%%' "
+        ... "WHERE (COALESCE(pr.newname, '') LIKE '%%%s%%' "
         ... "OR COALESCE(fs.last_name, '') LIKE '%%%s%%' "
         ... "OR COALESCE(w.cached_personaname, '') LIKE '%%%s%%') "
         ... "ORDER BY GREATEST(COALESCE(w.playtime, 0), 0) DESC, "
         ... "LOWER(COALESCE(NULLIF(pr.newname COLLATE utf8mb4_uca1400_ai_ci, ''), NULLIF(fs.last_name, ''), NULLIF(w.cached_personaname, ''), w.steamid)) ASC "
         ... "LIMIT %d",
-        GetRankMinimumKillsDeaths(),
-        GetRankMinimumPlaytime(),
         escapedSearch,
         escapedSearch,
         escapedSearch,
@@ -164,7 +148,7 @@ public void SQL_OnMailPlayerSearch(Database db, DBResultSet rows, const char[] e
 
     if (error[0] != '\0')
     {
-        LogError("[server_mail] Ranked-player search failed: %s", error);
+        LogError("[server_mail] Player search failed: %s", error);
         CPrintToChat(client, "%s Player search failed.", MAIL_PREFIX);
         return;
     }
@@ -196,22 +180,16 @@ public void SQL_OnMailPlayerSearch(Database db, DBResultSet rows, const char[] e
         }
 
         int index = FindSearchResult(results, steamId);
-        int rankedHours = 0;
-        if (GetFeatureStatus(FeatureType_Native, "WhaleTracker_GetRankedPlaytimeHours") == FeatureStatus_Available)
-        {
-            rankedHours = WhaleTracker_GetRankedPlaytimeHours(target);
-        }
-
         if (index == -1)
         {
-            if (rankedHours <= 0 || StrContains(currentName, g_MailPendingSearch[client], false) == -1)
+            if (StrContains(currentName, g_MailPendingSearch[client], false) == -1)
             {
                 continue;
             }
 
             strcopy(entry.steamId, sizeof(entry.steamId), steamId);
             strcopy(entry.name, sizeof(entry.name), currentName);
-            entry.playtime = rankedHours * 3600;
+            entry.playtime = 0;
             entry.connected = true;
             results.PushArray(entry, sizeof(entry));
             continue;
@@ -219,10 +197,6 @@ public void SQL_OnMailPlayerSearch(Database db, DBResultSet rows, const char[] e
 
         results.GetArray(index, entry, sizeof(entry));
         strcopy(entry.name, sizeof(entry.name), currentName);
-        if (rankedHours > 0)
-        {
-            entry.playtime = rankedHours * 3600;
-        }
         entry.connected = true;
         results.SetArray(index, entry, sizeof(entry));
     }
@@ -256,7 +230,7 @@ void ShowMailSearchResults(int client)
     ArrayList results = g_MailSearchResults[client];
     if (results == null || results.Length == 0)
     {
-        CPrintToChat(client, "%s No ranked player matched '{gold}%s{default}'.", MAIL_PREFIX, g_MailPendingSearch[client]);
+        CPrintToChat(client, "%s No player matched '{gold}%s{default}'.", MAIL_PREFIX, g_MailPendingSearch[client]);
         return;
     }
 
