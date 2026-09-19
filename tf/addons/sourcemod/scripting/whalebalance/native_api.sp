@@ -83,6 +83,11 @@ public any Native_TeamBalanceIsScrambleCandidate(Handle plugin, int numParams)
     return TeamBalance_IsScrambleCandidateInternal(client, expectedTeam, ignoreImmunity, allowBots);
 }
 
+public any Native_TeamBalanceIsVolunteer(Handle plugin, int numParams)
+{
+    return IsClientVolunteer(GetNativeCell(1));
+}
+
 public any Native_TeamBalanceHasScramblePurchaseImmunity(Handle plugin, int numParams)
 {
     return TeamBalance_HasScramblePurchaseImmunityInternal(GetNativeCell(1));

@@ -273,6 +273,20 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
         return;
     }
 
+    if (GetFeatureStatus(FeatureType_Native, "TeamBalance_IsVolunteer") == FeatureStatus_Available
+        && TeamBalance_IsVolunteer(client))
+    {
+        ApplyBonusPoints(
+            client,
+            BP_VOLUNTEER_WELFARE_BONUS,
+            true,
+            true,
+            1.0,
+            BP_VOLUNTEER_WELFARE_BONUS_TYPE,
+            0,
+            BP_VOLUNTEER_WELFARE_BONUS_DELAY);
+    }
+
     PlayWelfareSound();
     LogEconomyEvent("welfare_pool_debit", client, amount, "welfare", 0, g_WelfarePoolBalance, g_CumulativeSpentBalance);
 

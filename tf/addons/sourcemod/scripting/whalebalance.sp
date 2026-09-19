@@ -118,6 +118,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     CreateNative("TeamBalance_CancelScramble", Native_TeamBalanceCancelScramble);
     CreateNative("TeamBalance_FinishScramble", Native_TeamBalanceFinishScramble);
     CreateNative("TeamBalance_IsScrambleCandidate", Native_TeamBalanceIsScrambleCandidate);
+    CreateNative("TeamBalance_IsVolunteer", Native_TeamBalanceIsVolunteer);
     CreateNative("TeamBalance_HasScramblePurchaseImmunity", Native_TeamBalanceHasScramblePurchaseImmunity);
     CreateNative("TeamBalance_ConsumeScramblePurchaseImmunity", Native_TeamBalanceConsumeScramblePurchaseImmunity);
     CreateNative("TeamBalance_MoveScramblePair", Native_TeamBalanceMoveScramblePair);

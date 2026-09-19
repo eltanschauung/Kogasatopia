@@ -29,6 +29,9 @@ native void TeamBalance_FinishScramble(bool movedPlayers, bool countForImmunity 
 /** Applies the controller's common validity, duel, and scramble-immunity policy. */
 native bool TeamBalance_IsScrambleCandidate(int client, int expectedTeam, bool ignoreImmunity, bool allowBots);
 
+/** Returns whether the client is currently registered as an autobalance volunteer. */
+native bool TeamBalance_IsVolunteer(int client);
+
 /** Checks/consumes the store-backed scramble immunity through the controller. */
 native bool TeamBalance_HasScramblePurchaseImmunity(int client);
 native int TeamBalance_ConsumeScramblePurchaseImmunity(int client);
@@ -43,5 +46,9 @@ public SharedPlugin __pl_team_balance =
 {
     name = "whalebalance",
     file = "whalebalance.smx",
+#if defined REQUIRE_PLUGIN
     required = 1,
+#else
+    required = 0,
+#endif
 };

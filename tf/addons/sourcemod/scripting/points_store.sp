@@ -10,6 +10,7 @@
 #include <dgm_api>
 #include <filters_api>
 #include <saysounds>
+#include <team_balance_api>
 #include <weapons>
 #include <whaletracker_api>
 #define REQUIRE_PLUGIN
@@ -49,6 +50,9 @@
 #define BP_WELFARE_SOUND_COMMAND "monkey"
 #define BP_WELFARE_MIN 4
 #define BP_WELFARE_MAX 16
+#define BP_VOLUNTEER_WELFARE_BONUS 5
+#define BP_VOLUNTEER_WELFARE_BONUS_DELAY 2.0
+#define BP_VOLUNTEER_WELFARE_BONUS_TYPE "Volunteer welfare bonus"
 #define BP_PURCHASE_PERMANENT 0
 #define BP_PURCHASE_UNLIMITED_USES -1
 #define BP_LEADERBOARD_PAGE_SIZE 10
@@ -136,6 +140,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeHours");
     MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeSeconds");
+    MarkNativeAsOptional("TeamBalance_IsVolunteer");
     RegPluginLibrary("points_store");
     CreateNative("PointsStore_AreBonusPointsLoaded", Native_PointsStore_AreBonusPointsLoaded);
     CreateNative("PointsStore_GetBonusPoints", Native_PointsStore_GetBonusPoints);
