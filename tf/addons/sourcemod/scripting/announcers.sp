@@ -847,6 +847,52 @@ bool Announcer_PlaySound(int target, int sourceClient, const char[] commandName)
         return false;
     }
 
+    if (target == 0 && ShouldResolveAnnouncerSoundPerListener(commandName))
+    {
+        bool played = false;
+        char listenerCommand[ANNOUNCER_MAX_COMMAND_NAME];
+
+        for (int client = 1; client <= MaxClients; client++)
+        {
+            if (!IsHumanAnnouncerClient(client))
+            {
+                continue;
+            }
+
+            ResolveAnnouncerSoundForListener(
+                commandName,
+                client,
+                listenerCommand,
+                sizeof(listenerCommand)
+            );
+
+            if (Announcer_PlaySoundCommand(client, sourceClient, listenerCommand))
+            {
+                played = true;
+            }
+        }
+
+        return played;
+    }
+
+    char listenerCommand[ANNOUNCER_MAX_COMMAND_NAME];
+    ResolveAnnouncerSoundForListener(
+        commandName,
+        target,
+        listenerCommand,
+        sizeof(listenerCommand)
+    );
+
+    return Announcer_PlaySoundCommand(target, sourceClient, listenerCommand);
+}
+
+static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[] commandName)
+{
+    if (!commandName[0])
+    {
+        return false;
+    }
+
     if (IsValidAnnouncerClient(sourceClient)
         && GetFeatureStatus(FeatureType_Native, ANNOUNCER_SOUND_PLAY_AS_NATIVE) == FeatureStatus_Available)
     {
@@ -1323,6 +1369,139 @@ bool SelectAnnouncerSoundCommand(ArrayList commands, int sourceClient, char[] co
     delete paidCommands;
     delete freeCommands;
     return found && commandName[0] != '\0';
+}
+
+static bool ShouldResolveAnnouncerSoundPerListener(const char[] commandName)
+{
+    return CanInspectSaySoundGroups()
+        && !SaySounds_IsCommandPaid(commandName);
+}
+
+static void ResolveAnnouncerSoundForListener(
+    const char[] sourceCommand,
+    int listener,
+    char[] resolvedCommand,
+    int resolvedLen)
+{
+    strcopy(resolvedCommand, resolvedLen, sourceCommand);
+
+    if (!IsHumanAnnouncerClient(listener)
+        || !ShouldResolveAnnouncerSoundPerListener(sourceCommand))
+    {
+        return;
+    }
+
+    ArrayList commands = FindAnnouncerSoundCommandList(sourceCommand);
+    if (commands == null)
+    {
+        return;
+    }
+
+    char replacement[ANNOUNCER_MAX_COMMAND_NAME];
+    if (SelectPaidAnnouncerSoundForListener(commands, listener, replacement, sizeof(replacement)))
+    {
+        strcopy(resolvedCommand, resolvedLen, replacement);
+    }
+}
+
+static ArrayList FindAnnouncerSoundCommandList(const char[] commandName)
+{
+    ArrayList commands = FindAnnouncerSoundCommandListInMap(g_KillstreakSoundMap, commandName);
+    if (commands != null)
+    {
+        return commands;
+    }
+
+    commands = FindAnnouncerSoundCommandListInMap(g_MultikillSoundMap, commandName);
+    if (commands != null)
+    {
+        return commands;
+    }
+
+    commands = FindAnnouncerSoundCommandListInMap(g_ShutdownSoundMap, commandName);
+    if (commands != null)
+    {
+        return commands;
+    }
+
+    return FindAnnouncerSoundCommandListInMap(g_MedicDropSoundMap, commandName);
+}
+
+static ArrayList FindAnnouncerSoundCommandListInMap(StringMap map, const char[] commandName)
+{
+    if (map == null)
+    {
+        return null;
+    }
+
+    StringMapSnapshot snapshot = map.Snapshot();
+    char key[16];
+    char candidate[ANNOUNCER_MAX_COMMAND_NAME];
+    any listValue;
+
+    for (int i = 0; i < snapshot.Length; i++)
+    {
+        snapshot.GetKey(i, key, sizeof(key));
+        if (!map.GetValue(key, listValue))
+        {
+            continue;
+        }
+
+        ArrayList commands = view_as<ArrayList>(listValue);
+        for (int j = 0; j < commands.Length; j++)
+        {
+            commands.GetString(j, candidate, sizeof(candidate));
+            if (StrEqual(candidate, commandName, false))
+            {
+                delete snapshot;
+                return commands;
+            }
+        }
+    }
+
+    delete snapshot;
+    return null;
+}
+
+static bool SelectPaidAnnouncerSoundForListener(
+    ArrayList commands,
+    int listener,
+    char[] commandName,
+    int commandLen)
+{
+    commandName[0] = '\0';
+    if (!CanUsePurchaseAwareSoundSelection(listener))
+    {
+        return false;
+    }
+
+    ArrayList paidCommands = new ArrayList(ByteCountToCells(ANNOUNCER_MAX_COMMAND_NAME));
+    char candidate[ANNOUNCER_MAX_COMMAND_NAME];
+
+    for (int i = 0; i < commands.Length; i++)
+    {
+        commands.GetString(i, candidate, sizeof(candidate));
+        if (!SaySounds_IsCommandPaid(candidate)
+            || !SaySounds_CanClientUseCommand(listener, candidate)
+            || IsAnnouncerSoundCommandDisabled(listener, candidate))
+        {
+            continue;
+        }
+
+        paidCommands.PushString(candidate);
+    }
+
+    if (paidCommands.Length > 0)
+    {
+        paidCommands.GetString(
+            GetRandomInt(0, paidCommands.Length - 1),
+            commandName,
+            commandLen
+        );
+    }
+
+    delete paidCommands;
+    return commandName[0] != '\0';
 }
 
 bool CanUsePurchaseAwareSoundSelection(int sourceClient)
