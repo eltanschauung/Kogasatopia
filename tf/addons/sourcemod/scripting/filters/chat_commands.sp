@@ -167,7 +167,7 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
         return Plugin_Stop;
     }
 
-    if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput))
+    if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput, sArgs))
     {
         return Plugin_Stop;
     }
@@ -936,7 +936,7 @@ bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs,
         return true;
     }
 
-    if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput))
+    if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput, sArgs))
     {
         return true;
     }

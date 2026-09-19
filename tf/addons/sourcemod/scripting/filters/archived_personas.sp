@@ -1,4 +1,5 @@
 #define PARSEE_AUTOMATIC_MESSAGE_MAX_LENGTH 64
+#define PARSEE_LIVE_FORCE_REPLACEMENT_LENGTH 48
 
 static void Filters_GetArchivedSpeakerDetails(
     ArchivedSpeaker speaker,
@@ -284,15 +285,29 @@ static bool Filters_IsConnectedParseeClient(int client)
         && StrEqual(steamId64, PARSEE_STEAMID64);
 }
 
-bool Filters_TryReplaceConnectedParseeMessage(
-    int client, const char[] message, const char[] senderMessage = "")
+static int Filters_GetUtf8CharacterCount(const char[] message)
 {
+    int characters = 0;
+    for (int offset = 0; message[offset] != '\0'; characters++)
+    {
+        int bytes = GetCharBytes(message[offset]);
+        offset += bytes > 0 ? bytes : 1;
+    }
+    return characters;
+}
+
+bool Filters_TryReplaceConnectedParseeMessage(
+    int client, const char[] message, const char[] senderMessage = "",
+    const char[] rawMessage = "")
+{
+    bool forceReplacement = Filters_GetUtf8CharacterCount(rawMessage)
+        > PARSEE_LIVE_FORCE_REPLACEMENT_LENGTH;
     if (!Filters_IsConnectedParseeClient(client)
-        || (!g_hParseeEnabled.BoolValue && !g_hParseeMode.BoolValue)
+        || (!forceReplacement && !g_hParseeEnabled.BoolValue && !g_hParseeMode.BoolValue)
         || GetConVarInt(g_sEnabled) == 0
         || !Filters_DbAvailable()
         || g_iArchivedMessageCounts[ArchivedSpeaker_Parsee] <= 0
-        || (!g_hParseeMode.BoolValue
+        || (!forceReplacement && !g_hParseeMode.BoolValue
             && GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT))
     {
         return false;
