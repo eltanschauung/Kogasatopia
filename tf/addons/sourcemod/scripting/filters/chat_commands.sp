@@ -157,12 +157,14 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
 
     ApplyFiltersIfNeeded(output, sizeof(output), context);
 
-    if (HandleCordModeBlacklistedChat(client, output, context, senderOutput))
+    // Gags must take precedence over every delivery mode so the message is
+    // suppressed in-game while still being queued for the polling outbox.
+    if (HandleRestrictedMessage(client, output, context, senderOutput))
     {
         return Plugin_Stop;
     }
 
-    if (HandleRestrictedMessage(client, output, context, senderOutput))
+    if (HandleCordModeBlacklistedChat(client, output, context, senderOutput))
     {
         return Plugin_Stop;
     }
