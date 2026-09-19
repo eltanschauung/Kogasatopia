@@ -21,6 +21,16 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
 
     delete pack;
 
+    if (TeamBalance_IsRoundEndingSoon())
+    {
+        TeamBalance_CancelScramble();
+        LogWhale("Scramble cancelled: active round timer has less than %d seconds remaining.",
+            TEAM_BALANCE_MIN_ROUND_TIME);
+        LogWhaleStat("scramble_result", "mode=%s|result=aborted|reason=round_time_low",
+            scrambleMode);
+        return Plugin_Stop;
+    }
+
     bool suppressRespawn = g_bSuppressSwapRespawn;
     bool setupScramble = IsSetupActive();
     if (GetFeatureStatus(FeatureType_Native, "FilterAlerts_SuppressTeamAlertWindow") == FeatureStatus_Available)

@@ -143,6 +143,11 @@ public any Native_DGM_GetRecentControlPointCaptureIntervalSeconds(Handle plugin,
     return DGM_GetRecentCaptureIntervalSeconds();
 }
 
+public any Native_DGM_GetRoundTimeRemaining(Handle plugin, int numParams)
+{
+    return view_as<any>(DGM_GetHudRoundTimerRemaining());
+}
+
 public any Native_DGM_SetTime(Handle plugin, int numParams)
 {
     return DGM_ChangeRoundTimerTime(GetNativeCell(1), false);
@@ -181,6 +186,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     CreateNative("DGM_GetLastRoundDurationSeconds", Native_DGM_GetLastRoundDurationSeconds);
     CreateNative("DGM_GetRoundDurationSeconds", Native_DGM_GetRoundDurationSeconds);
     CreateNative("DGM_GetRecentControlPointCaptureIntervalSeconds", Native_DGM_GetRecentControlPointCaptureIntervalSeconds);
+    CreateNative("DGM_GetRoundTimeRemaining", Native_DGM_GetRoundTimeRemaining);
     CreateNative("DGM_GetObjectiveLeader", Native_DGM_GetObjectiveLeader);
     CreateNative("DGM_GetObjectiveLeaderTeam", Native_DGM_GetObjectiveLeaderTeam);
     CreateNative("DGM_SetTime", Native_DGM_SetTime);

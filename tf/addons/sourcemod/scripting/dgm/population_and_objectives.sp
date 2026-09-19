@@ -268,16 +268,22 @@ int DGM_GetEntityTeam(int entity)
 
 int DGM_GetRoundTimerRemaining(int timer)
 {
+    float secondsRemaining = DGM_GetRoundTimerRemainingFloat(timer);
+    return secondsRemaining < 0.0 ? -1 : RoundToNearest(secondsRemaining);
+}
+
+float DGM_GetRoundTimerRemainingFloat(int timer)
+{
     if (!IsValidEntity(timer))
     {
-        return -1;
+        return -1.0;
     }
 
     char classname[64];
     GetEntityClassname(timer, classname, sizeof(classname));
     if (!StrEqual(classname, "team_round_timer", false))
     {
-        return -1;
+        return -1.0;
     }
 
     float secondsRemaining;
@@ -286,7 +292,7 @@ int DGM_GetRoundTimerRemaining(int timer)
     {
         if (!HasEntProp(timer, Prop_Send, "m_flTotalTime"))
         {
-            return -1;
+            return -1.0;
         }
 
         secondsRemaining = GetEntPropFloat(timer, Prop_Send, "m_flTotalTime");
@@ -295,7 +301,7 @@ int DGM_GetRoundTimerRemaining(int timer)
     {
         if (!HasEntProp(timer, Prop_Send, "m_flTimeRemaining"))
         {
-            return -1;
+            return -1.0;
         }
 
         secondsRemaining = GetEntPropFloat(timer, Prop_Send, "m_flTimeRemaining");
@@ -304,7 +310,7 @@ int DGM_GetRoundTimerRemaining(int timer)
     {
         if (!HasEntProp(timer, Prop_Send, "m_flTimerEndTime"))
         {
-            return -1;
+            return -1.0;
         }
 
         secondsRemaining = GetEntPropFloat(timer, Prop_Send, "m_flTimerEndTime") - GetGameTime();
@@ -315,7 +321,20 @@ int DGM_GetRoundTimerRemaining(int timer)
         secondsRemaining = 0.0;
     }
 
-    return RoundToNearest(secondsRemaining);
+    return secondsRemaining;
+}
+
+float DGM_GetHudRoundTimerRemaining()
+{
+    int objectiveResource = FindEntityByClassname(-1, "tf_objective_resource");
+    if (objectiveResource == -1
+        || !HasEntProp(objectiveResource, Prop_Send, "m_iTimerToShowInHUD"))
+    {
+        return -1.0;
+    }
+
+    return DGM_GetRoundTimerRemainingFloat(
+        GetEntProp(objectiveResource, Prop_Send, "m_iTimerToShowInHUD"));
 }
 
 bool DGM_GetEntityBool(int entity, const char[] prop)

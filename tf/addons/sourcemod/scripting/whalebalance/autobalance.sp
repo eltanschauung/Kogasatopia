@@ -11,6 +11,11 @@ public Action Timer_StartAutobalance(Handle timer)
 
 public Action Timer_Autobalance(Handle timer)
 {
+    if (TeamBalance_IsRoundEndingSoon())
+    {
+        return Plugin_Continue;
+    }
+
     if (ShouldSuppressAutobalanceForGamemode())
     {
         return Plugin_Continue;

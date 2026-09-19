@@ -49,6 +49,19 @@ bool IsBalanceLoggingEnabled()
     return g_hLogEnabled != null && g_hLogEnabled.BoolValue;
 }
 
+bool TeamBalance_IsRoundEndingSoon()
+{
+    if (GetFeatureStatus(FeatureType_Native, "DGM_GetRoundTimeRemaining")
+        != FeatureStatus_Available)
+    {
+        return false;
+    }
+
+    float secondsRemaining = DGM_GetRoundTimeRemaining();
+    return secondsRemaining >= 0.0
+        && secondsRemaining < float(TEAM_BALANCE_MIN_ROUND_TIME);
+}
+
 void LogBalance(const char[] fmt, any ...)
 {
     if (!IsBalanceLoggingEnabled())

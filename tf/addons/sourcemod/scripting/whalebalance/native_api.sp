@@ -39,6 +39,11 @@ public any Native_TeamBalanceEndScrambleVote(Handle plugin, int numParams)
 public any Native_TeamBalanceBeginScramble(Handle plugin, int numParams)
 {
     bool bypassCooldown = view_as<bool>(GetNativeCell(1));
+    if (TeamBalance_IsRoundEndingSoon())
+    {
+        return false;
+    }
+
     TeamBalance_RefreshState();
     if (g_eTeamBalanceState == TeamBalance_ScrambleVote)
     {

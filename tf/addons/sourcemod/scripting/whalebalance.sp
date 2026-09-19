@@ -46,6 +46,7 @@ native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 #define TEAM_BALANCE_RESPAWN_RETRY_COUNT 8
 #define POINTS_STORE_SCRAMBLE_IMMUNITY_ITEM "scramImmunity24h"
 #define SCRAMBLE_KOTH_ADD_TIME 180
+#define TEAM_BALANCE_MIN_ROUND_TIME 30
 
 enum TeamBalanceState
 {
@@ -141,6 +142,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("DGM_GetLastRoundDurationSeconds");
     MarkNativeAsOptional("DGM_GetRecentControlPointCaptureIntervalSeconds");
+    MarkNativeAsOptional("DGM_GetRoundTimeRemaining");
     MarkNativeAsOptional("DGM_IsSetupActive");
     MarkNativeAsOptional("SaySounds_PlayCommand");
     MarkNativeAsOptional("Filters_GetChatName");

@@ -30,6 +30,8 @@ native bool DGM_IsSetupActive();
 native int DGM_GetLastRoundDurationSeconds();
 native int DGM_GetRoundDurationSeconds(int firstTimestamp, int secondTimestamp);
 native int DGM_GetRecentControlPointCaptureIntervalSeconds();
+// Returns the active HUD round timer's remaining seconds, or -1.0 if unavailable.
+native float DGM_GetRoundTimeRemaining();
 native DGMObjectiveLeader DGM_GetObjectiveLeader(int &redOwned, int &blueOwned, int &neutralOwned, int &total);
 native int DGM_GetObjectiveLeaderTeam();
 native bool DGM_SetTime(int seconds);

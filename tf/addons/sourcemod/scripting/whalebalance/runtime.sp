@@ -23,6 +23,11 @@ void TeamBalance_EndScrambleVote()
 
 bool TeamBalance_BeginScramble(bool bypassCooldown = false)
 {
+    if (TeamBalance_IsRoundEndingSoon())
+    {
+        return false;
+    }
+
     TeamBalance_RefreshState();
     if (g_eTeamBalanceState == TeamBalance_ScrambleVote)
     {
@@ -122,6 +127,14 @@ bool TeamBalance_IsScrambleCooldownActiveInternal()
 
 bool TeamBalance_TryBegin(TeamBalanceState state, float leaseSeconds, bool bypassScrambleCooldown)
 {
+    if ((state == TeamBalance_Autobalance
+            || state == TeamBalance_ScrambleVote
+            || state == TeamBalance_ScramblePending)
+        && TeamBalance_IsRoundEndingSoon())
+    {
+        return false;
+    }
+
     TeamBalance_RefreshState();
     if (g_eTeamBalanceState != TeamBalance_Idle) return false;
     if (!bypassScrambleCooldown
