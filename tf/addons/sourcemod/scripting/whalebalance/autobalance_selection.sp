@@ -83,8 +83,24 @@ bool IsBasicBalanceCandidate(int client, int team)
     if (DuelDetection_IsClientInDuel(client)) return false;
     if (TeamBalance_IsRecentlyMoved(client)) return false;
     if (ClientHasDecapitationHeads(client)) return false;
+    if (IsClientVolunteer(client)
+        && (IsClientUnderUberEffect(client) || TeamBalance_HasProtectedKillstreak(client))) return false;
 
     return true;
+}
+
+static bool IsClientUnderUberEffect(int client)
+{
+    return TF2_IsPlayerInCondition(client, TFCond_Ubercharged)
+        || TF2_IsPlayerInCondition(client, TFCond_UberchargeFading)
+        || TF2_IsPlayerInCondition(client, TFCond_Kritzkrieged)
+        || TF2_IsPlayerInCondition(client, TFCond_MegaHeal)
+        || TF2_IsPlayerInCondition(client, TFCond_UberchargedHidden)
+        || TF2_IsPlayerInCondition(client, TFCond_UberchargedCanteen)
+        || TF2_IsPlayerInCondition(client, TFCond_UberchargedOnTakeDamage)
+        || TF2_IsPlayerInCondition(client, TFCond_UberBulletResist)
+        || TF2_IsPlayerInCondition(client, TFCond_UberBlastResist)
+        || TF2_IsPlayerInCondition(client, TFCond_UberFireResist);
 }
 
 static bool ClientHasDecapitationHeads(int client)

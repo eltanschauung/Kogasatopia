@@ -4,6 +4,8 @@ Handle g_hBalanceRespawnTimer[MAXPLAYERS + 1];
 int g_iBalanceRespawnGeneration[MAXPLAYERS + 1];
 int g_iBalanceOperationGeneration;
 
+#define TEAM_BALANCE_PROTECTED_KILLSTREAK 10
+
 bool TeamBalance_IsScrambleCooldownActive()
 {
     return TeamBalance_IsScrambleCooldownActiveInternal();
@@ -182,6 +184,7 @@ bool TeamBalance_IsScrambleCandidateInternal(int client, int expectedTeam, bool 
     if ((expectedTeam == TEAM_RED || expectedTeam == TEAM_BLUE) && team != expectedTeam) return false;
     if (team != TEAM_RED && team != TEAM_BLUE) return false;
     if (DuelDetection_IsClientInDuel(client) || TeamBalance_IsRecentlyMoved(client)) return false;
+    if (TeamBalance_HasProtectedKillstreak(client)) return false;
     return ignoreImmunity || !TeamBalance_IsScrambleImmuneInternal(client);
 }
 
@@ -194,11 +197,21 @@ static bool TeamBalance_IsScrambleMedicCandidateInternal(int client, int expecte
     if ((expectedTeam == TEAM_RED || expectedTeam == TEAM_BLUE) && team != expectedTeam) return false;
     if (team != TEAM_RED && team != TEAM_BLUE) return false;
     if (DuelDetection_IsClientInDuel(client)) return false;
+    if (TeamBalance_HasProtectedKillstreak(client)) return false;
 
     bool movedInThisScramble = g_eTeamBalanceState == TeamBalance_ScrambleMoving
         && g_iBalanceMovedOperationGeneration[client] == g_iBalanceOperationGeneration;
     if (TeamBalance_IsRecentlyMoved(client) && !movedInThisScramble) return false;
     return ignoreImmunity || movedInThisScramble || !TeamBalance_IsScrambleImmuneInternal(client);
+}
+
+bool TeamBalance_HasProtectedKillstreak(int client)
+{
+    return client > 0
+        && client <= MaxClients
+        && IsClientInGame(client)
+        && HasEntProp(client, Prop_Send, "m_nStreaks")
+        && GetEntProp(client, Prop_Send, "m_nStreaks") >= TEAM_BALANCE_PROTECTED_KILLSTREAK;
 }
 
 static bool TeamBalance_IsScrambleImmuneInternal(int client)
