@@ -29,6 +29,9 @@
 #define FILTERS_OUTBOX_CLEANUP_INTERVAL 120
 #define FILTERS_OUTBOX_RETENTION_SECONDS 3600
 #define FILTERS_CHAT_RETENTION_SECONDS 86400
+#define FILTERS_BLACKLIST_BURST_LIMIT 3
+#define FILTERS_BLACKLIST_BURST_WINDOW_SECONDS 60
+#define FILTERS_BLACKLIST_DISABLE_SECONDS 60
 #define FILTERS_OUTBOX_POLL_INTERVAL 2.0
 #define FILTERS_MUTE_CHECK_INTERVAL 1.0
 #define FILTERS_CONNECT_QUEUE_DELAY 3.0
@@ -106,6 +109,9 @@ bool g_TidyChatSuppressNextTeamAlert[MAXPLAYERS + 1];
 float g_TidyChatSuppressTeamAlertsUntil = 0.0;
 int g_iBlacklistChatMessageTimes[MAXPLAYERS + 1][FILTERS_BLACKLIST_CHAT_LIMIT];
 int g_iBlacklistChatMessageCount[MAXPLAYERS + 1];
+int g_iBlacklistIncidentTimes[FILTERS_BLACKLIST_BURST_LIMIT + 1];
+int g_iBlacklistIncidentCount = 0;
+int g_iBlacklistFiltersDisabledUntil = 0;
 
 #include "filters/mutecheck.inc"
 

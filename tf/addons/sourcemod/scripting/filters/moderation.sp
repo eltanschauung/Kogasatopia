@@ -208,7 +208,7 @@ bool CheckCommands(const char[] sArgs)
 
 bool CheckBlacklistedTerms(const char[] sArgs)
 {
-    if (g_hFiltersEnabled != null && !g_hFiltersEnabled.BoolValue)
+    if (!Filters_IsBlacklistWordMatchingEnabled())
     {
         return false;
     }
@@ -227,6 +227,7 @@ bool CheckBlacklistedTerms(const char[] sArgs)
         if (StrContains(sArgs, g_BlacklistWords[i], false) != -1)
         {
             PrintToServer("Blacklisted term: %s", g_BlacklistWords[i]);
+            Filters_RecordBlacklistWordIncident();
             return true;
         }
     }
@@ -241,6 +242,7 @@ bool CheckBlacklistedTerms(const char[] sArgs)
             if (GetRandomInt(0, 1) == 1)
             {
                 PrintToServer("Blacklisted term (50%%): %s", g_BlacklistWords50[i]);
+                Filters_RecordBlacklistWordIncident();
                 return true;
             }
             return false;
@@ -248,6 +250,47 @@ bool CheckBlacklistedTerms(const char[] sArgs)
     }
 
     return false;
+}
+
+static bool Filters_IsBlacklistWordMatchingEnabled()
+{
+    if (g_hFiltersEnabled != null && !g_hFiltersEnabled.BoolValue)
+    {
+        return false;
+    }
+
+    int now = GetTime();
+    if (g_iBlacklistFiltersDisabledUntil > now)
+    {
+        return false;
+    }
+
+    g_iBlacklistFiltersDisabledUntil = 0;
+    return true;
+}
+
+static void Filters_RecordBlacklistWordIncident()
+{
+    int now = GetTime();
+    int retained = 0;
+    for (int i = 0; i < g_iBlacklistIncidentCount; i++)
+    {
+        if (now - g_iBlacklistIncidentTimes[i] < FILTERS_BLACKLIST_BURST_WINDOW_SECONDS)
+        {
+            g_iBlacklistIncidentTimes[retained++] = g_iBlacklistIncidentTimes[i];
+        }
+    }
+
+    g_iBlacklistIncidentTimes[retained++] = now;
+    g_iBlacklistIncidentCount = retained;
+    if (g_iBlacklistIncidentCount > FILTERS_BLACKLIST_BURST_LIMIT)
+    {
+        g_iBlacklistFiltersDisabledUntil = now + FILTERS_BLACKLIST_DISABLE_SECONDS;
+        g_iBlacklistIncidentCount = 0;
+        PrintToServer("[Filters] Blacklist word matching disabled for %d seconds after %d incidents.",
+            FILTERS_BLACKLIST_DISABLE_SECONDS,
+            FILTERS_BLACKLIST_BURST_LIMIT + 1);
+    }
 }
 void Filters_AnnouncePlayerJoin(const char[] name)
 {
