@@ -561,10 +561,7 @@ void PlayShutdownSound(int client, int killstreak)
     }
 
     char commandName[ANNOUNCER_MAX_COMMAND_NAME];
-    if (!GetShutdownSoundCommand(client, killstreak, commandName, sizeof(commandName)))
-    {
-        return;
-    }
+    GetShutdownSoundCommand(client, killstreak, commandName, sizeof(commandName));
 
     int shutdownMinimum = 10;
     if (g_cvShutdownMin != null)
@@ -576,12 +573,55 @@ void PlayShutdownSound(int client, int killstreak)
     {
         if (IsHumanAnnouncerClient(client))
         {
-            Announcer_PlaySound(client, client, commandName);
+            Announcer_PlayShutdownSound(client, client, killstreak, commandName);
         }
         return;
     }
 
-    Announcer_PlaySound(0, client, commandName);
+    Announcer_PlayShutdownSound(0, client, killstreak, commandName);
+}
+
+static bool Announcer_PlayShutdownSound(
+    int target,
+    int sourceClient,
+    int killstreak,
+    const char[] sourceCommand)
+{
+    if (sourceCommand[0])
+    {
+        return Announcer_PlaySound(target, sourceClient, sourceCommand);
+    }
+
+    if (target > 0)
+    {
+        return Announcer_PlayShutdownSoundForClient(target, sourceClient, killstreak);
+    }
+
+    bool played = false;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsHumanAnnouncerClient(client)
+            && Announcer_PlayShutdownSoundForClient(client, sourceClient, killstreak))
+        {
+            played = true;
+        }
+    }
+
+    return played;
+}
+
+static bool Announcer_PlayShutdownSoundForClient(
+    int listener,
+    int sourceClient,
+    int killstreak)
+{
+    char commandName[ANNOUNCER_MAX_COMMAND_NAME];
+    if (!GetShutdownSoundCommand(listener, killstreak, commandName, sizeof(commandName)))
+    {
+        return false;
+    }
+
+    return Announcer_PlaySoundCommand(listener, sourceClient, commandName);
 }
 
 void PlayMedicDropSound(int attacker, int medic)
