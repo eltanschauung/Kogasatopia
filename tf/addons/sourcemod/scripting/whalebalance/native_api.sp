@@ -88,6 +88,11 @@ public any Native_TeamBalanceIsVolunteer(Handle plugin, int numParams)
     return IsClientVolunteer(GetNativeCell(1));
 }
 
+public any Native_TeamBalanceIsVolunteerEligible(Handle plugin, int numParams)
+{
+    return IsClientVolunteerEligible(GetNativeCell(1));
+}
+
 public any Native_TeamBalanceHasScramblePurchaseImmunity(Handle plugin, int numParams)
 {
     return TeamBalance_HasScramblePurchaseImmunityInternal(GetNativeCell(1));

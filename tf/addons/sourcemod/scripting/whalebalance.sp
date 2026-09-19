@@ -47,6 +47,8 @@ native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 #define POINTS_STORE_SCRAMBLE_IMMUNITY_ITEM "scramImmunity24h"
 #define SCRAMBLE_KOTH_ADD_TIME 180
 #define TEAM_BALANCE_MIN_ROUND_TIME 30
+#define VOLUNTEER_ELIGIBILITY_SECONDS (12 * 60 * 60)
+#define VOLUNTEER_LEGACY_TIMESTAMP 1789808400
 
 enum TeamBalanceState
 {
@@ -119,6 +121,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     CreateNative("TeamBalance_FinishScramble", Native_TeamBalanceFinishScramble);
     CreateNative("TeamBalance_IsScrambleCandidate", Native_TeamBalanceIsScrambleCandidate);
     CreateNative("TeamBalance_IsVolunteer", Native_TeamBalanceIsVolunteer);
+    CreateNative("TeamBalance_IsVolunteerEligible", Native_TeamBalanceIsVolunteerEligible);
     CreateNative("TeamBalance_HasScramblePurchaseImmunity", Native_TeamBalanceHasScramblePurchaseImmunity);
     CreateNative("TeamBalance_ConsumeScramblePurchaseImmunity", Native_TeamBalanceConsumeScramblePurchaseImmunity);
     CreateNative("TeamBalance_MoveScramblePair", Native_TeamBalanceMoveScramblePair);

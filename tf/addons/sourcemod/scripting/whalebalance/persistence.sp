@@ -89,7 +89,8 @@ public void SQL_OnImmunitySchemaReady(Database db, DBResultSet results, const ch
     g_hImmunityDb.Query(SQL_OnVolunteerSchemaReady,
         "CREATE TABLE IF NOT EXISTS autobalance_volunteers ("
         ... "steamid64 VARCHAR(32) NOT NULL PRIMARY KEY, "
-        ... "volunteer TINYINT(1) NOT NULL DEFAULT 1)");
+        ... "volunteer TINYINT(1) NOT NULL DEFAULT 1, "
+        ... "volunteered_at BIGINT NOT NULL DEFAULT 0)");
 }
 
 public void SQL_OnPersistentImmunityLoaded(Database db, DBResultSet results, const char[] error, any data)
@@ -150,8 +151,72 @@ public void SQL_OnVolunteerSchemaReady(Database db, DBResultSet results, const c
     }
     g_iPersistentVolunteerCount = 0;
 
-    g_hImmunityDb.Query(SQL_OnPersistentVolunteersLoaded,
-        "SELECT steamid64 FROM autobalance_volunteers WHERE volunteer != 0");
+    g_hImmunityDb.Query(SQL_OnVolunteerTimestampColumnChecked,
+        "SELECT volunteered_at FROM autobalance_volunteers LIMIT 0");
+}
+
+public void SQL_OnVolunteerTimestampColumnChecked(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (!error[0])
+    {
+        BackfillVolunteerTimestamps(db);
+        return;
+    }
+
+    if (StrContains(error, "volunteered_at", false) == -1)
+    {
+        LogError("[whalebalance] Volunteer timestamp schema check failed: %s", error);
+        if (Db_IsTransientError(error))
+        {
+            ScheduleImmunityDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+        return;
+    }
+
+    db.Query(SQL_OnVolunteerTimestampColumnAdded,
+        "ALTER TABLE autobalance_volunteers "
+        ... "ADD COLUMN volunteered_at BIGINT NOT NULL DEFAULT 0");
+}
+
+public void SQL_OnVolunteerTimestampColumnAdded(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (error[0])
+    {
+        LogError("[whalebalance] Volunteer timestamp schema migration failed: %s", error);
+        if (Db_IsTransientError(error))
+        {
+            ScheduleImmunityDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+        return;
+    }
+
+    BackfillVolunteerTimestamps(db);
+}
+
+static void BackfillVolunteerTimestamps(Database db)
+{
+    char query[256];
+    FormatEx(query, sizeof(query),
+        "UPDATE autobalance_volunteers SET volunteered_at = %d "
+        ... "WHERE volunteer != 0 AND volunteered_at <= 0",
+        VOLUNTEER_LEGACY_TIMESTAMP);
+    db.Query(SQL_OnVolunteerTimestampsBackfilled, query);
+}
+
+public void SQL_OnVolunteerTimestampsBackfilled(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (error[0])
+    {
+        LogError("[whalebalance] Volunteer timestamp backfill failed: %s", error);
+        if (Db_IsTransientError(error))
+        {
+            ScheduleImmunityDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+        return;
+    }
+
+    db.Query(SQL_OnPersistentVolunteersLoaded,
+        "SELECT steamid64, volunteered_at FROM autobalance_volunteers WHERE volunteer != 0");
 }
 
 public void SQL_OnPersistentVolunteersLoaded(Database db, DBResultSet results, const char[] error, any data)
@@ -188,7 +253,8 @@ public void SQL_OnPersistentVolunteersLoaded(Database db, DBResultSet results, c
                 continue;
             }
 
-            g_hVolunteers.SetValue(steamId, 1, true);
+            int volunteeredAt = results.FetchInt(1);
+            g_hVolunteers.SetValue(steamId, volunteeredAt, true);
             g_iPersistentVolunteerCount++;
         }
     }
@@ -259,6 +325,7 @@ public Action Command_Volunteer(int client, int args)
     AB_EscapeSql(steamId, escapedSteam, sizeof(escapedSteam));
 
     char query[256];
+    int volunteeredAt = GetTime();
     if (wasVolunteer)
     {
         FormatEx(query, sizeof(query),
@@ -268,8 +335,10 @@ public Action Command_Volunteer(int client, int args)
     else
     {
         FormatEx(query, sizeof(query),
-            "REPLACE INTO autobalance_volunteers (steamid64, volunteer) VALUES ('%s', 1)",
-            escapedSteam);
+            "REPLACE INTO autobalance_volunteers (steamid64, volunteer, volunteered_at) "
+            ... "VALUES ('%s', 1, %d)",
+            escapedSteam,
+            volunteeredAt);
     }
 
     DataPack pack = new DataPack();
@@ -277,6 +346,7 @@ public Action Command_Volunteer(int client, int args)
     pack.WriteCell(GetClientUserId(target));
     pack.WriteCell(wasVolunteer ? 1 : 0);
     pack.WriteCell(targetChangedByAdmin ? 1 : 0);
+    pack.WriteCell(volunteeredAt);
     pack.WriteString(steamId);
 
     g_hImmunityDb.Query(SQL_OnPersistentVolunteerToggled, query, pack);
@@ -292,6 +362,7 @@ public void SQL_OnPersistentVolunteerToggled(Database db, DBResultSet results, c
     int targetUserId = pack.ReadCell();
     bool wasVolunteer = (pack.ReadCell() != 0);
     bool targetChangedByAdmin = (pack.ReadCell() != 0);
+    int volunteeredAt = pack.ReadCell();
     char steamId[32];
     pack.ReadString(steamId, sizeof(steamId));
     delete pack;
@@ -322,7 +393,7 @@ public void SQL_OnPersistentVolunteerToggled(Database db, DBResultSet results, c
         return;
     }
 
-    SetPersistentVolunteerCache(steamId, nowVolunteer);
+    SetPersistentVolunteerCache(steamId, nowVolunteer, volunteeredAt);
 
     if (targetChangedByAdmin)
     {

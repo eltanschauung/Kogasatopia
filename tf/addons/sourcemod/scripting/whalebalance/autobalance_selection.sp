@@ -396,12 +396,31 @@ bool IsClientVolunteer(int client)
     return g_hVolunteers.GetValue(steamId, dummy);
 }
 
+bool IsClientVolunteerEligible(int client)
+{
+    if (g_hVolunteers == null || !IsClientInGame(client))
+    {
+        return false;
+    }
+
+    char steamId[32];
+    if (!Kogasa_GetClientSteamId64(client, steamId, sizeof(steamId), true))
+    {
+        return false;
+    }
+
+    int volunteeredAt = 0;
+    return g_hVolunteers.GetValue(steamId, volunteeredAt)
+        && volunteeredAt > 0
+        && GetTime() - volunteeredAt >= VOLUNTEER_ELIGIBILITY_SECONDS;
+}
+
 bool HasCachedVolunteers()
 {
     return g_bVolunteerDbReady && g_hVolunteers != null && g_iPersistentVolunteerCount > 0;
 }
 
-void SetPersistentVolunteerCache(const char[] steamId, bool volunteer)
+void SetPersistentVolunteerCache(const char[] steamId, bool volunteer, int volunteeredAt = 0)
 {
     if (g_hVolunteers == null || !steamId[0])
     {
@@ -413,7 +432,11 @@ void SetPersistentVolunteerCache(const char[] steamId, bool volunteer)
 
     if (volunteer)
     {
-        g_hVolunteers.SetValue(steamId, 1, true);
+        if (volunteeredAt <= 0)
+        {
+            volunteeredAt = GetTime();
+        }
+        g_hVolunteers.SetValue(steamId, volunteeredAt, true);
         if (!wasVolunteer)
         {
             g_iPersistentVolunteerCount++;

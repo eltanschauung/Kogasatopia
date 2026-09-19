@@ -32,6 +32,9 @@ native bool TeamBalance_IsScrambleCandidate(int client, int expectedTeam, bool i
 /** Returns whether the client is currently registered as an autobalance volunteer. */
 native bool TeamBalance_IsVolunteer(int client);
 
+/** Returns whether the client has continuously volunteered for at least 12 hours. */
+native bool TeamBalance_IsVolunteerEligible(int client);
+
 /** Checks/consumes the store-backed scramble immunity through the controller. */
 native bool TeamBalance_HasScramblePurchaseImmunity(int client);
 native int TeamBalance_ConsumeScramblePurchaseImmunity(int client);

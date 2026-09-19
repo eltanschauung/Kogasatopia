@@ -273,8 +273,8 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
         return;
     }
 
-    if (GetFeatureStatus(FeatureType_Native, "TeamBalance_IsVolunteer") == FeatureStatus_Available
-        && TeamBalance_IsVolunteer(client))
+    if (GetFeatureStatus(FeatureType_Native, "TeamBalance_IsVolunteerEligible") == FeatureStatus_Available
+        && TeamBalance_IsVolunteerEligible(client))
     {
         ApplyBonusPoints(
             client,

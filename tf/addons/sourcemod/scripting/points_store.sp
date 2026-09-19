@@ -141,6 +141,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
     MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeHours");
     MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeSeconds");
     MarkNativeAsOptional("TeamBalance_IsVolunteer");
+    MarkNativeAsOptional("TeamBalance_IsVolunteerEligible");
     RegPluginLibrary("points_store");
     CreateNative("PointsStore_AreBonusPointsLoaded", Native_PointsStore_AreBonusPointsLoaded);
     CreateNative("PointsStore_GetBonusPoints", Native_PointsStore_GetBonusPoints);
