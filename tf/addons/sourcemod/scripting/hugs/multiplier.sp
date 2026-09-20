@@ -65,7 +65,10 @@ void CancelReminderTimer(int client)
 
 	if (g_hReminderTimer[client] != null)
 	{
-		CloseHandle(g_hReminderTimer[client]);
+		if (IsValidHandle(g_hReminderTimer[client]))
+		{
+			delete g_hReminderTimer[client];
+		}
 		g_hReminderTimer[client] = null;
 	}
 }
@@ -79,7 +82,10 @@ void CancelStatsRetryTimer(int client)
 
 	if (g_hStatsRetryTimer[client] != null)
 	{
-		CloseHandle(g_hStatsRetryTimer[client]);
+		if (IsValidHandle(g_hStatsRetryTimer[client]))
+		{
+			delete g_hStatsRetryTimer[client];
+		}
 		g_hStatsRetryTimer[client] = null;
 	}
 }
@@ -92,20 +98,19 @@ void ScheduleStatsRetry(int client)
 		return;
 	}
 
-	g_hStatsRetryTimer[client] = CreateTimer(5.0, Timer_RetryStatsLoad, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	g_hStatsRetryTimer[client] = CreateTimer(5.0, Timer_RetryStatsLoad, GetClientSerial(client));
 }
 
 public Action Timer_RetryStatsLoad(Handle timer, any data)
 {
-	int client = GetClientOfUserId(data);
+	int client = GetClientFromSerial(data);
+	if (client > 0 && g_hStatsRetryTimer[client] == timer)
+	{
+		g_hStatsRetryTimer[client] = null;
+	}
 	if (!IsClientIndexValid(client) || !IsClientInGame(client))
 	{
 		return Plugin_Stop;
-	}
-
-	if (g_hStatsRetryTimer[client] == timer)
-	{
-		g_hStatsRetryTimer[client] = null;
 	}
 
 	AttemptLoadClientStats(client);

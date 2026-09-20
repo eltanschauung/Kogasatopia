@@ -23,7 +23,8 @@
 		g_bDatabaseReady = false;
 		if (g_hDbReconnectTimer == null)
 		{
-			g_hDbReconnectTimer = CreateTimer(delay, Timer_ReconnectDatabase, _, TIMER_FLAG_NO_MAPCHANGE);
+			// Database recovery belongs to the plugin lifetime, not the current map.
+			g_hDbReconnectTimer = CreateTimer(delay, Timer_ReconnectDatabase);
 		}
 	}
 
