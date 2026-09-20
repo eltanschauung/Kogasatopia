@@ -157,6 +157,14 @@ public Action Command_MuteParsee(int client, int args)
         return Plugin_Handled;
     }
 
+    if (Filters_IsConnectedParseeClient(client))
+    {
+        g_bMuteArchivedSpeakers[client] = false;
+        SetClientCookie(client, g_hCookieMuteArchivedSpeakers, "0");
+        CPrintToChat(client, "{gold}[Filters]{default} You can now see messages from Memoman and Parsee again!");
+        return Plugin_Handled;
+    }
+
     g_bMuteArchivedSpeakers[client] = !g_bMuteArchivedSpeakers[client];
     SetClientCookie(
         client,
@@ -283,6 +291,11 @@ static bool Filters_IsConnectedParseeClient(int client)
     return client > 0 && client <= MaxClients && IsClientInGame(client)
         && Kogasa_GetClientSteamId64(client, steamId64, sizeof(steamId64), true)
         && StrEqual(steamId64, PARSEE_STEAMID64);
+}
+
+bool Filters_HasMutedArchivedSpeakers(int client)
+{
+    return g_bMuteArchivedSpeakers[client] && !Filters_IsConnectedParseeClient(client);
 }
 
 static int Filters_GetUtf8CharacterCount(const char[] message)
@@ -575,7 +588,7 @@ static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker,
         for (int client = 1; client <= MaxClients; client++)
         {
             if (client == skipClient || !Filters_ShouldReceiveChat(client, 0)
-                || g_bMuteArchivedSpeakers[client])
+                || Filters_HasMutedArchivedSpeakers(client))
             {
                 continue;
             }

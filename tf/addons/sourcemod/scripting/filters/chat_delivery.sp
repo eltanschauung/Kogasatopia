@@ -26,7 +26,7 @@ void Filters_PrintToChatAll(const char[] message, bool skipArchivedMuted = false
         {
             continue;
         }
-        if (skipArchivedMuted && g_bMuteArchivedSpeakers[i])
+        if (skipArchivedMuted && Filters_HasMutedArchivedSpeakers(i))
         {
             continue;
         }
@@ -41,7 +41,7 @@ void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, 
         return;
     }
 
-    if (g_bMuteArchivedSpeakers[receiver] && Filters_IsConnectedParseeClient(sender))
+    if (Filters_HasMutedArchivedSpeakers(receiver) && Filters_IsConnectedParseeClient(sender))
     {
         return;
     }

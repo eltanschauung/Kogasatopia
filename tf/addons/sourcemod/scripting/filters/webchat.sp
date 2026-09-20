@@ -252,7 +252,7 @@ void Filters_PrintOutboxToClients(const char[] message, bool skipArchivedMuted =
     for (int client = 1; client <= MaxClients; client++)
     {
         if (!Filters_ShouldReceiveChat(client, 0)) continue;
-        if (skipArchivedMuted && g_bMuteArchivedSpeakers[client]) continue;
+        if (skipArchivedMuted && Filters_HasMutedArchivedSpeakers(client)) continue;
         if (!frontendEnabled && Filters_GetAdminsDbLevel(client) != -3) continue;
         if (IsClientInGame(client)) CPrintToChat(client, "%s", message);
     }
