@@ -268,6 +268,19 @@ static void AB_EscapeSql(const char[] input, char[] output, int maxlen)
     Db_Escape(g_hImmunityDb, input, output, maxlen, "whalebalance");
 }
 
+static void PrintVolunteerStatus(int client, bool enabled)
+{
+    if (enabled)
+    {
+        CPrintToChat(client,
+            "{gold}[WhaleBalance]{default} You are now an autobalance volunteer. Remain a volunteer for >6 hours to receive bonus welfare checks. Volunteers won't be autobalanced or scrambled during 10+ killstreaks or ÜberCharge.");
+        return;
+    }
+
+    CPrintToChat(client,
+        "{gold}[WhaleBalance]{default} You are no longer an autobalance volunteer.");
+}
+
 public Action Command_Volunteer(int client, int args)
 {
     if (g_hImmunityDb == null || !g_bVolunteerDbReady)
@@ -439,10 +452,7 @@ public void SQL_OnPersistentVolunteerToggled(Database db, DBResultSet results, c
 
         if (target > 0 && IsClientInGame(target))
         {
-            PrintToChat(target,
-                nowVolunteer
-                    ? "[Autobalance] You are now an autobalance volunteer; use !volunteer to opt out."
-                    : "[Autobalance] You are no longer an autobalance volunteer; use !volunteer to opt in.");
+            PrintVolunteerStatus(target, nowVolunteer);
         }
 
         if (actor > 0 && IsClientInGame(actor) && target > 0 && IsClientInGame(target))
@@ -474,10 +484,7 @@ public void SQL_OnPersistentVolunteerToggled(Database db, DBResultSet results, c
 
     if (target > 0 && IsClientInGame(target))
     {
-        PrintToChat(target,
-            nowVolunteer
-                ? "[Autobalance] You are now an autobalance volunteer; use !volunteer to opt out."
-                : "[Autobalance] You are no longer an autobalance volunteer; use !volunteer to opt in.");
+        PrintVolunteerStatus(target, nowVolunteer);
         LogBalance(
             nowVolunteer
                 ? "%N volunteered for autobalance"

@@ -47,7 +47,7 @@ native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 #define POINTS_STORE_SCRAMBLE_IMMUNITY_ITEM "scramImmunity24h"
 #define SCRAMBLE_KOTH_ADD_TIME 180
 #define TEAM_BALANCE_MIN_ROUND_TIME 30
-#define VOLUNTEER_ELIGIBILITY_SECONDS (12 * 60 * 60)
+#define VOLUNTEER_ELIGIBILITY_SECONDS (6 * 60 * 60)
 #define VOLUNTEER_LEGACY_TIMESTAMP 1789808400
 
 enum TeamBalanceState
