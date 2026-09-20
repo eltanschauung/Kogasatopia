@@ -30,7 +30,7 @@ void LoadHatStateCookie(int client)
 		if (count > 1 && parts[1][0] != '\0' && StringToInt(parts[0]) != 0)
 		{
 			int hatIndex = FindHatIndexById(parts[1]);
-			if (IsHatEnabled(hatIndex) && !g_Hats[hatIndex].force)
+			if (IsHatEnabled(hatIndex))
 			{
 				g_bHatEnabled[client][hatIndex] = true;
 				if (count > 2)
@@ -81,12 +81,6 @@ void LoadHatStateCookie(int client)
 			{
 				continue;
 			}
-			if (g_Hats[hatIndex].force)
-			{
-				needsResave = true;
-				continue;
-			}
-
 			g_bHatEnabled[client][hatIndex] = true;
 			if (partCount > 1 && entryParts[1][0])
 			{
@@ -122,11 +116,6 @@ void LoadHatStateCookie(int client)
 			}
 			if (!IsHatEnabled(hatIndex))
 			{
-				continue;
-			}
-			if (g_Hats[hatIndex].force)
-			{
-				needsResave = true;
 				continue;
 			}
 			g_bHatEnabled[client][hatIndex] = true;
@@ -227,7 +216,9 @@ void SaveHatStateCookie(int client, bool allowClear = false)
 	bool first = true;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!g_bHatEnabled[client][i] || !IsHatEnabled(i) || g_Hats[i].force)
+		// Persist only the player's explicit choice. A forced hat is added to the
+		// effective loadout at dispense time and must not alter that choice.
+		if (!g_bHatEnabled[client][i] || !IsHatEnabled(i))
 		{
 			continue;
 		}
