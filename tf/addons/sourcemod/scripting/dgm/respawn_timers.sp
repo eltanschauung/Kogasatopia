@@ -132,7 +132,7 @@ void DGM_ScheduleRespawnTimer(int client, float delay)
         delay, Timer_RespawnClient, GetClientSerial(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (!Client_IsInGame(client))

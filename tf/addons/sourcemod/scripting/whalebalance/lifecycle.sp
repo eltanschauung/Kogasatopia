@@ -1,4 +1,4 @@
-public void OnPluginStart()
+void WhaleBalance_OnPluginStart()
 {
     LoadTranslations("common.phrases");
     DuelDetection_Initialize();
@@ -30,7 +30,7 @@ public void OnPluginStart()
     WhaleScramble_OnPluginStart();
 }
 
-public void OnMapStart()
+void WhaleBalance_OnMapStart()
 {
     TeamBalance_ResetRuntime();
     ClearAllTeamSwapRequests();
@@ -45,7 +45,7 @@ public void OnMapStart()
     WhaleScramble_OnMapStart();
 }
 
-public void OnMapEnd()
+void WhaleBalance_OnMapEnd()
 {
     TeamBalance_ResetRuntime();
     ClearAllTeamSwapRequests();
@@ -54,7 +54,7 @@ public void OnMapEnd()
     WhaleScramble_OnMapEnd();
 }
 
-public void OnClientDisconnect(int client)
+void WhaleBalance_OnClientDisconnect(int client)
 {
     TeamBalance_ClearRespawnState(client);
     if (client > 0 && client <= MaxClients)
@@ -66,7 +66,7 @@ public void OnClientDisconnect(int client)
     WhaleScramble_OnClientDisconnect(client);
 }
 
-public void OnPluginEnd()
+void WhaleBalance_OnPluginEnd()
 {
     WhaleScramble_OnPluginEnd();
     ApplyServerBalanceCvars(false);

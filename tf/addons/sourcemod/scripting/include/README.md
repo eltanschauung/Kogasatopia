@@ -78,11 +78,11 @@ scripting/include/
 Only plugin-facing natives and forwards are listed here; internal stock helper files are not part of this API list.
 
 ## autobalance_4teams_api.inc
-- Compatibility API provided by `whalebalance.smx`.
+- Compatibility API provided by `whalescramble.smx`.
 - `Autobalance_HasPendingTeamSwap` - Returns whether a client has an incoming team-swap request.
 
 ## team_balance_api.inc
-- Compatibility API provided by `whalebalance.smx` for candidate validation, immunity, moves, respawns, cooldowns, and operation exclusion.
+- Compatibility API provided by `whalescramble.smx` for candidate validation, immunity, moves, respawns, cooldowns, and operation exclusion.
 
 ## amplifier.inc
 - `Amplifier_WouldReplaceBuilding` - Returns whether a build request would become an amplifier instead of the requested object.

@@ -35,11 +35,11 @@ void DGM_RecordCaptureInterval(Event event)
     int previousTimestamp = g_iLastCaptureTimestamp;
     if (previousTimestamp <= 0)
     {
-        previousTimestamp = g_iRoundStartTimestamp;
+        previousTimestamp = g_iDgmRoundStartTimestamp;
     }
 
     int interval = DGM_CalculateRoundDurationSeconds(previousTimestamp, now);
-    int roundElapsed = DGM_CalculateRoundDurationSeconds(g_iRoundStartTimestamp, now);
+    int roundElapsed = DGM_CalculateRoundDurationSeconds(g_iDgmRoundStartTimestamp, now);
     int index = g_iCaptureIntervalCount++;
 
     g_iCaptureIntervalSeconds[index] = interval;

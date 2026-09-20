@@ -15,22 +15,12 @@ void StopAutobalanceTimer()
 
 bool ShouldSuppressAutobalanceForGamemode()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_IsSmallFormatGamemode") != FeatureStatus_Available)
-    {
-        return false;
-    }
-
     return DGM_IsSmallFormatGamemode();
 }
 
 bool ShouldSkipWinningTeamAutobalance(int fromTeam, int toTeam, int diff)
 {
     if (g_hIgnoreWinning == null || g_hIgnoreWinning.FloatValue <= 0.0)
-    {
-        return false;
-    }
-
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetObjectiveLeaderTeam") != FeatureStatus_Available)
     {
         return false;
     }

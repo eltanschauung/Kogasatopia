@@ -195,6 +195,7 @@ void DGM_CheckSetupTeamRatioForward()
     }
 
     g_bSetupTeamRatioForwardFired = true;
+    WhaleBalance_OnSetupTeamRatioReady(realTeamPlayers, connectedClients);
     Call_StartForward(g_hSetupTeamRatioReadyForward);
     Call_PushCell(realTeamPlayers);
     Call_PushCell(connectedClients);

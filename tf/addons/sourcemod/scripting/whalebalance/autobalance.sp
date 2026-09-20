@@ -360,7 +360,14 @@ public Action Timer_Autobalance(Handle timer)
         PointsStore_ApplyBonusPoints(pick, "autobalance_volunteer", true, true, 1.0, 0, 0.0);
     }
     g_fImbalanceDetectedAt = 0.0;
-    SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
+    bool useDragonBallSound =
+        GetFeatureStatus(FeatureType_Native, "Announcers_IsGroupEnabled") == FeatureStatus_Available
+        && Announcers_IsGroupEnabled(pick, TEAM_MOVE_DRAGONBALL_GROUP);
+    if (!useDragonBallSound
+        || !SaySounds_TryPlayCommand(0, TEAM_MOVE_DRAGONBALL_SAYSOUND, true))
+    {
+        SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
+    }
 
     CPrintToChatAllEx(
         pick,

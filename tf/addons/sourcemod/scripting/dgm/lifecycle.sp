@@ -1,4 +1,4 @@
-public void OnPluginStart()
+void DGM_OnPluginStart()
 {
 
     // The respawn time
@@ -57,15 +57,15 @@ public void OnPluginStart()
     HookConVarChange(g_cvBluTime, ConVarChange_RespawnSetting);
     HookConVarChange(g_cvSetupUberMultiplier, ConVarChange_SetupUberMultiplier);
 
-    HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
-    HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
-    HookEvent("teamplay_round_start", Event_RoundActive);
-    HookEvent("teamplay_round_active", Event_RoundFullyActive, EventHookMode_PostNoCopy);
-    HookEvent("teamplay_setup_finished", Event_SetupFinished);
-    HookEvent("teamplay_round_win", Event_RoundWin, EventHookMode_Pre);
-    HookEvent("teamplay_point_captured", Event_PointCaptured, EventHookMode_Post);
-    HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
-    HookEvent("player_changeclass", Event_PlayerChangeClass, EventHookMode_Post);
+    HookEvent("player_death", DGM_Event_PlayerDeath, EventHookMode_Pre);
+    HookEvent("player_spawn", DGM_Event_PlayerSpawn, EventHookMode_Post);
+    HookEvent("teamplay_round_start", DGM_Event_RoundActive);
+    HookEvent("teamplay_round_active", DGM_Event_RoundFullyActive, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_setup_finished", DGM_Event_SetupFinished);
+    HookEvent("teamplay_round_win", DGM_Event_RoundWin, EventHookMode_Pre);
+    HookEvent("teamplay_point_captured", DGM_Event_PointCaptured, EventHookMode_Post);
+    HookEvent("player_team", DGM_Event_PlayerTeam, EventHookMode_Post);
+    HookEvent("player_changeclass", DGM_Event_PlayerChangeClass, EventHookMode_Post);
 
 	RegAdminCmd("sm_respawn", Command_RespawnToggle, ADMFLAG_KICK, "Toggles respawn times");
 	RegAdminCmd("sm_noset", Command_ResetSetup, ADMFLAG_KICK, "Set round setup time to 10 seconds");
@@ -83,7 +83,7 @@ public void OnPluginStart()
     DGM_RefreshRespawnVisualState();
 }
 
-public void OnPluginEnd()
+void DGM_OnPluginEnd()
 {
     DGM_RestoreSetupUpgradeMetal();
     g_bSetupConstructionMultiplierActive = false;
@@ -107,7 +107,7 @@ public void OnPluginEnd()
     delete g_hSetupTeamRatioReadyForward;
 }
 
-public void OnMapStart()
+void DGM_OnMapStart()
 {
     DGM_RestoreSetupUpgradeMetal();
     g_bGameRulesReady = false;
@@ -129,7 +129,7 @@ public void OnMapStart()
     DGM_UpdateSetupState();
 }
 
-public void OnMapEnd()
+void DGM_OnMapEnd()
 {
     DGM_RestoreSetupUpgradeMetal();
     g_bGameRulesReady = false;
@@ -188,13 +188,13 @@ public Action Timer_SetupStateMonitor(Handle timer)
 }
 
 // We can be sure entities are loaded by this point
-public void OnConfigsExecuted()
+void DGM_OnConfigsExecuted()
 {
     g_bGameRulesReady = true;
     DetectGameMode();
     g_InternalOverride = DGM_AreRespawnTimesForcedOn();
     g_bRoundStartedOnce = false;
-    g_iRoundStartTimestamp = 0;
+    g_iDgmRoundStartTimestamp = 0;
     g_iLastRoundDuration = 0;
     DGM_ResetCaptureIntervalStats(0);
     DGM_ApplySetupUberMultiplier();
@@ -208,7 +208,7 @@ public void DGM_FrameUpdateSetupState(any data)
 }
 
 // Fires when a control point is captured
-public void Event_PointCaptured(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_PointCaptured(Event event, const char[] name, bool dontBroadcast)
 {
     DGM_RecordCaptureInterval(event);
 
@@ -240,7 +240,7 @@ public void Event_PointCaptured(Event event, const char[] name, bool dontBroadca
 	}
 }
 
-public void OnClientPutInServer(int client)
+void DGM_OnClientPutInServer(int client)
 {
     if (!IsFakeClient(client))
     {
@@ -254,24 +254,24 @@ public void OnClientPutInServer(int client)
     }
 }
 
-public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
     DGM_ClearRespawnTimer(GetClientOfUserId(event.GetInt("userid")));
     DGM_QueueNoEngineerSetupReductionCheck();
     RequestFrame(DGM_FrameCheckSetupTeamRatio);
 }
 
-public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     DGM_ClearRespawnTimer(GetClientOfUserId(event.GetInt("userid")));
 }
 
-public void Event_PlayerChangeClass(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_PlayerChangeClass(Event event, const char[] name, bool dontBroadcast)
 {
     DGM_QueueNoEngineerSetupReductionCheck();
 }
 
-public void OnClientDisconnect(int client)
+void DGM_OnClientDisconnect(int client)
 {
     DGM_ClearRespawnTimer(client);
     DGM_ClearRespawnReminderTimer(client);

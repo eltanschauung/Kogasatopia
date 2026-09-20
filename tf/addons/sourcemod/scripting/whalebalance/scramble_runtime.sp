@@ -128,24 +128,24 @@ void WhaleScramble_OnPluginStart()
     AddCommandListener(SayListener, "say");
     AddCommandListener(SayListener, "say_team");
     // This handler reads "full_round" and "team", so it needs a copied event.
-    HookEvent("teamplay_round_win", Event_RoundWin, EventHookMode_Post);
-    HookEvent("teamplay_round_start", Event_RoundStart, EventHookMode_PostNoCopy);
-    HookEvent("teamplay_point_captured", Event_PointCaptured, EventHookMode_Post);
-    HookEvent("teamplay_game_over", Event_GameOver, EventHookMode_PostNoCopy);
-    HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
+    HookEvent("teamplay_round_win", WhaleBalance_Event_RoundWin, EventHookMode_Post);
+    HookEvent("teamplay_round_start", WhaleBalance_Event_RoundStart, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_point_captured", WhaleBalance_Event_PointCaptured, EventHookMode_Post);
+    HookEvent("teamplay_game_over", WhaleBalance_Event_GameOver, EventHookMode_PostNoCopy);
+    HookEvent("player_team", WhaleBalance_Event_PlayerTeam, EventHookMode_Post);
 }
 
-public void OnConfigsExecuted()
+void WhaleBalance_OnConfigsExecuted()
 {
     ApplyEngineScramblePolicy();
 }
 
-public void OnAllPluginsLoaded()
+void WhaleBalance_OnAllPluginsLoaded()
 {
     UpdateNativeVotes();
 }
 
-public void OnLibraryAdded(const char[] name)
+void WhaleBalance_OnLibraryAdded(const char[] name)
 {
     if (StrEqual(name, "nativevotes", false))
     {
@@ -153,7 +153,7 @@ public void OnLibraryAdded(const char[] name)
     }
 }
 
-public void OnLibraryRemoved(const char[] name)
+void WhaleBalance_OnLibraryRemoved(const char[] name)
 {
     if (StrEqual(name, "nativevotes", false))
     {
@@ -212,7 +212,7 @@ void WhaleScramble_OnClientDisconnect(int client)
     }
 }
 
-public void OnClientPutInServer(int client)
+void WhaleBalance_OnClientPutInServer(int client)
 {
     if (client <= 0 || client > MaxClients)
         return;
@@ -280,7 +280,7 @@ public Action Command_WhaleBalance(int client, int args)
     return Plugin_Handled;
 }
 
-public void DGM_OnSetupTeamRatioReady(int realTeamPlayers, int connectedClients)
+void WhaleBalance_OnSetupTeamRatioReady(int realTeamPlayers, int connectedClients)
 {
     if (g_bStackRedPayloadAttempted || g_hStackRedPayload == null || !g_hStackRedPayload.BoolValue)
     {
@@ -288,8 +288,7 @@ public void DGM_OnSetupTeamRatioReady(int realTeamPlayers, int connectedClients)
     }
 
     char gamemodeKey[16];
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetGameModeKey") != FeatureStatus_Available
-        || !DGM_GetGameModeKey(gamemodeKey, sizeof(gamemodeKey))
+    if (!DGM_GetGameModeKey(gamemodeKey, sizeof(gamemodeKey))
         || !StrEqual(gamemodeKey, "pl"))
     {
         return;
@@ -332,7 +331,6 @@ public Action Timer_WaitForStackRedPayloadRatio(Handle timer)
         || g_bStackRedPayloadAttempted
         || g_hStackRedPayload == null
         || !g_hStackRedPayload.BoolValue
-        || GetFeatureStatus(FeatureType_Native, "DGM_IsSetupActive") != FeatureStatus_Available
         || !DGM_IsSetupActive())
     {
         g_hStackRedPayloadWaitTimer = null;
@@ -425,7 +423,7 @@ public Action SayListener(int client, const char[] command, int argc)
     return Plugin_Continue;
 }
 
-public void Event_RoundWin(Event event, const char[] name, bool dontBroadcast)
+public void WhaleBalance_Event_RoundWin(Event event, const char[] name, bool dontBroadcast)
 {
     bool fullRound = event.GetBool("full_round");
     LogWhale("Round win: full_round=%d voteRunning=%d activeKind=%d activeTeam=%d.",
@@ -487,13 +485,6 @@ public Action Timer_CheckShortRoundAutoScramble(Handle timer)
         return Plugin_Stop;
     }
 
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetLastRoundDurationSeconds") != FeatureStatus_Available)
-    {
-        LogWhale("Short-round auto scramble skipped: DGM_GetLastRoundDurationSeconds unavailable.");
-        LogWhaleStat("auto_scramble_decision", "trigger=short_round|result=skipped|reason=native_unavailable|threshold=%d", threshold);
-        return Plugin_Stop;
-    }
-
     int duration = DGM_GetLastRoundDurationSeconds();
     if (duration <= 0 || duration >= threshold)
     {
@@ -510,7 +501,7 @@ public Action Timer_CheckShortRoundAutoScramble(Handle timer)
     return Plugin_Stop;
 }
 
-public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+public void WhaleBalance_Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     g_bKothRedCapped = false;
     g_bKothBluCapped = false;
@@ -539,7 +530,7 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
     }
 }
 
-public void Event_PointCaptured(Event event, const char[] name, bool dontBroadcast)
+public void WhaleBalance_Event_PointCaptured(Event event, const char[] name, bool dontBroadcast)
 {
     int team = event.GetInt("team");
     g_iRoundCaptureCount++;
@@ -576,13 +567,6 @@ public Action Timer_CheckPayloadStompFirstCapture(Handle timer)
     if (!IsCurrentPayloadGamemode())
     {
         LogWhaleStat("auto_scramble_decision", "trigger=payload_first_cap|result=skipped|reason=gamemode|threshold=%d", threshold);
-        return Plugin_Stop;
-    }
-
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetRecentControlPointCaptureIntervalSeconds") != FeatureStatus_Available)
-    {
-        LogWhale("Payload first-cap auto scramble skipped: DGM_GetRecentControlPointCaptureIntervalSeconds unavailable.");
-        LogWhaleStat("auto_scramble_decision", "trigger=payload_first_cap|result=skipped|reason=native_unavailable|threshold=%d", threshold);
         return Plugin_Stop;
     }
 
@@ -635,11 +619,6 @@ static void CheckKothNoCapAutoScramble()
 
 static bool IsCurrentKothGamemode()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetGameModeKey") != FeatureStatus_Available)
-    {
-        return false;
-    }
-
     char gamemodeKey[32];
     if (!DGM_GetGameModeKey(gamemodeKey, sizeof(gamemodeKey)))
     {
@@ -651,11 +630,6 @@ static bool IsCurrentKothGamemode()
 
 static bool IsCurrentPayloadGamemode()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetGameModeKey") != FeatureStatus_Available)
-    {
-        return false;
-    }
-
     char gamemodeKey[32];
     if (!DGM_GetGameModeKey(gamemodeKey, sizeof(gamemodeKey)))
     {
@@ -747,14 +721,14 @@ static void CheckWinStreakAutoScramble(int winningTeam)
     }
 }
 
-public void Event_GameOver(Event event, const char[] name, bool dontBroadcast)
+public void WhaleBalance_Event_GameOver(Event event, const char[] name, bool dontBroadcast)
 {
     ClearAutoScramblePending();
     ClearPendingFullRoundWin();
     LogWhale("Game over: auto scramble pending state cleared.");
 }
 
-public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+public void WhaleBalance_Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (client <= 0 || client > MaxClients)

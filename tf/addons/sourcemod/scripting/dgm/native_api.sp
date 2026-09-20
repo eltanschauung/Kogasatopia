@@ -158,7 +158,7 @@ public any Native_DGM_AddTime(Handle plugin, int numParams)
     return DGM_ChangeRoundTimerTime(GetNativeCell(1), true);
 }
 
-public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
+void DGM_RegisterPluginApi()
 {
     MarkNativeAsOptional("TF2SetupUber_SetMultiplier");
     MarkNativeAsOptional("TF2SetupUber_IsAvailable");
@@ -191,5 +191,4 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     CreateNative("DGM_GetObjectiveLeaderTeam", Native_DGM_GetObjectiveLeaderTeam);
     CreateNative("DGM_SetTime", Native_DGM_SetTime);
     CreateNative("DGM_AddTime", Native_DGM_AddTime);
-    return APLRes_Success;
 }

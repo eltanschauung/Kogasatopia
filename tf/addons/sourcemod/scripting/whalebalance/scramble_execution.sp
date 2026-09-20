@@ -319,12 +319,6 @@ static int SelectScrambleMedicCorrectionCandidate(int team, bool requireMedic,
 
 static void WhaleScramble_AddKothTime()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetGameModeKey") != FeatureStatus_Available
-        || GetFeatureStatus(FeatureType_Native, "DGM_AddTime") != FeatureStatus_Available)
-    {
-        return;
-    }
-
     char gamemodeKey[32];
     if (!DGM_GetGameModeKey(gamemodeKey, sizeof(gamemodeKey))
         || !StrEqual(gamemodeKey, "koth", false))
@@ -343,12 +337,6 @@ static void WhaleScramble_AddKothTime()
 
 static bool IsSetupActive()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_IsSetupActive") != FeatureStatus_Available)
-    {
-        LogWhale("Setup scramble polish skipped: DGM_IsSetupActive unavailable.");
-        return false;
-    }
-
     return DGM_IsSetupActive();
 }
 

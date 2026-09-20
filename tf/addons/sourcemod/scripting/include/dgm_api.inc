@@ -13,6 +13,7 @@ enum DGMObjectiveLeader
     DGMObjectiveLeader_Blue
 };
 
+#if !defined DGM_IMPLEMENTATION
 native bool DGM_GetGameMode(char[] buffer, int maxlen);
 native int DGM_RealPlayerCount();
 native int DGM_RealTeamPlayerCount(int team);
@@ -45,3 +46,15 @@ native bool DGM_AddTime(int seconds);
  * @param connectedClients Current GetClientCount(false) value.
  */
 forward void DGM_OnSetupTeamRatioReady(int realTeamPlayers, int connectedClients);
+
+public SharedPlugin __pl_dgm =
+{
+    name = "dgm",
+    file = "whalescramble.smx",
+#if defined REQUIRE_PLUGIN
+    required = 1,
+#else
+    required = 0,
+#endif
+};
+#endif

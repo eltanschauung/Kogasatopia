@@ -93,16 +93,8 @@ static int GetPlayableTeamClientCount(int team)
 
 void GetScrambleTeamCounts(int &redCount, int &bluCount, int &totalPlayers)
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_RealTeamPlayerCount") == FeatureStatus_Available)
-    {
-        redCount = DGM_RealTeamPlayerCount(TEAM_RED);
-        bluCount = DGM_RealTeamPlayerCount(TEAM_BLU);
-    }
-    else
-    {
-        redCount = GetPlayableTeamClientCount(TEAM_RED);
-        bluCount = GetPlayableTeamClientCount(TEAM_BLU);
-    }
+    redCount = DGM_RealTeamPlayerCount(TEAM_RED);
+    bluCount = DGM_RealTeamPlayerCount(TEAM_BLU);
 
     totalPlayers = redCount + bluCount;
 }
@@ -213,11 +205,6 @@ void ApplyEngineScramblePolicy()
 
 bool IsSmallFormatGamemode()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_IsSmallFormatGamemode") != FeatureStatus_Available)
-    {
-        return false;
-    }
-
     return DGM_IsSmallFormatGamemode();
 }
 

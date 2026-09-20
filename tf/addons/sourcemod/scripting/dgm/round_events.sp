@@ -1,11 +1,11 @@
-public void Event_RoundActive(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_RoundActive(Event event, const char[] name, bool dontBroadcast)
 {
     g_bGameRulesReady = true;
     g_bSetupTeamRatioForwardFired = false;
     DGM_ClearAllRespawnTimers();
-    g_iRoundStartTimestamp = GetTime();
+    g_iDgmRoundStartTimestamp = GetTime();
     g_iLastRoundDuration = 0;
-    DGM_ResetCaptureIntervalStats(g_iRoundStartTimestamp);
+    DGM_ResetCaptureIntervalStats(g_iDgmRoundStartTimestamp);
 
     if (g_cvTimeOverride != null)    g_cvTimeOverride.RestoreDefault();
     if (!g_cvPopulationRespawns.BoolValue)
@@ -43,13 +43,13 @@ public void Event_RoundActive(Event event, const char[] name, bool dontBroadcast
 	}
 }
 
-public void Event_SetupFinished(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_SetupFinished(Event event, const char[] name, bool dontBroadcast)
 {
     g_bGameRulesReady = true;
     DGM_SetSetupActive(false);
 }
 
-public void Event_RoundFullyActive(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_RoundFullyActive(Event event, const char[] name, bool dontBroadcast)
 {
     g_bGameRulesReady = true;
     if (DGM_IsSetupBhopActive())
@@ -67,12 +67,12 @@ public void Event_RoundFullyActive(Event event, const char[] name, bool dontBroa
     DGM_QueueSetupStartCheck();
 }
 
-public void Event_RoundWin(Event event, const char[] name, bool dontBroadcast)
+public void DGM_Event_RoundWin(Event event, const char[] name, bool dontBroadcast)
 {
     g_bGameRulesReady = true;
     DGM_ClearAllRespawnTimers();
     int roundEndTimestamp = GetTime();
-    g_iLastRoundDuration = DGM_CalculateRoundDurationSeconds(g_iRoundStartTimestamp, roundEndTimestamp);
+    g_iLastRoundDuration = DGM_CalculateRoundDurationSeconds(g_iDgmRoundStartTimestamp, roundEndTimestamp);
     DGM_LogCaptureIntervalStats(event.GetInt("team"), g_iLastRoundDuration);
 
     SetConVarInt(g_cvTimeOverride, 30);
