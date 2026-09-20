@@ -149,13 +149,13 @@ public Action Timer_Autobalance(Handle timer)
     AB_GetTeamChatLabel(biggestTeam,  fromTeamChat, sizeof(fromTeamChat));
     AB_GetTeamChatLabel(smallestTeam, toTeamChat,   sizeof(toTeamChat));
 
-    if (ShouldSkipWinningTeamAutobalance(biggestTeam, smallestTeam, diff))
+    if (ShouldSkipLosingTeamAutobalance(biggestTeam))
     {
         if (loggingEnabled)
         {
             LogBalance(
-                "Skip balance from %s to %s: sm_autobalance_ignore_winning=%.2f blocked losing-to-winning move at diff=%d",
-                fromTeamName, toTeamName, g_hIgnoreWinning.FloatValue, diff
+                "Skip balance from %s to %s: sm_autobalance_ignore_winning blocked a move away from the detected losing team at diff=%d",
+                fromTeamName, toTeamName, diff
             );
         }
         return Plugin_Continue;

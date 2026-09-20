@@ -18,28 +18,16 @@ bool ShouldSuppressAutobalanceForGamemode()
     return DGM_IsSmallFormatGamemode();
 }
 
-bool ShouldSkipWinningTeamAutobalance(int fromTeam, int toTeam, int diff)
+bool ShouldSkipLosingTeamAutobalance(int fromTeam)
 {
-    if (g_hIgnoreWinning == null || g_hIgnoreWinning.FloatValue <= 0.0)
+    if (g_hIgnoreWinning == null || !g_hIgnoreWinning.BoolValue)
     {
         return false;
     }
 
     int winningTeam = DGM_GetObjectiveLeaderTeam();
     int losingTeam = AB_GetOpposingCoreTeam(winningTeam);
-
-    if (losingTeam == 0 || fromTeam != losingTeam || toTeam != winningTeam)
-    {
-        return false;
-    }
-
-    float ignoreWinning = g_hIgnoreWinning.FloatValue;
-    if (ignoreWinning > 1.0 && ignoreWinning >= float(diff))
-    {
-        return false;
-    }
-
-    return true;
+    return losingTeam != 0 && fromTeam == losingTeam;
 }
 
 static int AB_GetOpposingCoreTeam(int team)
