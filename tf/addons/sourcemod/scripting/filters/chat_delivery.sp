@@ -41,6 +41,11 @@ void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, 
         return;
     }
 
+    if (g_bMuteArchivedSpeakers[receiver] && Filters_IsConnectedParseeClient(sender))
+    {
+        return;
+    }
+
     if (Filters_RedlistEnabled()
         && sender > 0
         && sender <= MaxClients
