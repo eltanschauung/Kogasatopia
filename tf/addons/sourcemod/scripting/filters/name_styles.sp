@@ -649,6 +649,11 @@ static void BuildChatPrefix(int client, char[] output, int maxlen)
 {
     output[0] = '\0';
 
+    if (Filters_IsConnectedParseeClient(client))
+    {
+        return;
+    }
+
     if (GetFeatureStatus(FeatureType_Native, "Tags_GetSelectedTag") != FeatureStatus_Available)
     {
         return;
