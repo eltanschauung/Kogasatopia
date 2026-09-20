@@ -4,7 +4,7 @@ koth_harvest_final
 koth_bagel_rc13
 koth_soot_final1
 koth_lumberyard_pro
-koth_eientei_final1
+koth_citadel_a7
 koth_kemptown_rc4
 workshop/koth_rocktop_rc2.ugc454207393
 koth_slaughterhouse_72_rc1
