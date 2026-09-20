@@ -14,6 +14,7 @@ public void OnPluginStart()
     g_PerMapStateAction = g_PerMapLateLoad ? BP_PER_MAP_ACTION_RESTORE : BP_PER_MAP_ACTION_RESET;
     RefreshPerMapAwardScope();
     Rewards_OnPluginStart();
+    Welfare_OnPluginStart();
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -129,6 +130,7 @@ public void OnMapStart()
 {
     Lotteries_OnMapStart();
     Bounties_OnMapStart();
+    Welfare_OnMapStart();
     RefreshPerMapAwardScope();
     if (g_PerMapIgnoreInitialMapStart)
     {

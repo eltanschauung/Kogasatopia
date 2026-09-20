@@ -53,19 +53,18 @@ bool BuildPerMapAwardKeyForSteamId(const char[] steamId, const char[] type, char
     return true;
 }
 
-bool BuildPerMapAwardKey(int client, const char[] type, char[] key, int maxlen)
+int GetPerMapAwardCount(int client, const char[] type)
 {
     char steamId[32];
     if (!GetClientSteamId64(client, steamId, sizeof(steamId)))
     {
-        key[0] = '\0';
-        return false;
+        return 0;
     }
 
-    return BuildPerMapAwardKeyForSteamId(steamId, type, key, maxlen);
+    return GetPerMapAwardCountForSteamId(steamId, type);
 }
 
-int GetPerMapAwardCount(int client, const char[] type)
+int GetPerMapAwardCountForSteamId(const char[] steamId, const char[] type)
 {
     if (!g_PerMapAwardsReady)
     {
@@ -73,7 +72,7 @@ int GetPerMapAwardCount(int client, const char[] type)
     }
 
     char key[128];
-    if (!BuildPerMapAwardKey(client, type, key, sizeof(key)))
+    if (!BuildPerMapAwardKeyForSteamId(steamId, type, key, sizeof(key)))
     {
         return 0;
     }
@@ -195,6 +194,61 @@ bool QueuePerMapAwardIncrement(const char[] steamId, const char[] type)
             now);
     }
 
+    g_Database.Query(SQL_OnIgnoredResult, query);
+    return true;
+}
+
+bool ResetPerMapAwardCount(int client, const char[] type)
+{
+    char steamId[32];
+    if (!GetClientSteamId64(client, steamId, sizeof(steamId)))
+    {
+        return false;
+    }
+
+    if (GetPerMapAwardCountForSteamId(steamId, type) <= 0
+        || !QueuePerMapAwardReset(steamId, type))
+    {
+        return false;
+    }
+
+    char key[128];
+    if (!BuildPerMapAwardKeyForSteamId(steamId, type, key, sizeof(key)))
+    {
+        return false;
+    }
+
+    g_PerMapAwardCounts.Remove(key);
+    return true;
+}
+
+bool QueuePerMapAwardReset(const char[] steamId, const char[] type)
+{
+    if (!g_PerMapAwardsReady || !g_DatabaseReady || g_Database == null
+        || steamId[0] == '\0' || type[0] == '\0')
+    {
+        return false;
+    }
+
+    char escapedMap[257];
+    char escapedSteamId[65];
+    char escapedType[129];
+    if (!EscapeSql(g_PerMapName, escapedMap, sizeof(escapedMap))
+        || !EscapeSql(steamId, escapedSteamId, sizeof(escapedSteamId))
+        || !EscapeSql(type, escapedType, sizeof(escapedType)))
+    {
+        return false;
+    }
+
+    char query[768];
+    FormatEx(query, sizeof(query),
+        "DELETE FROM %s WHERE server_port = %d AND map_name = '%s' "
+        ... "AND steamid64 = '%s' AND reward_id = '%s'",
+        BP_PER_MAP_AWARDS_TABLE,
+        g_PerMapServerPort,
+        escapedMap,
+        escapedSteamId,
+        escapedType);
     g_Database.Query(SQL_OnIgnoredResult, query);
     return true;
 }

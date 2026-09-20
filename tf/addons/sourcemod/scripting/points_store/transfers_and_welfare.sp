@@ -1,3 +1,62 @@
+bool g_WelfareVolunteerResetUsed = false;
+
+void Welfare_OnPluginStart()
+{
+    HookEvent("teamplay_round_start", Event_WelfareRoundStart, EventHookMode_PostNoCopy);
+}
+
+void Welfare_OnMapStart()
+{
+    g_WelfareVolunteerResetUsed = false;
+}
+
+public void Event_WelfareRoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_WelfareVolunteerResetUsed || !g_PerMapAwardsReady
+        || GetFeatureStatus(FeatureType_Native, "TeamBalance_IsVolunteerEligible") != FeatureStatus_Available)
+    {
+        return;
+    }
+
+    if (GetPerMapAwardCountForSteamId(
+        BP_WELFARE_VOLUNTEER_RESET_STEAMID,
+        BP_WELFARE_VOLUNTEER_RESET_REWARD) > 0)
+    {
+        g_WelfareVolunteerResetUsed = true;
+        return;
+    }
+
+    bool resetAny = false;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!Client_IsHumanInGame(client)
+            || !TeamBalance_IsVolunteerEligible(client)
+            || GetPerMapAwardCount(client, "welfare") < 1)
+        {
+            continue;
+        }
+
+        if (ResetPerMapAwardCount(client, "welfare"))
+        {
+            resetAny = true;
+        }
+    }
+
+    if (!resetAny)
+    {
+        return;
+    }
+
+    g_WelfareVolunteerResetUsed = true;
+    IncrementPerMapAwardCountForSteamId(
+        BP_WELFARE_VOLUNTEER_RESET_STEAMID,
+        BP_WELFARE_VOLUNTEER_RESET_REWARD);
+
+    char colorTag[BP_CURRENCY_COLOR_MAX + 2];
+    GetCurrencyColorTag(colorTag, sizeof(colorTag));
+    CPrintToChatAll("%s[Gems]{gold}!volunteer{default}s can collect welfare again!", colorTag);
+}
+
 public Action Command_SendBonusPoints(int client, int args)
 {
     if (!Client_IsHumanInGame(client))
@@ -271,20 +330,6 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
             CPrintToChat(client, "%s Could not collect welfare right now.", prefix);
         }
         return;
-    }
-
-    if (GetFeatureStatus(FeatureType_Native, "TeamBalance_IsVolunteerEligible") == FeatureStatus_Available
-        && TeamBalance_IsVolunteerEligible(client))
-    {
-        ApplyBonusPoints(
-            client,
-            BP_VOLUNTEER_WELFARE_BONUS,
-            true,
-            true,
-            1.0,
-            BP_VOLUNTEER_WELFARE_BONUS_TYPE,
-            0,
-            BP_VOLUNTEER_WELFARE_BONUS_DELAY);
     }
 
     PlayWelfareSound();
