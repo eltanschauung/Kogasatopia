@@ -189,8 +189,8 @@ int g_iBalanceMovedOperationGeneration[MAXPLAYERS + 1];
 public Plugin myinfo =
 {
     name = "WhaleScramble",
-    author = "Hombre, AW 'Swixel' Stanley",
-    description = "Unified gamemode, respawn, autobalance, team-swap, and scramble controller.",
+    author = "Hombre, AW 'Swixel' Stanley, Tsunami",
+    description = "Unified gamemode, respawn, class-limit, autobalance, team-swap, and scramble controller.",
     version = PLUGIN_VERSION,
     url = "https://kogasa.tf"
 };
@@ -199,6 +199,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 {
     DGM_RegisterPluginApi();
     WhaleBalance_RegisterPluginApi();
+    ClassLimits_RegisterOptionalNatives();
     return APLRes_Success;
 }
 
@@ -206,10 +207,12 @@ public void OnPluginStart()
 {
     DGM_OnPluginStart();
     WhaleBalance_OnPluginStart();
+    ClassLimits_OnPluginStart();
 }
 
 public void OnPluginEnd()
 {
+    ClassLimits_OnPluginEnd();
     WhaleBalance_OnPluginEnd();
     DGM_OnPluginEnd();
 }
@@ -218,6 +221,7 @@ public void OnMapStart()
 {
     DGM_OnMapStart();
     WhaleBalance_OnMapStart();
+    ClassLimits_OnMapStart();
 }
 
 public void OnMapEnd()
@@ -230,6 +234,7 @@ public void OnConfigsExecuted()
 {
     DGM_OnConfigsExecuted();
     WhaleBalance_OnConfigsExecuted();
+    ClassLimits_OnConfigsExecuted();
 }
 
 public void OnAllPluginsLoaded()
@@ -251,10 +256,12 @@ public void OnClientPutInServer(int client)
 {
     DGM_OnClientPutInServer(client);
     WhaleBalance_OnClientPutInServer(client);
+    ClassLimits_OnClientPutInServer(client);
 }
 
 public void OnClientDisconnect(int client)
 {
+    ClassLimits_OnClientDisconnect(client);
     WhaleBalance_OnClientDisconnect(client);
     DGM_OnClientDisconnect(client);
 }
@@ -271,6 +278,8 @@ public void OnClientDisconnect(int client)
 #include "dgm/commands.sp"
 #include "dgm/respawn_timers.sp"
 #include "dgm/round_events.sp"
+
+#include "classlimits/module.sp"
 
 #include "whalebalance/native_api.sp"
 #include "whalebalance/plugin_api.sp"

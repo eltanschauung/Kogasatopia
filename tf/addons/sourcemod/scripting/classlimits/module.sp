@@ -1,27 +1,6 @@
-#pragma semicolon 1
-#pragma newdecls required
-#pragma tabsize 4
-
-#include <sourcemod>
-
-#include <tf2>
-#include <tf2_stocks>
-
-#include <dhooks>
-
-#include <morecolors>
-
-
-#undef REQUIRE_PLUGIN
-#include <dgm_api>
-#include <whaletracker_api>
-#define REQUIRE_PLUGIN
-#include <plugin_statistics>
-
-#include "include/steam_identity.inc"
-#include "include/tf2_classes.inc"
-
-#define PL_VERSION "1.0.2"
+// Class Limits is compiled as an internal WhaleScramble module. Its public
+// convar and command names remain unchanged for configuration compatibility.
+#define CLASSLIMITS_VERSION "1.0.2"
 #define CLASSLIMITS_STATS_INTERVAL 180.0
 #define CLASSLIMITS_CONFIG "configs/classlimits.cfg"
 #define CLASS_AVAILABILITY_REQUEST_LIFETIME 240
@@ -42,15 +21,6 @@
 #define TF_TEAM_RED             2
 
 #define POPULATION_RESTRICTION_MIN_PLAYERS 3
-
-public Plugin myinfo =
-{
-    name        = "classlimits",
-    author      = "Tsunami (updated by Codex)",
-    description = "Restrict classes evenly across teams in TF2.",
-    version     = PL_VERSION,
-    url         = "https://kogasa.tf"
-};
 
 int g_iClass[MAXPLAYERS + 1];
 bool g_bForcedRespawn[MAXPLAYERS + 1];
@@ -96,12 +66,12 @@ char g_sSounds[TF_CLASS_ENGINEER + 1][24] = {"", "vo/scout_no03.mp3",   "vo/snip
                                 "vo/demoman_no03.mp3", "vo/medic_no03.mp3",  "vo/heavy_no02.mp3",
                                 "vo/pyro_no01.mp3",    "vo/spy_no02.mp3",    "vo/engineer_no03.mp3"};
 
-public void OnPluginStart()
+void ClassLimits_OnPluginStart()
 {
     g_ClassBans = new StringMap();
     SetupOverhealWarningHook();
 
-    CreateConVar("classlimits_version", PL_VERSION, "Restrict classes in TF2.", FCVAR_NOTIFY);
+    CreateConVar("classlimits_version", CLASSLIMITS_VERSION, "Restrict classes in TF2.", FCVAR_NOTIFY);
     g_hEnabled      = CreateConVar("restrict_enabled",     "1", "Enable or disable class limits.");
     g_hFlags        = CreateConVar("restrict_flags",       "z", "Admin flags allowed to bypass class limits.");
     g_hImmunity     = CreateConVar("restrict_immunity",    "0", "Enable/disable admin immunity for class limits.");
@@ -183,18 +153,13 @@ public void OnPluginStart()
     g_hClassStateTimer = CreateTimer(3.0, Timer_UpdateClassState, _, TIMER_REPEAT);
 }
 
-public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
+void ClassLimits_RegisterOptionalNatives()
 {
-    MarkNativeAsOptional("DGM_GetGameModeKey");
-    MarkNativeAsOptional("DGM_RealPlayerCount");
-    MarkNativeAsOptional("DGM_CurrentNormalizedMap");
-    MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("WhaleTracker_AreStatsLoaded");
     MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeSeconds");
-    return APLRes_Success;
 }
 
-public void OnMapStart()
+void ClassLimits_OnMapStart()
 {
     g_bMedicImbalanceActive = false;
     g_bMedicImbalanceDisabledAlertShown = false;
@@ -215,7 +180,7 @@ public void OnMapStart()
     }
 }
 
-public void OnPluginEnd()
+void ClassLimits_OnPluginEnd()
 {
     RestoreOverheal();
     if (g_hStartHealingTarget != null)
@@ -239,7 +204,7 @@ public void OnPluginEnd()
     delete g_ClassBans;
 }
 
-public void OnClientPutInServer(int client)
+void ClassLimits_OnClientPutInServer(int client)
 {
     g_iClass[client]                 = TF_CLASS_UNKNOWN;
     g_bForcedRespawn[client]         = false;
@@ -249,7 +214,7 @@ public void OnClientPutInServer(int client)
     QueueOverhealStateUpdate();
 }
 
-public void OnClientDisconnect(int client)
+void ClassLimits_OnClientDisconnect(int client)
 {
     g_bOverhealWarningShown[client] = false;
     ClearClassAvailabilityRequest(client);
@@ -395,7 +360,7 @@ bool ShouldDisplayClassInList(int classId)
     return limitCvar.FloatValue >= 0.0;
 }
 
-public void OnConfigsExecuted()
+void ClassLimits_OnConfigsExecuted()
 {
     LoadClassBans();
     UpdateGameModeName();
@@ -491,7 +456,7 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
     }
 }
 
-static int GetClientScore(int client)
+static int ClassLimits_GetClientScore(int client)
 {
     static int scorePropState = 0;
     if (scorePropState == 0
@@ -516,7 +481,7 @@ static bool GetTeamTopScoreThreshold(int team, int &threshold)
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsClientInGame(i) || IsFakeClient(i) || GetClientTeam(i) != team) continue;
-        int score = GetClientScore(i);
+        int score = ClassLimits_GetClientScore(i);
         count++;
         if (score > topScores[0])      { topScores[2] = topScores[1]; topScores[1] = topScores[0]; topScores[0] = score; }
         else if (score > topScores[1]) { topScores[2] = topScores[1]; topScores[1] = score; }
@@ -535,7 +500,7 @@ static bool IsTopTeamScorer(int client)
     if (team < TF_TEAM_RED) return false;
     int threshold;
     if (!GetTeamTopScoreThreshold(team, threshold)) return false;
-    return GetClientScore(client) >= threshold;
+    return ClassLimits_GetClientScore(client) >= threshold;
 }
 
 static bool IsClassLimitImmune(int client)
@@ -588,16 +553,10 @@ static int GetHumanTeamClientCount(int team)
 
 static bool GetReliableGameplayHumanClientCount(int &playerCount)
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_RealPlayerCount") == FeatureStatus_Available)
-    {
-        playerCount = DGM_RealPlayerCount();
-        int connectedClients = GetClientCount(false);
-        return connectedClients <= 0
-            || float(playerCount) / float(connectedClients) >= DGM_PLAYERCOUNT_RELIABILITY_RATIO;
-    }
-
-    playerCount = GetHumanTeamClientCount(TF_TEAM_RED) + GetHumanTeamClientCount(TF_TEAM_BLU);
-    return true;
+    playerCount = DGM_RealPlayerCount();
+    int connectedClients = GetClientCount(false);
+    return connectedClients <= 0
+        || float(playerCount) / float(connectedClients) >= DGM_PLAYERCOUNT_RELIABILITY_RATIO;
 }
 
 static void SetupOverhealWarningHook()
@@ -900,7 +859,7 @@ bool IsClassAtLimit(int client, int iTeam, int iClass, int &limitOut)
             continue;
         }
         if (iClass == TF_CLASS_MEDIC && !MedicCountsTowardClassLimit(i)) continue;
-        if (haveThreshold && GetClientScore(i) >= scoreThreshold) continue;
+        if (haveThreshold && ClassLimits_GetClientScore(i) >= scoreThreshold) continue;
         if (++iCount >= limitOut) return true;
     }
     return false;
@@ -1163,7 +1122,7 @@ static bool IsClassAvailableForClient(int client, int classId)
         {
             continue;
         }
-        if (haveThreshold && GetClientScore(other) >= scoreThreshold)
+        if (haveThreshold && ClassLimits_GetClientScore(other) >= scoreThreshold)
         {
             continue;
         }
@@ -1195,13 +1154,12 @@ void FormatClassLimitText(int classId, char[] buffer, int maxlen)
 
 void UpdateGameModeName()
 {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_GetGameModeKey") != FeatureStatus_Available)
+    if (!DGM_GetGameModeKey(g_sGameMode, sizeof(g_sGameMode)))
     {
         strcopy(g_sGameMode, sizeof(g_sGameMode), "this map");
         return;
     }
 
-    DGM_GetGameModeKey(g_sGameMode, sizeof(g_sGameMode));
     TrimString(g_sGameMode);
     if (!g_sGameMode[0])
         strcopy(g_sGameMode, sizeof(g_sGameMode), "this map");
