@@ -46,6 +46,7 @@
 #define ATTR_RELOAD_ON_KILL "reload on kill"
 #define ATTR_REFILL_CLIP_ON_HIT "refill clip on hit"
 #define ATTR_REFILL_SECONDARY_CLIP_ON_HIT "refill secondary clip on hit"
+#define ATTR_REFILL_SECONDARY_CLIP_ON_HIT_PERCENTAGE "refill secondary clip on hit percentage"
 #define ATTR_WEARER_REFILL_SECONDARY_CLIP_ON_KILL "wearer refill secondary clip on kill"
 #define ATTR_AMBASSADOR_102 "ambassador 102"
 #define ATTR_RANDOM_SPREAD_OVERRIDE "random spread override"

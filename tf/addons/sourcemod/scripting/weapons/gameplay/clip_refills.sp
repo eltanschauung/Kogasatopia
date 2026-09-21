@@ -150,6 +150,37 @@ static void RefillSecondaryClipOnHit_ApplyFrame(any data)
 	RefillSecondaryClip(attacker, refillAmount);
 }
 
+static void RefillSecondaryClipPercentageOnHit_ApplyFrame(any data)
+{
+    DataPack pack = view_as<DataPack>(data);
+    pack.Reset();
+    int attacker = GetClientOfUserId(pack.ReadCell());
+    int sourceWeapon = EntRefToEntIndex(pack.ReadCell());
+    float refillPercentage = pack.ReadFloat();
+    delete pack;
+
+    if (!Weapons_IsClientInGame(attacker)
+        || !Weapons_IsValidWeaponEntity(sourceWeapon))
+    {
+        return;
+    }
+
+    int secondary = GetPlayerWeaponSlot(attacker, WEAPON_SLOT_SECONDARY);
+    int maxClip = GetWeaponMaxClip(secondary);
+    if (maxClip <= 0)
+    {
+        return;
+    }
+
+    int refillAmount = RoundToNearest(float(maxClip) * refillPercentage);
+    if (refillAmount < 1)
+    {
+        refillAmount = 1;
+    }
+
+    RefillSecondaryClip(attacker, refillAmount);
+}
+
 static bool RefillSecondaryClip(int attacker, int refillAmount)
 {
 	if (!Weapons_IsClientInGame(attacker) || refillAmount <= 0)
@@ -193,6 +224,18 @@ void WearerRefillSecondaryClipOnKill(int attacker)
 
 void RefillSecondaryClipOnHit_OnDamage(int attacker, int weapon)
 {
+    float refillPercentage = TF2CustAttr_GetFloat(
+        weapon, ATTR_REFILL_SECONDARY_CLIP_ON_HIT_PERCENTAGE, 0.0);
+    if (refillPercentage > 0.0)
+    {
+        DataPack percentagePack = new DataPack();
+        percentagePack.WriteCell(GetClientUserId(attacker));
+        percentagePack.WriteCell(EntIndexToEntRef(weapon));
+        percentagePack.WriteFloat(refillPercentage);
+        RequestFrame(RefillSecondaryClipPercentageOnHit_ApplyFrame, percentagePack);
+        return;
+    }
+
 	int refillAmount = TF2CustAttr_GetInt(weapon, ATTR_REFILL_SECONDARY_CLIP_ON_HIT, 0);
 	if (refillAmount <= 0)
 	{
