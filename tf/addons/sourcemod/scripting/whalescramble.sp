@@ -32,6 +32,7 @@
 #include "include/steam_identity.inc"
 #include "include/buildings.inc"
 #include "include/client_validation.inc"
+#include "include/tf2_classes.inc"
 
 #define DGM_IMPLEMENTATION
 #include "include/dgm_api.inc"
@@ -74,6 +75,7 @@ ConVar g_cvRespawnTime;
 ConVar g_cvPopulationConfigs;
 ConVar g_cvPopulationRespawns;
 ConVar g_cvLowPopThreshold;
+ConVar g_cvHeavyInstantRespawnImmunity;
 bool g_bSymmetrical;
 bool g_bRoundStartedOnce;
 bool g_bRespawnAdminTouchedThisMap;

@@ -2,6 +2,13 @@
 // Clear ownership before calling engine natives: respawning fires hooks synchronously.
 int g_iRespawnScheduledTeam[MAXPLAYERS + 1];
 
+bool DGM_HasInstantRespawnImmunity(int client)
+{
+    return g_cvHeavyInstantRespawnImmunity.BoolValue
+        && Client_IsInGame(client)
+        && TF2Classes_GetCurrentOrDesired(client) == TFClass_Heavy;
+}
+
 void DGM_StartRespawnReminderTimer(int client)
 {
     DGM_ClearRespawnReminderTimer(client);
@@ -71,7 +78,8 @@ int DGM_RespawnDeadClients()
     for (int client = 1; client <= MaxClients; client++)
     {
         if (!Client_IsInGame(client) || IsPlayerAlive(client)
-            || GetClientTeam(client) <= view_as<int>(TFTeam_Spectator))
+            || GetClientTeam(client) <= view_as<int>(TFTeam_Spectator)
+            || DGM_HasInstantRespawnImmunity(client))
         {
             continue;
         }
@@ -146,6 +154,11 @@ public void DGM_Event_PlayerDeath(Event event, const char[] name, bool dontBroad
         return;
     }
 
+    if (DGM_HasInstantRespawnImmunity(client))
+    {
+        return;
+    }
+
     float baseRespawn = g_cvRespawnTime.FloatValue;
     if (FloatCompare(baseRespawn, DGM_RESPAWN_DISABLED_TIME) == 0)
     {
@@ -191,7 +204,8 @@ public Action Timer_RespawnClient(Handle timer, int serial)
 
     // Settings and team membership can change while the timer is queued.
     if (!Client_IsInGame(client) || g_InternalOverride
-        || DGM_AreRespawnTimesForcedOn() || DGM_ShouldDisableInstantRespawn())
+        || DGM_AreRespawnTimesForcedOn() || DGM_ShouldDisableInstantRespawn()
+        || DGM_HasInstantRespawnImmunity(client))
     {
         return Plugin_Stop;
     }

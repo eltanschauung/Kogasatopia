@@ -5,6 +5,16 @@ void DGM_OnPluginStart()
     g_cvRespawnTime = CreateConVar("respawn_time", "3.0", "Respawn time length", _, true, 0.0, true, 30.0);
     g_cvPopulationRespawns = CreateConVar("dgm_population_respawns", "1", "Allow playercount changes to adjust respawn times.", _, true, 0.0, true, 1.0);
     g_cvLowPopThreshold = CreateConVar("dgm_lowpop_threshhold", "10", "Connected human count below which respawn times are disabled.", _, true, 0.0, true, 100.0);
+    g_cvHeavyInstantRespawnImmunity = CreateConVar(
+        "dgm_heavy_instant_respawn_immunity",
+        "0",
+        "If enabled, Heavies use TF2's normal respawn waves instead of DGM instant respawns.",
+        _,
+        true,
+        0.0,
+        true,
+        1.0
+    );
     // See description
     g_cvThreshold = CreateConVar("sm_highpop_threshhold", "18.0", "Threshhold for executing the highpop config", _, true, 0.0, true, 100.0);
     g_cvPopulationConfigs = CreateConVar("sm_dgm_population_configs", "0", "Enable DGM lowpop/highpop config execution.", _, true, 0.0, true, 1.0);
@@ -232,6 +242,11 @@ public void DGM_Event_PointCaptured(Event event, const char[] name, bool dontBro
 			for (int i = 1; i <= MaxClients; i++)
 				if (IsClientInGame(i) && GetClientTeam(i) == 2 && !IsPlayerAlive(i))
                 {
+                    if (DGM_HasInstantRespawnImmunity(i))
+                    {
+                        continue;
+                    }
+
                     DGM_ClearRespawnTimer(i);
 					TF2_RespawnPlayer(i);
                 }
