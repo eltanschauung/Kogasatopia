@@ -1,6 +1,6 @@
 void EquipHat(int client, int hatIndex)
 {
-	RemoveHat(client, hatIndex, false);
+	RemoveHat(client, hatIndex);
 
 	TFClassType playerClass = TF2_GetPlayerClass(client);
 	if (!IsClassAllowedForHat(hatIndex, playerClass))
@@ -40,10 +40,6 @@ void EquipHat(int client, int hatIndex)
 		}
 		g_iHatRef[client][hatIndex] = EntIndexToEntRef(wearable);
 	}
-	if (!g_Hats[hatIndex].force)
-	{
-		QueueHatStateSave(client);
-	}
 }
 
 void RemoveHatIndex(int client, int hatIndex)
@@ -68,7 +64,7 @@ void RemoveHatIndex(int client, int hatIndex)
 	g_iHideHatRef[client][hatIndex] = INVALID_ENT_REFERENCE;
 }
 
-void RemoveHat(int client, int hatIndex, bool saveState = true)
+void RemoveHat(int client, int hatIndex)
 {
 	if (client <= 0 || client > MaxClients)
 	{
@@ -81,18 +77,10 @@ void RemoveHat(int client, int hatIndex, bool saveState = true)
 		{
 			RemoveHatIndex(client, i);
 		}
-		if (saveState)
-		{
-			QueueHatStateSave(client);
-		}
 		return;
 	}
 
 	RemoveHatIndex(client, hatIndex);
-	if (saveState)
-	{
-		QueueHatStateSave(client);
-	}
 }
 
 int CreateWearableBase(int client, int itemIndex, int level, int quality)

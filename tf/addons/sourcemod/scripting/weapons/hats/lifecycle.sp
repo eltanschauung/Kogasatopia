@@ -13,7 +13,15 @@ void CustomHats_OnPluginStart()
 	RegConsoleCmd("sm_hats", Command_Hats, "Open the custom hats menu");
 	RegConsoleCmd("sm_hat", Command_Hats, "Open the custom hats menu");
 	RegConsoleCmd("sm_wear", Command_Hats, "Open the custom hats menu");
-	g_hHatStateCookie = RegClientCookie("custom_hats_state", "Custom hats state (hat,paint,hat,paint)", CookieAccess_Public);
+	g_hHatStateCookies[0] = RegClientCookie("custom_hats_state", "Custom hats state (hat_id:paint,...)", CookieAccess_Public);
+	for (int i = 1; i < MAX_HATS; i++)
+	{
+		char cookieName[32];
+		char cookieDescription[64];
+		Format(cookieName, sizeof(cookieName), "custom_hats_state_%d", i + 1);
+		Format(cookieDescription, sizeof(cookieDescription), "Custom hats state continuation %d", i + 1);
+		g_hHatStateCookies[i] = RegClientCookie(cookieName, cookieDescription, CookieAccess_Private);
+	}
 	g_hHatDebug = CreateConVar("sm_custom_hats_debug", "0", "Enable custom hats debug logging (0/1).", FCVAR_NONE, true, 0.0, true, 1.0);
 
 	for (int i = 1; i <= MaxClients; i++)
@@ -36,6 +44,7 @@ void CustomHats_OnPluginStart()
 		g_hHatSaveTimer[i] = INVALID_HANDLE;
 		g_bHatSaveAllowClear[i] = false;
 		g_iClientEnabledHatCount[i] = 0;
+		g_iHatCookieChunksUsed[i] = 0;
 	}
 
 	LoadConfig();
@@ -135,6 +144,7 @@ void CustomHats_OnClientConnected(int client)
 	g_iPostInventoryRetry[client] = 0;
 	g_bHatSaveAllowClear[client] = false;
 	g_iClientEnabledHatCount[client] = 0;
+	g_iHatCookieChunksUsed[client] = 0;
 	ResetClientHatSelections(client);
 	SetClientDefaultHat(client);
 	g_bHatStateLoaded[client] = false;
@@ -169,7 +179,6 @@ void CustomHats_OnClientCookiesCached(int client)
 
 	LoadHatStateCookie(client);
 	g_bHatStateLoaded[client] = true;
-	MigrateLegacyHatCookieIfNeeded(client);
 
 	if (IsPlayerAlive(client))
 	{
@@ -187,11 +196,12 @@ void CustomHats_OnClientDisconnect(int client)
 	g_iPostInventoryUserId[client] = 0;
 	g_iPostInventoryRetry[client] = 0;
 	FlushHatStateSave(client);
-	RemoveHat(client, -1, false);
+	RemoveHat(client, -1);
 	ResetClientHatSelections(client);
 	SetClientDefaultHat(client);
 	g_bHatStateLoaded[client] = false;
 	g_bHatStatePending[client] = false;
 	g_bHatStatePendingAllowClear[client] = false;
+	g_iHatCookieChunksUsed[client] = 0;
 }
 

@@ -30,7 +30,8 @@ int g_iPostInventoryRetry[MAXPLAYERS + 1];
 Handle g_hHatSaveTimer[MAXPLAYERS + 1];
 bool g_bHatSaveAllowClear[MAXPLAYERS + 1];
 int g_iClientEnabledHatCount[MAXPLAYERS + 1];
-Handle g_hHatStateCookie = INVALID_HANDLE;
+Handle g_hHatStateCookies[MAX_HATS];
+int g_iHatCookieChunksUsed[MAXPLAYERS + 1];
 int g_iHatPaintChoice[MAXPLAYERS + 1][MAX_HATS];
 ConVar g_hHatDebug = null;
 

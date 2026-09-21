@@ -201,37 +201,6 @@ bool HasClientEnabledHats(int client)
 	return g_iClientEnabledHatCount[client] > 0;
 }
 
-void MigrateLegacyHatCookieIfNeeded(int client)
-{
-	if (client <= 0 || client > MaxClients)
-	{
-		return;
-	}
-	if (!AreClientCookiesCached(client))
-	{
-		return;
-	}
-
-	char stateValue[HAT_COOKIE_VALUE_LEN];
-	GetClientCookie(client, g_hHatStateCookie, stateValue, sizeof(stateValue));
-	if (!stateValue[0])
-	{
-		return;
-	}
-	if (StrContains(stateValue, "|") == -1 && StrContains(stateValue, ":") == -1)
-	{
-		return;
-	}
-
-	if (g_hHatDebug != null && g_hHatDebug.BoolValue)
-	{
-		LogMessage("[CustomHats] Legacy cookie detected for %N: \"%s\"", client, stateValue);
-	}
-
-	LoadHatStateCookie(client);
-	g_bHatStateLoaded[client] = true;
-}
-
 bool TryParseNonNegativeInt(const char[] text, int &value)
 {
 	if (!text[0])

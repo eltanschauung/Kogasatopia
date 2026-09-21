@@ -1,21 +1,64 @@
+static void LoadStableHatStateChunk(int client, const char[] stateValue)
+{
+	char entries[32][96];
+	int entryCount = ExplodeString(stateValue, ",", entries, sizeof(entries), sizeof(entries[]));
+	for (int i = 0; i < entryCount; i++)
+	{
+		TrimString(entries[i]);
+		if (!entries[i][0])
+		{
+			continue;
+		}
+
+		char entryParts[2][64];
+		int partCount = ExplodeString(entries[i], ":", entryParts, sizeof(entryParts), sizeof(entryParts[]));
+		if (partCount <= 0 || !entryParts[0][0])
+		{
+			continue;
+		}
+
+		int hatIndex = FindHatIndexById(entryParts[0]);
+		if (!IsHatEnabled(hatIndex))
+		{
+			continue;
+		}
+		g_bHatEnabled[client][hatIndex] = true;
+		if (partCount > 1 && entryParts[1][0])
+		{
+			g_iHatPaintChoice[client][hatIndex] = ClampPaintIndex(StringToInt(entryParts[1]));
+		}
+		if (!g_Hats[hatIndex].paintable)
+		{
+			g_iHatPaintChoice[client][hatIndex] = ClampPaintIndex(g_Hats[hatIndex].defaultPaint);
+		}
+
+		if (!g_szHatIdChoice[client][0])
+		{
+			strcopy(g_szHatIdChoice[client], sizeof(g_szHatIdChoice[]), g_Hats[hatIndex].id);
+		}
+	}
+}
+
 void LoadHatStateCookie(int client)
 {
 	ResetClientHatSelections(client);
 	g_szHatIdChoice[client][0] = '\0';
+	g_iHatCookieChunksUsed[client] = 0;
 
-	if (g_hHatStateCookie == INVALID_HANDLE || !AreClientCookiesCached(client))
+	if (g_hHatStateCookies[0] == INVALID_HANDLE || !AreClientCookiesCached(client))
 	{
 		SetClientDefaultHat(client);
 		return;
 	}
 
 	char stateValue[HAT_COOKIE_VALUE_LEN];
-	GetClientCookie(client, g_hHatStateCookie, stateValue, sizeof(stateValue));
+	GetClientCookie(client, g_hHatStateCookies[0], stateValue, sizeof(stateValue));
 	if (!stateValue[0])
 	{
 		SetClientDefaultHat(client);
 		return;
 	}
+	g_iHatCookieChunksUsed[client] = 1;
 
 	if (g_hHatDebug != null && g_hHatDebug.BoolValue)
 	{
@@ -44,6 +87,8 @@ void LoadHatStateCookie(int client)
 				strcopy(g_szHatIdChoice[client], sizeof(g_szHatIdChoice[]), parts[1]);
 			}
 		}
+		// The pipe format used a stable id, but is rewritten once into the
+		// canonical comma-separated id:paint format.
 		needsResave = true;
 		if (!g_szHatIdChoice[client][0])
 		{
@@ -59,47 +104,28 @@ void LoadHatStateCookie(int client)
 
 	if (StrContains(stateValue, ":") != -1)
 	{
-		char entries[32][96];
-		int entryCount = ExplodeString(stateValue, ",", entries, sizeof(entries), sizeof(entries[]));
-		for (int i = 0; i < entryCount; i++)
+		LoadStableHatStateChunk(client, stateValue);
+		for (int chunk = 1; chunk < MAX_HATS; chunk++)
 		{
-			TrimString(entries[i]);
-			if (!entries[i][0])
+			if (g_hHatStateCookies[chunk] == INVALID_HANDLE)
 			{
 				continue;
 			}
-
-			char entryParts[2][64];
-			int partCount = ExplodeString(entries[i], ":", entryParts, sizeof(entryParts), sizeof(entryParts[]));
-			if (partCount <= 0 || !entryParts[0][0])
+			char chunkValue[HAT_COOKIE_VALUE_LEN];
+			GetClientCookie(client, g_hHatStateCookies[chunk], chunkValue, sizeof(chunkValue));
+			if (!chunkValue[0])
 			{
 				continue;
 			}
-
-			int hatIndex = FindHatIndexById(entryParts[0]);
-			if (!IsHatEnabled(hatIndex))
-			{
-				continue;
-			}
-			g_bHatEnabled[client][hatIndex] = true;
-			if (partCount > 1 && entryParts[1][0])
-			{
-				g_iHatPaintChoice[client][hatIndex] = ClampPaintIndex(StringToInt(entryParts[1]));
-			}
-			if (!g_Hats[hatIndex].paintable)
-			{
-				g_iHatPaintChoice[client][hatIndex] = ClampPaintIndex(g_Hats[hatIndex].defaultPaint);
-			}
-
-			if (!g_szHatIdChoice[client][0])
-			{
-				strcopy(g_szHatIdChoice[client], sizeof(g_szHatIdChoice[]), g_Hats[hatIndex].id);
-			}
+			LoadStableHatStateChunk(client, chunkValue);
+			g_iHatCookieChunksUsed[client] = chunk + 1;
 		}
-		needsResave = true;
 	}
 	else
 	{
+		// Numeric hat indices are configuration-order dependent. Resolve them
+		// against the current config once, then immediately persist stable ids.
+		needsResave = true;
 		char entries[64][12];
 		int entryCount = ExplodeString(stateValue, ",", entries, sizeof(entries), sizeof(entries[]));
 		for (int i = 0; i + 1 < entryCount; i += 2)
@@ -194,7 +220,7 @@ public Action Timer_HatStateSave(Handle timer, any client)
 
 void SaveHatStateCookie(int client, bool allowClear = false)
 {
-	if (g_hHatStateCookie == INVALID_HANDLE || client <= 0 || client > MaxClients)
+	if (g_hHatStateCookies[0] == INVALID_HANDLE || client <= 0 || client > MaxClients)
 	{
 		return;
 	}
@@ -210,9 +236,8 @@ void SaveHatStateCookie(int client, bool allowClear = false)
 		return;
 	}
 
-	char state[HAT_COOKIE_VALUE_LEN];
-	state[0] = '\0';
-
+	char states[MAX_HATS][HAT_COOKIE_VALUE_LEN];
+	int chunk = 0;
 	bool first = true;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
@@ -226,24 +251,30 @@ void SaveHatStateCookie(int client, bool allowClear = false)
 		int paint = g_Hats[i].paintable
 			? ClampPaintIndex(g_iHatPaintChoice[client][i])
 			: ClampPaintIndex(g_Hats[i].defaultPaint);
-		char entry[24];
-		Format(entry, sizeof(entry), "%d,%d", i, paint);
+		char entry[72];
+		Format(entry, sizeof(entry), "%s:%d", g_Hats[i].id, paint);
 
-		int needed = strlen(state) + strlen(entry) + (first ? 0 : 1);
-		if (needed >= sizeof(state))
+		int needed = strlen(states[chunk]) + strlen(entry) + (first ? 0 : 1);
+		if (needed >= sizeof(states[]))
 		{
-			break;
+			chunk++;
+			first = true;
+			if (chunk >= MAX_HATS)
+			{
+				LogError("[CustomHats] Cannot persist all selected hats for client %d: cookie chunk limit reached.", client);
+				return;
+			}
 		}
 
 		if (!first)
 		{
-			StrCat(state, sizeof(state), ",");
+			StrCat(states[chunk], sizeof(states[]), ",");
 		}
-		StrCat(state, sizeof(state), entry);
+		StrCat(states[chunk], sizeof(states[]), entry);
 		first = false;
 	}
 
-	if (!state[0] && !allowClear)
+	if (!states[0][0] && !allowClear)
 	{
 		if (g_hHatDebug != null && g_hHatDebug.BoolValue)
 		{
@@ -254,9 +285,28 @@ void SaveHatStateCookie(int client, bool allowClear = false)
 
 	if (g_hHatDebug != null && g_hHatDebug.BoolValue)
 	{
-		LogMessage("[CustomHats] Save cookie for %N: \"%s\"", client, state);
+		LogMessage("[CustomHats] Save cookie for %N using %d chunk(s): \"%s\"", client, states[0][0] ? chunk + 1 : 0, states[0]);
 	}
-	SetClientCookie(client, g_hHatStateCookie, state);
+
+	int newChunksUsed = states[0][0] ? chunk + 1 : 0;
+	int chunksToWrite = newChunksUsed;
+	if (g_iHatCookieChunksUsed[client] > chunksToWrite)
+	{
+		chunksToWrite = g_iHatCookieChunksUsed[client];
+	}
+	if (allowClear && chunksToWrite == 0)
+	{
+		chunksToWrite = 1;
+	}
+
+	for (int i = 0; i < chunksToWrite; i++)
+	{
+		if (g_hHatStateCookies[i] != INVALID_HANDLE)
+		{
+			SetClientCookie(client, g_hHatStateCookies[i], i < newChunksUsed ? states[i] : "");
+		}
+	}
+	g_iHatCookieChunksUsed[client] = newChunksUsed;
 }
 
 

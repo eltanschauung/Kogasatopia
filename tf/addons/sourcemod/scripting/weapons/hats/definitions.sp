@@ -193,6 +193,13 @@ bool AddHatConfig(HatConfig hat)
 	{
 		return false;
 	}
+	if (StrContains(hat.id, ",") != -1
+		|| StrContains(hat.id, ":") != -1
+		|| StrContains(hat.id, "|") != -1)
+	{
+		LogError("[CustomHats] Hat id contains a reserved cookie delimiter: %s", hat.id);
+		return false;
+	}
 	if (FindHatIndexById(hat.id) >= 0)
 	{
 		LogError("[CustomHats] Duplicate hat id in config: %s", hat.id);

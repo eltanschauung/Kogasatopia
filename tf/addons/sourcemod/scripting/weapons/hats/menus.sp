@@ -147,7 +147,7 @@ public int MenuHandler_HatToggle(Menu menu, MenuAction action, int client, int i
 		if (!CanClientUseHatForClass(client, hatIndex, TF2_GetPlayerClass(client)))
 		{
 			PrintHatLockedMessage(client, hatIndex);
-			RemoveHat(client, hatIndex, false);
+			RemoveHat(client, hatIndex);
 			ShowHatMenu(client);
 			return 0;
 		}
@@ -220,7 +220,7 @@ public int MenuHandler_HatPaint(Menu menu, MenuAction action, int client, int it
 		if (!CanClientUseHatForClass(client, hatIndex, TF2_GetPlayerClass(client)))
 		{
 			PrintHatLockedMessage(client, hatIndex);
-			RemoveHat(client, hatIndex, false);
+			RemoveHat(client, hatIndex);
 			ShowHatMenu(client);
 			return 0;
 		}
