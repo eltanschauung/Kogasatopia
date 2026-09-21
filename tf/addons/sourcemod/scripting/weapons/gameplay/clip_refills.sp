@@ -165,20 +165,7 @@ static void RefillSecondaryClipPercentageOnHit_ApplyFrame(any data)
         return;
     }
 
-    int secondary = GetPlayerWeaponSlot(attacker, WEAPON_SLOT_SECONDARY);
-    int maxClip = GetWeaponMaxClip(secondary);
-    if (maxClip <= 0)
-    {
-        return;
-    }
-
-    int refillAmount = RoundToNearest(float(maxClip) * refillPercentage);
-    if (refillAmount < 1)
-    {
-        refillAmount = 1;
-    }
-
-    RefillSecondaryClip(attacker, refillAmount);
+    RefillSecondaryClipByPercentage(attacker, refillPercentage);
 }
 
 static bool RefillSecondaryClip(int attacker, int refillAmount)
@@ -202,8 +189,54 @@ static bool RefillSecondaryClip(int attacker, int refillAmount)
 	return true;
 }
 
+static bool RefillSecondaryClipByPercentage(int attacker, float refillPercentage)
+{
+    if (!Weapons_IsClientInGame(attacker) || refillPercentage <= 0.0)
+    {
+        return false;
+    }
+
+    int secondary = GetPlayerWeaponSlot(attacker, WEAPON_SLOT_SECONDARY);
+    int maxClip = GetWeaponMaxClip(secondary);
+    if (maxClip <= 0)
+    {
+        return false;
+    }
+
+    int refillAmount = RoundToNearest(float(maxClip) * refillPercentage);
+    if (refillAmount < 1)
+    {
+        refillAmount = 1;
+    }
+
+    return RefillSecondaryClip(attacker, refillAmount);
+}
+
 void WearerRefillSecondaryClipOnKill(int attacker)
 {
+    float refillPercentage = 0.0;
+    for (int slot = 0; slot <= WEAPON_SLOT_LAST; slot++)
+    {
+        int weapon = GetPlayerWeaponSlot(attacker, slot);
+        if (!Weapons_IsValidWeaponEntity(weapon))
+        {
+            continue;
+        }
+
+        float percentage = TF2CustAttr_GetFloat(
+            weapon, ATTR_WEARER_REFILL_SECONDARY_CLIP_ON_KILL_PERCENTAGE, 0.0);
+        if (percentage > refillPercentage)
+        {
+            refillPercentage = percentage;
+        }
+    }
+
+    if (refillPercentage > 0.0)
+    {
+        RefillSecondaryClipByPercentage(attacker, refillPercentage);
+        return;
+    }
+
 	int refillAmount = 0;
 	for (int slot = 0; slot <= WEAPON_SLOT_LAST; slot++)
 	{
