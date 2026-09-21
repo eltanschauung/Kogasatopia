@@ -87,6 +87,11 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (!client)
         return Plugin_Continue;
 
+    // Preserve BaseComm's Plugin_Stop semantics: a gag blocks both ordinary
+    // chat and chat-triggered commands before any Filters delivery path runs.
+    if (FiltersBaseComm_IsClientGagged(client))
+        return Plugin_Stop;
+
     char dead[64];
     BuildDeathPrefix(client, dead, sizeof(dead));
 

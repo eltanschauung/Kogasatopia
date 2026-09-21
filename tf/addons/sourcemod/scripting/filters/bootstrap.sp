@@ -1,5 +1,12 @@
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 {
+    if (!FiltersBaseComm_PrepareMergedProvider(self, error, err_max))
+    {
+        return FiltersBaseComm_MigrationScheduled()
+            ? APLRes_SilentFailure
+            : APLRes_Failure;
+    }
+
     RegPluginLibrary("filters");
     CreateNative("Filters_IsRedlisted", Native_Filters_IsRedlisted);
     CreateNative("Filters_GetChatName", Native_Filters_GetChatName);
@@ -10,6 +17,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
     CreateNative("FilterAlerts_SuppressTeamAlertWindow", Native_FilterAlerts_SuppressTeamAlertWindow);
     RegPluginLibrary("mutecheck");
     CreateNative("MuteCheck_GetMutedClientCount", Native_MuteCheck_GetMutedClientCount);
+    FiltersBaseComm_RegisterNatives();
     MarkNativeAsOptional("AdminsDB_GetClientWhitelistLevel");
     MarkNativeAsOptional("Hugs_GetRapesGiven");
     MarkNativeAsOptional("Hugs_AreStatsLoaded");
@@ -23,6 +31,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 public void OnPluginStart()
 {
     LoadTranslations("common.phrases");
+    FiltersBaseComm_Initialize();
     Filters_EnsureCollections();
     LoadFilterConfig();
     Filters_CreateConVars();

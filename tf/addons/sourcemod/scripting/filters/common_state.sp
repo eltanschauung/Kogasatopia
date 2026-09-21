@@ -21,7 +21,7 @@ bool Filters_MuteDeafenEnabled()
 bool Filters_IsClientGagged(int client)
 {
     return Filters_IsClientIndex(client) && IsClientConnected(client)
-        && (BaseComm_IsClientGagged(client)
+        && (FiltersBaseComm_IsClientGagged(client)
             || (Filters_MuteDeafenEnabled() && g_MuteDeafened[client]));
 }
 

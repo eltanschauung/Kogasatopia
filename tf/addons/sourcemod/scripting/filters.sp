@@ -3,13 +3,13 @@
 
 #include <sourcemod>
 #include <clientprefs>
-#include <basecomm>
 #include <sdktools>
 #include <sdktools_functions>
 #include <sdktools_voice>
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
+#include <adminmenu>
 #include <adminsdb_api>
 #include <hugs_api>
 #include <points_store_api>
@@ -199,14 +199,15 @@ int g_iLastChatCleanup = 0;
 public Plugin myinfo =
 {
     name = "filters",
-    author = "Hombre, Dr. McKay",
-    description = "Chat Management + Filtered/Blacklisted Words + Web Communication Frontend",
+    author = "Hombre, Dr. McKay, AlliedModders LLC",
+    description = "Chat management, filtering, web relay, and BaseComm controls",
     version = "1.0.0",
     url = "https://kogasa.tf"
 };
 
 // Configuration/registration are separate from the asynchronous relay implementation.
 // Existing tidychat integration retains credit to pheadxdll.
+#include "filters/basecomm.sp"
 #include "filters/bootstrap.sp"
 #include "filters/common_state.sp"
 #include "filters/tidychat.sp"

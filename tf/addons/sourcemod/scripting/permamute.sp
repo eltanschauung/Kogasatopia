@@ -203,6 +203,14 @@ public OnLibraryRemoved(const String:name[]) {
     }
 }
 
+public OnLibraryAdded(const String:name[]) {
+    if (StrEqual(name, "basecomm")) {
+        // Reapply persistent and active vote silences after the merged
+        // provider is reloaded with filters.smx.
+        CreateTimer(0.1, Timer_ProcessConnectedCookies);
+    }
+}
+
 public OnAdminMenuReady(Handle:topmenu) {
     if (topmenu == g_adminMenu) {
 	return;
