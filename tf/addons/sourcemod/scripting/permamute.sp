@@ -33,6 +33,8 @@
 #include <filters_api>
 #define REQUIRE_PLUGIN
 
+#include "include/database.inc"
+
 #pragma semicolon 1
 
 #define PERMAMUTE_VERSION   "0.2"
@@ -40,6 +42,12 @@
 #define VOTEMUTE_DURATION   3600
 #define VOTEMUTE_PERCENT    65
 #define VOTEMUTE_TIME       20
+#define VOTEMUTE_DB_CONFIG  "default"
+#define VOTEMUTE_HISTORY_TABLE "permamute_votemute_history"
+#define VOTEMUTE_LOCK_TABLE "permamute_votemute_targets"
+#define VOTEMUTE_HISTORY_SECONDS (30 * 24 * 60 * 60)
+#define VOTEMUTE_PRUNE_INTERVAL 21600.0
+#define VOTEMUTE_RETRY_INTERVAL 5.0
 
 #define CVAR_VERSION	    0
 #define CVAR_NUM_CVARS	    1
@@ -63,8 +71,14 @@ new g_VoteMuteTargetUserId;
 new g_VoteMuteChoice[MAXPLAYERS + 1];
 new g_VoteMuteWeight[MAXPLAYERS + 1];
 new String:g_VoteMuteTargetAuth[32];
+new String:g_VoteMuteTargetSteamId64[32];
 new String:g_VoteMuteTargetName[MAX_NAME_LENGTH];
 new String:g_VoteMuteTargetChatName[256];
+Database g_VoteMuteDatabase = null;
+bool g_VoteMuteDatabaseReady = false;
+Handle g_VoteMuteDatabaseReconnectTimer = null;
+Handle g_VoteMutePruneTimer = null;
+int g_VoteMuteDatabaseGeneration = 0;
 
 enum PCommType {
     PCommType_PMute = 0,
@@ -151,11 +165,18 @@ public OnPluginStart() {
 	"sm_punsilence <player> - Permanently restores a player's ability to use voice and chat.");
 
     CreateTimer(1.0, Timer_ProcessConnectedCookies);
+    ConnectVoteMuteDatabase();
 
     new Handle:topmenu;
     if (LibraryExists("adminmenu") && ((topmenu = GetAdminTopMenu()) != INVALID_HANDLE)) {
 	OnAdminMenuReady(topmenu);
     }
+}
+
+public OnPluginEnd() {
+    Db_CancelTimer(g_VoteMuteDatabaseReconnectTimer);
+    Db_CancelTimer(g_VoteMutePruneTimer);
+    Db_Close(g_VoteMuteDatabase, g_VoteMuteDatabaseReady);
 }
 
 stock bool:PluginExists(const String:plugin_name[]) {
@@ -488,6 +509,172 @@ public Action:Timer_ProcessConnectedCookies(Handle:timer) {
     return Plugin_Stop;
 }
 
+stock ConnectVoteMuteDatabase() {
+    Db_CancelTimer(g_VoteMuteDatabaseReconnectTimer);
+    Db_Close(g_VoteMuteDatabase, g_VoteMuteDatabaseReady);
+
+    if (!Db_CheckConfigOrLog("permamute", VOTEMUTE_DB_CONFIG)) {
+        return;
+    }
+
+    g_VoteMuteDatabaseGeneration++;
+    Database.Connect(SQL_OnVoteMuteDatabaseConnected, VOTEMUTE_DB_CONFIG, g_VoteMuteDatabaseGeneration);
+}
+
+stock ScheduleVoteMuteDatabaseReconnect(Float:delay = DB_RECONNECT_DELAY) {
+    g_VoteMuteDatabaseReady = false;
+    if (g_VoteMuteDatabaseReconnectTimer == null) {
+        g_VoteMuteDatabaseReconnectTimer = CreateTimer(delay, Timer_ReconnectVoteMuteDatabase);
+    }
+}
+
+public Action:Timer_ReconnectVoteMuteDatabase(Handle:timer) {
+    g_VoteMuteDatabaseReconnectTimer = null;
+    ConnectVoteMuteDatabase();
+    return Plugin_Stop;
+}
+
+public void SQL_OnVoteMuteDatabaseConnected(Database db, const char[] error, any data) {
+    if (data != g_VoteMuteDatabaseGeneration) {
+        if (db != null) {
+            delete db;
+        }
+        return;
+    }
+
+    if (db == null) {
+        LogError("[PermaMute] Votemute history database connection failed: %s", error[0] ? error : "unknown error");
+        ScheduleVoteMuteDatabaseReconnect();
+        return;
+    }
+
+    g_VoteMuteDatabase = db;
+    g_VoteMuteDatabaseReady = false;
+    Db_CancelTimer(g_VoteMuteDatabaseReconnectTimer);
+
+    if (!g_VoteMuteDatabase.SetCharset("utf8mb4")) {
+        LogError("[PermaMute] Could not set the votemute database charset to utf8mb4.");
+    }
+
+    char query[768];
+    Format(query, sizeof(query),
+        "CREATE TABLE IF NOT EXISTS %s ("
+        ... "steamid64 VARCHAR(20) NOT NULL PRIMARY KEY, "
+        ... "updated_at BIGINT NOT NULL"
+        ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        VOTEMUTE_LOCK_TABLE);
+    g_VoteMuteDatabase.Query(SQL_OnVoteMuteLockSchemaReady, query);
+}
+
+public void SQL_OnVoteMuteLockSchemaReady(Database db, DBResultSet results, const char[] error, any data) {
+    if (db != g_VoteMuteDatabase) {
+        return;
+    }
+
+    if (error[0]) {
+        LogError("[PermaMute] Could not create the votemute target table: %s", error);
+        if (Db_IsTransientError(error)) {
+            ScheduleVoteMuteDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+        return;
+    }
+
+    char query[1024];
+    Format(query, sizeof(query),
+        "CREATE TABLE IF NOT EXISTS %s ("
+        ... "id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, "
+        ... "event_key VARCHAR(64) NOT NULL, "
+        ... "steamid64 VARCHAR(20) NOT NULL, "
+        ... "voted_at BIGINT NOT NULL, "
+        ... "PRIMARY KEY (id), "
+        ... "UNIQUE KEY uq_permavote_event (event_key), "
+        ... "KEY idx_permavote_target_time (steamid64, voted_at), "
+        ... "KEY idx_permavote_time (voted_at)"
+        ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        VOTEMUTE_HISTORY_TABLE);
+    g_VoteMuteDatabase.Query(SQL_OnVoteMuteHistorySchemaReady, query);
+}
+
+public void SQL_OnVoteMuteHistorySchemaReady(Database db, DBResultSet results, const char[] error, any data) {
+    if (db != g_VoteMuteDatabase) {
+        return;
+    }
+
+    if (error[0]) {
+        LogError("[PermaMute] Could not create the votemute history table: %s", error);
+        if (Db_IsTransientError(error)) {
+            ScheduleVoteMuteDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+        return;
+    }
+
+    g_VoteMuteDatabaseReady = true;
+    PruneVoteMuteHistory();
+    if (g_VoteMutePruneTimer == null) {
+        g_VoteMutePruneTimer = CreateTimer(
+            VOTEMUTE_PRUNE_INTERVAL,
+            Timer_PruneVoteMuteHistory,
+            _,
+            TIMER_REPEAT);
+    }
+}
+
+public Action:Timer_PruneVoteMuteHistory(Handle:timer) {
+    PruneVoteMuteHistory();
+    return Plugin_Continue;
+}
+
+stock PruneVoteMuteHistory() {
+    if (!Db_IsReady(g_VoteMuteDatabase, g_VoteMuteDatabaseReady)) {
+        return;
+    }
+
+    char query[256];
+    Format(query, sizeof(query),
+        "DELETE FROM %s WHERE voted_at < %d",
+        VOTEMUTE_HISTORY_TABLE,
+        GetTime() - VOTEMUTE_HISTORY_SECONDS);
+    g_VoteMuteDatabase.Query(SQL_OnVoteMuteHistoryPruned, query);
+}
+
+public void SQL_OnVoteMuteHistoryPruned(Database db, DBResultSet results, const char[] error, any data) {
+    if (db != g_VoteMuteDatabase) {
+        return;
+    }
+
+    if (error[0]) {
+        LogError("[PermaMute] Could not prune expired votemute history: %s", error);
+        if (Db_IsTransientError(error)) {
+            ScheduleVoteMuteDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+        return;
+    }
+
+    char query[512];
+    Format(query, sizeof(query),
+        "DELETE FROM %s WHERE updated_at < %d AND NOT EXISTS ("
+        ... "SELECT 1 FROM %s WHERE %s.steamid64 = %s.steamid64)",
+        VOTEMUTE_LOCK_TABLE,
+        GetTime() - VOTEMUTE_HISTORY_SECONDS,
+        VOTEMUTE_HISTORY_TABLE,
+        VOTEMUTE_HISTORY_TABLE,
+        VOTEMUTE_LOCK_TABLE);
+    g_VoteMuteDatabase.Query(SQL_OnVoteMuteLocksPruned, query);
+}
+
+public void SQL_OnVoteMuteLocksPruned(Database db, DBResultSet results, const char[] error, any data) {
+    if (db != g_VoteMuteDatabase) {
+        return;
+    }
+
+    if (error[0]) {
+        LogError("[PermaMute] Could not prune expired votemute targets: %s", error);
+        if (Db_IsTransientError(error)) {
+            ScheduleVoteMuteDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+        }
+    }
+}
+
 stock bool:VoteMutePointsStoreReady() {
     return GetFeatureStatus(FeatureType_Native, "PointsStore_GetBonusPoints") == FeatureStatus_Available
         && GetFeatureStatus(FeatureType_Native, "PointsStore_SpendBonusPoints") == FeatureStatus_Available;
@@ -503,6 +690,18 @@ stock GetVoteSilenceExpiry(client) {
     return StringToInt(value);
 }
 
+stock bool:IsClientPermanentlySilenced(client) {
+    if (client <= 0 || !IsClientInGame(client) || !AreClientCookiesCached(client)) {
+        return false;
+    }
+
+    decl String:muteValue[8];
+    decl String:gagValue[8];
+    GetClientCookie(client, g_cookies[COOKIE_PMUTE], muteValue, sizeof(muteValue));
+    GetClientCookie(client, g_cookies[COOKIE_PGAG], gagValue, sizeof(gagValue));
+    return StrEqual(muteValue, "1") && StrEqual(gagValue, "1");
+}
+
 public Action:Command_VoteMute(client, args) {
     if (client <= 0 || !IsClientInGame(client)) {
         return Plugin_Handled;
@@ -515,6 +714,11 @@ public Action:Command_VoteMute(client, args) {
 
     if (IsVoteInProgress() || g_VoteMuteTargetUserId != 0) {
         CPrintToChat(client, "{gold}[PermaMute]{default} Another vote is already in progress.");
+        return Plugin_Handled;
+    }
+
+    if (!Db_IsReady(g_VoteMuteDatabase, g_VoteMuteDatabaseReady)) {
+        CPrintToChat(client, "{gold}[PermaMute]{default} Votemute history is not ready yet.");
         return Plugin_Handled;
     }
 
@@ -537,6 +741,11 @@ public Action:Command_VoteMute(client, args) {
 
     if (GetVoteSilenceExpiry(target) > GetTime()) {
         CPrintToChat(client, "{gold}[PermaMute]{default} %N is already vote-silenced.", target);
+        return Plugin_Handled;
+    }
+
+    if (IsClientPermanentlySilenced(target)) {
+        CPrintToChat(client, "{gold}[PermaMute]{default} %N is already permanently silenced.", target);
         return Plugin_Handled;
     }
 
@@ -604,6 +813,16 @@ stock bool:StartVoteMute(client, target) {
         return false;
     }
 
+    if (IsClientPermanentlySilenced(target)) {
+        CPrintToChat(client, "{gold}[PermaMute]{default} The target is already permanently silenced.");
+        return false;
+    }
+
+    if (!Db_IsReady(g_VoteMuteDatabase, g_VoteMuteDatabaseReady)) {
+        CPrintToChat(client, "{gold}[PermaMute]{default} Votemute history is no longer ready.");
+        return false;
+    }
+
     if (!VoteMutePointsStoreReady()
         || (GetFeatureStatus(FeatureType_Native, "PointsStore_AreBonusPointsLoaded") == FeatureStatus_Available
             && !PointsStore_AreBonusPointsLoaded(client))
@@ -615,6 +834,12 @@ stock bool:StartVoteMute(client, target) {
     decl String:targetAuth[32];
     if (!GetClientAuthId(target, AuthId_Steam2, targetAuth, sizeof(targetAuth), true)) {
         CPrintToChat(client, "{gold}[PermaMute]{default} Target authentication is not ready.");
+        return false;
+    }
+
+    decl String:targetSteamId64[32];
+    if (!GetClientAuthId(target, AuthId_SteamID64, targetSteamId64, sizeof(targetSteamId64), true)) {
+        CPrintToChat(client, "{gold}[PermaMute]{default} Target SteamID64 is not ready.");
         return false;
     }
 
@@ -645,6 +870,7 @@ stock bool:StartVoteMute(client, target) {
     g_VoteMuteTargetUserId = GetClientUserId(target);
     ResetVoteMuteWeightedState();
     strcopy(g_VoteMuteTargetAuth, sizeof(g_VoteMuteTargetAuth), targetAuth);
+    strcopy(g_VoteMuteTargetSteamId64, sizeof(g_VoteMuteTargetSteamId64), targetSteamId64);
     GetClientName(target, g_VoteMuteTargetName, sizeof(g_VoteMuteTargetName));
     BuildVoteMuteChatName(target, g_VoteMuteTargetChatName, sizeof(g_VoteMuteTargetChatName));
 
@@ -689,7 +915,7 @@ stock ApplySuccessfulVoteMute() {
         SetClientCookie(target, g_cookies[COOKIE_VOTESILENCE], value);
         ApplyVoteSilence(target, expiresAt);
         BuildVoteMuteChatName(target, g_VoteMuteTargetChatName, sizeof(g_VoteMuteTargetChatName));
-        CPrintToChatAllEx(target, "{gold}[PermaMute]%s{default} is now silenced for one hour!", g_VoteMuteTargetChatName);
+        CPrintToChatAllEx(target, "{gold}[PermaMute] %s{default} is now silenced for one hour!", g_VoteMuteTargetChatName);
         return;
     }
 
