@@ -337,7 +337,7 @@ public Action Timer_WaitForStackRedPayloadRatio(Handle timer)
         return Plugin_Stop;
     }
 
-    int connectedClients = GetClientCount(false);
+    int connectedClients = DGM_CountConnectedHumans();
     int realTeamPlayers = 0;
     for (int client = 1; client <= MaxClients; client++)
     {

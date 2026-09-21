@@ -2,8 +2,8 @@ public Action Command_Stats(int client, int args)
 {
     bool fromConsole = (client <= 0 || !IsClientInGame(client));
 
-    // Connected clients, matching SourceMod's raw client count.
-    int playerCount = GetClientCount(false);
+    // Connected human clients; exclude bots, SourceTV, and Replay.
+    int playerCount = DGM_CountConnectedHumans();
 
     // Current map name
     char map[64];

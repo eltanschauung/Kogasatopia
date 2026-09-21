@@ -182,7 +182,7 @@ void DGM_CheckSetupTeamRatioForward()
         return;
     }
 
-    int connectedClients = GetClientCount(false);
+    int connectedClients = DGM_CountConnectedHumans();
     if (connectedClients <= 0)
     {
         return;
