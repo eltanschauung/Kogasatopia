@@ -28,6 +28,7 @@
 
 #undef REQUIRE_PLUGIN
 #include <adminmenu>
+#include <adminsdb_api>
 #include <points_store_api>
 #include <filters_api>
 #define REQUIRE_PLUGIN
@@ -59,7 +60,8 @@ new Handle:g_VoteSilenceTimers[MAXPLAYERS + 1];
 new bool:g_VoteSilenceOwnsMute[MAXPLAYERS + 1];
 new bool:g_VoteSilenceOwnsGag[MAXPLAYERS + 1];
 new g_VoteMuteTargetUserId;
-new g_VoteMuteEligibleClients;
+new g_VoteMuteChoice[MAXPLAYERS + 1];
+new g_VoteMuteWeight[MAXPLAYERS + 1];
 new String:g_VoteMuteTargetAuth[32];
 new String:g_VoteMuteTargetName[MAX_NAME_LENGTH];
 new String:g_VoteMuteTargetChatName[256];
@@ -83,6 +85,7 @@ public Plugin:myinfo = {
 };
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], errMax) {
+    MarkNativeAsOptional("AdminsDB_GetClientWhitelistLevel");
     MarkNativeAsOptional("PointsStore_AreBonusPointsLoaded");
     MarkNativeAsOptional("PointsStore_GetBonusPoints");
     MarkNativeAsOptional("PointsStore_SpendBonusPoints");
@@ -471,6 +474,8 @@ public OnClientDisconnect(client) {
 
     g_VoteSilenceOwnsMute[client] = false;
     g_VoteSilenceOwnsGag[client] = false;
+    g_VoteMuteChoice[client] = 0;
+    g_VoteMuteWeight[client] = 0;
 }
 
 public Action:Timer_ProcessConnectedCookies(Handle:timer) {
@@ -638,7 +643,7 @@ stock bool:StartVoteMute(client, target) {
     }
 
     g_VoteMuteTargetUserId = GetClientUserId(target);
-    g_VoteMuteEligibleClients = recipientCount;
+    ResetVoteMuteWeightedState();
     strcopy(g_VoteMuteTargetAuth, sizeof(g_VoteMuteTargetAuth), targetAuth);
     GetClientName(target, g_VoteMuteTargetName, sizeof(g_VoteMuteTargetName));
     BuildVoteMuteChatName(target, g_VoteMuteTargetChatName, sizeof(g_VoteMuteTargetChatName));
@@ -658,20 +663,11 @@ stock bool:StartVoteMute(client, target) {
 }
 
 public MenuHandler_VoteMute(Handle:menu, MenuAction:action, param1, param2) {
-    if (action == MenuAction_VoteEnd) {
-        new winningVotes;
-        new totalVotes;
-        GetMenuVoteInfo(param2, winningVotes, totalVotes);
-
-        new yesVotes = (param1 == 0) ? winningVotes : totalVotes - winningVotes;
-        if (g_VoteMuteEligibleClients > 0
-            && yesVotes * 100 >= g_VoteMuteEligibleClients * VOTEMUTE_PERCENT) {
-            ApplySuccessfulVoteMute();
-        }
-        else {
-            CPrintToChatAll("{gold}[PermaMute]{default} Vote failed: %d/%d clients voted yes; %d%% was required.",
-                yesVotes, g_VoteMuteEligibleClients, VOTEMUTE_PERCENT);
-        }
+    if (action == MenuAction_Select) {
+        TrackVoteMuteSelection(menu, param1, param2);
+    }
+    else if (action == MenuAction_VoteEnd) {
+        ResolveWeightedVoteMute();
     }
     else if (action == MenuAction_VoteCancel) {
         CPrintToChatAll("{gold}[PermaMute]{default} Vote cancelled.");
@@ -780,10 +776,91 @@ stock BuildVoteMuteChatName(client, String:buffer[], maxlen) {
 
 stock ResetVoteMuteState() {
     g_VoteMuteTargetUserId = 0;
-    g_VoteMuteEligibleClients = 0;
     g_VoteMuteTargetAuth[0] = '\0';
     g_VoteMuteTargetName[0] = '\0';
     g_VoteMuteTargetChatName[0] = '\0';
+    ResetVoteMuteWeightedState();
+}
+
+stock ResetVoteMuteWeightedState() {
+    for (new client = 1; client <= MaxClients; client++) {
+        g_VoteMuteChoice[client] = 0;
+        g_VoteMuteWeight[client] = 0;
+    }
+}
+
+stock GetVoteMuteClientVoteWeight(client) {
+    if (client <= 0 || client > MaxClients || !IsClientInGame(client) || IsFakeClient(client)) {
+        return 0;
+    }
+
+    new level = 0;
+    if (GetFeatureStatus(FeatureType_Native, "AdminsDB_GetClientWhitelistLevel") == FeatureStatus_Available) {
+        level = AdminsDB_GetClientWhitelistLevel(client);
+    }
+
+    new weight = 1 + level;
+    return weight > 0 ? weight : 0;
+}
+
+stock TrackVoteMuteSelection(Handle:menu, client, item) {
+    if (client <= 0 || client > MaxClients) {
+        return;
+    }
+
+    decl String:info[8];
+    GetMenuItem(menu, item, info, sizeof(info));
+    if (StrEqual(info, "yes")) {
+        g_VoteMuteChoice[client] = 1;
+    }
+    else if (StrEqual(info, "no")) {
+        g_VoteMuteChoice[client] = 2;
+    }
+    else {
+        g_VoteMuteChoice[client] = 0;
+    }
+
+    g_VoteMuteWeight[client] = GetVoteMuteClientVoteWeight(client);
+}
+
+stock GetWeightedVoteMuteTotals(&yesVotes, &noVotes, &totalVotes) {
+    yesVotes = 0;
+    noVotes = 0;
+    totalVotes = 0;
+
+    for (new client = 1; client <= MaxClients; client++) {
+        new weight = g_VoteMuteWeight[client];
+        if (weight <= 0) {
+            continue;
+        }
+
+        if (g_VoteMuteChoice[client] == 1) {
+            yesVotes += weight;
+            totalVotes += weight;
+        }
+        else if (g_VoteMuteChoice[client] == 2) {
+            noVotes += weight;
+            totalVotes += weight;
+        }
+    }
+}
+
+stock ResolveWeightedVoteMute() {
+    new yesVotes;
+    new noVotes;
+    new totalVotes;
+    GetWeightedVoteMuteTotals(yesVotes, noVotes, totalVotes);
+
+    if (totalVotes > 0 && yesVotes * 100 >= totalVotes * VOTEMUTE_PERCENT) {
+        ApplySuccessfulVoteMute();
+        return;
+    }
+
+    CPrintToChatAll(
+        "{gold}[PermaMute]{default} Vote failed: %d/%d weighted votes were yes; %d%% was required.",
+        yesVotes,
+        totalVotes,
+        VOTEMUTE_PERCENT);
 }
 
 /* Commands {{{ */
