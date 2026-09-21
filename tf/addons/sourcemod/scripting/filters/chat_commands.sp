@@ -110,17 +110,24 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
         return Plugin_Stop;
     }
 
-    if (CheckCommands(sArgs))
+    if (Filters_IsDisguiseChatCommand(sArgs))
+    {
+        return Plugin_Continue;
+    }
+
+    if (CheckCommands(sArgs, !Filters_IsConnectedParseeClient(client)))
     {
         PrintToServer("%s", sArgs);
         return Plugin_Continue;
     }
 
+    g_DisguiseChatInProgress[client] = g_DisguiseActive[client];
     Filters_ScheduleArchivedMessageTriggers(client, sArgs);
     bool blacklistRateLimited = Filters_IsBlacklistChatRateLimited(client);
 
     if (TryHandleTeamChat(client, command, sArgs, dead, blacklistRateLimited))
     {
+        g_DisguiseChatInProgress[client] = false;
         return Plugin_Stop;
     }
 
@@ -166,25 +173,30 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     // suppressed in-game while still being queued for the polling outbox.
     if (HandleRestrictedMessage(client, output, context, senderOutput))
     {
+        g_DisguiseChatInProgress[client] = false;
         return Plugin_Stop;
     }
 
     if (HandleCordModeBlacklistedChat(client, output, context, senderOutput))
     {
+        g_DisguiseChatInProgress[client] = false;
         return Plugin_Stop;
     }
 
     if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput, sArgs))
     {
+        g_DisguiseChatInProgress[client] = false;
         return Plugin_Stop;
     }
 
     if (HandleEnabledChat(client, output, context, senderOutput))
     {
+        g_DisguiseChatInProgress[client] = false;
         return Plugin_Stop;
     }
 
     SendFallbackMessage(client);
+    g_DisguiseChatInProgress[client] = false;
     return Plugin_Stop;
 }
 
@@ -227,7 +239,7 @@ void BuildDeathPrefix(int client, char[] deadPrefix, int length)
 {
     if (!IsPlayerAlive(client))
     {
-        Format(deadPrefix, length, "*負け犬* ");
+        Format(deadPrefix, length, "*DIDDY* ");
         return;
     }
 
@@ -1039,9 +1051,21 @@ bool TryHandleTeamChat(int client, const char[] command, const char[] sArgs,
     }
     else
     {
-        CPrintToChatTeam(GetClientTeam(client), client, output, senderOutput);
+        if (g_DisguiseChatInProgress[client])
+        {
+            for (int receiver = 1; receiver <= MaxClients; receiver++)
+            {
+                if (IsClientInGame(receiver) && GetClientTeam(receiver) == GetClientTeam(client))
+                {
+                    Filters_SendChatToReceiver(receiver, client, output, senderOutput);
+                }
+            }
+        }
+        else
+        {
+            CPrintToChatTeam(GetClientTeam(client), client, output, senderOutput);
+        }
     }
     PrintToServer("%s", output);
     return true;
 }
-

@@ -285,7 +285,7 @@ void Filters_ResetArchivedMessageCooldowns(int client)
     }
 }
 
-static bool Filters_IsConnectedParseeClient(int client)
+bool Filters_IsConnectedParseeClient(int client)
 {
     char steamId64[KOGASA_STEAMID_MAX];
     return client > 0 && client <= MaxClients && IsClientInGame(client)
@@ -319,7 +319,6 @@ bool Filters_TryReplaceConnectedParseeMessage(
         || (!forceReplacement && !g_hParseeEnabled.BoolValue && !g_hParseeMode.BoolValue)
         || GetConVarInt(g_sEnabled) == 0
         || !Filters_DbAvailable()
-        || g_iArchivedMessageCounts[ArchivedSpeaker_Parsee] <= 0
         || (!forceReplacement && !g_hParseeMode.BoolValue
             && GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT))
     {
@@ -328,17 +327,20 @@ bool Filters_TryReplaceConnectedParseeMessage(
 
     Filters_SendChatToReceiver(client, client, message, senderMessage);
     PrintToServer("%s", message);
-    Filters_LogChatMessage(client, senderMessage[0] ? senderMessage : message);
+    Filters_LogChatMessage(client, senderMessage[0] ? senderMessage : message, true);
     Filters_QueryRandomArchivedMessage(
         ArchivedSpeaker_Parsee, GetClientUserId(client), false, true);
     return true;
 }
 
-static void Filters_QueryRandomArchivedMessage(
+void Filters_QueryRandomArchivedMessage(
     ArchivedSpeaker speaker, int skipUserId = 0, bool logAttributed = true,
     bool shortMessagesOnly = false)
 {
-    if (speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
+    bool liveParseeReplacement = speaker == ArchivedSpeaker_Parsee
+        && skipUserId != 0 && !logAttributed;
+    if (speaker == ArchivedSpeaker_Parsee
+        && !g_hParseeEnabled.BoolValue && !liveParseeReplacement)
     {
         return;
     }
@@ -353,11 +355,17 @@ static void Filters_QueryRandomArchivedMessage(
             "SELECT message FROM %s WHERE CHAR_LENGTH(message) < %d ORDER BY RAND() LIMIT 1",
             table, PARSEE_AUTOMATIC_MESSAGE_MAX_LENGTH);
     }
-    else
+    else if (g_iArchivedMessageCounts[speaker] > 0)
     {
         int offset = GetRandomInt(0, g_iArchivedMessageCounts[speaker] - 1);
         FormatEx(messageSelection, sizeof(messageSelection),
             "SELECT message FROM %s LIMIT 1 OFFSET %d", table, offset);
+    }
+    else
+    {
+        // The initial count is asynchronous; do not leak a live message while it loads.
+        FormatEx(messageSelection, sizeof(messageSelection),
+            "SELECT message FROM %s ORDER BY RAND() LIMIT 1", table);
     }
     char query[1536];
     Format(query, sizeof(query),
@@ -389,7 +397,10 @@ public void Filters_RandomArchivedMessageCallback(Database db, DBResultSet resul
     int skipUserId = pack.ReadCell();
     bool logAttributed = pack.ReadCell();
     delete pack;
-    if ((speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
+    bool liveParseeReplacement = speaker == ArchivedSpeaker_Parsee
+        && skipUserId != 0 && !logAttributed;
+    if ((speaker == ArchivedSpeaker_Parsee
+            && !g_hParseeEnabled.BoolValue && !liveParseeReplacement)
         || (speaker == ArchivedSpeaker_Memoman && !g_hMemomanEnabled.BoolValue))
     {
         return;
@@ -523,7 +534,10 @@ static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker,
     const char[] message, char[] displayName, char[] color, char[] pattern,
     bool webRelay, int skipUserId = 0, bool logAttributed = true)
 {
-    if (speaker == ArchivedSpeaker_Parsee && !g_hParseeEnabled.BoolValue)
+    bool liveParseeReplacement = speaker == ArchivedSpeaker_Parsee
+        && !webRelay && skipUserId != 0 && !logAttributed;
+    if (speaker == ArchivedSpeaker_Parsee
+        && !g_hParseeEnabled.BoolValue && !liveParseeReplacement)
     {
         return;
     }
@@ -572,8 +586,15 @@ static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker,
         }
         BuildRenderedStoredName(displayName, color, pattern, renderedName, sizeof(renderedName));
     }
+    char renderedMessage[512];
+    strcopy(renderedMessage, sizeof(renderedMessage), message);
+    if (speaker == ArchivedSpeaker_Parsee)
+    {
+        FilterString(renderedMessage, sizeof(renderedMessage));
+    }
+
     char output[768];
-    Format(output, sizeof(output), "%s{default} : %s", renderedName, message);
+    Format(output, sizeof(output), "%s{default} : %s", renderedName, renderedMessage);
     if (webRelay)
     {
         Filters_PrintOutboxToClients(output, true);
@@ -582,9 +603,13 @@ static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker,
     {
         Filters_PrintToChatAll(output, true);
     }
+    else if (skipUserId < 0)
+    {
+        Filters_PrintOutboxToClients(output, true);
+    }
     else
     {
-        int skipClient = GetClientOfUserId(skipUserId);
+        int skipClient = skipUserId > 0 ? GetClientOfUserId(skipUserId) : 0;
         for (int client = 1; client <= MaxClients; client++)
         {
             if (client == skipClient || !Filters_ShouldReceiveChat(client, 0)
@@ -598,7 +623,7 @@ static void Filters_RenderArchivedSpeakerMessage(ArchivedSpeaker speaker,
     PrintToServer("%s", output);
     if (!webRelay && logAttributed)
     {
-        Filters_LogAttributedChat(steam64, displayName, message, output);
+        Filters_LogAttributedChat(steam64, displayName, renderedMessage, output);
     }
 }
 

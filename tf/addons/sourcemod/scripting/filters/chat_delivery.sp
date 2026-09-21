@@ -34,6 +34,63 @@ void Filters_PrintToChatAll(const char[] message, bool skipArchivedMuted = false
     }
 }
 
+static void Filters_PrintRecreatedChat(int receiver, int sender, const char[] message)
+{
+    char rendered[MAX_BUFFER_LENGTH];
+    FormatEx(rendered, sizeof(rendered), "\x01%s", message);
+
+    if (sender > 0 && sender <= MaxClients && IsClientInGame(sender))
+    {
+        switch (GetClientTeam(sender))
+        {
+            case 2: ReplaceString(rendered, sizeof(rendered), "{teamcolor}", "{red}", false);
+            case 3: ReplaceString(rendered, sizeof(rendered), "{teamcolor}", "{blue}", false);
+            default: ReplaceString(rendered, sizeof(rendered), "{teamcolor}", "{gray}", false);
+        }
+    }
+    else
+    {
+        ReplaceString(rendered, sizeof(rendered), "{teamcolor}", "{gray}", false);
+    }
+
+    CReplaceColorCodes(rendered);
+
+    char output[MAX_MESSAGE_LENGTH];
+    strcopy(output, sizeof(output), rendered);
+
+    UserMsg sayText2 = GetUserMessageId("SayText2");
+    if (sayText2 == INVALID_MESSAGE_ID)
+    {
+        PrintToChat(receiver, "%s", output);
+        return;
+    }
+
+    Handle buffer = StartMessageOne(
+        "SayText2",
+        receiver,
+        USERMSG_RELIABLE | USERMSG_BLOCKHOOKS);
+
+    if (GetFeatureStatus(FeatureType_Native, "GetUserMessageType") == FeatureStatus_Available
+        && GetUserMessageType() == UM_Protobuf)
+    {
+        PbSetInt(buffer, "ent_idx", 0);
+        PbSetBool(buffer, "chat", true);
+        PbSetString(buffer, "msg_name", output);
+        PbAddString(buffer, "params", "");
+        PbAddString(buffer, "params", "");
+        PbAddString(buffer, "params", "");
+        PbAddString(buffer, "params", "");
+    }
+    else
+    {
+        BfWriteByte(buffer, 0);
+        BfWriteByte(buffer, true);
+        BfWriteString(buffer, output);
+    }
+
+    EndMessage();
+}
+
 void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, const char[] senderMessage = "")
 {
     if (receiver <= 0 || !IsClientInGame(receiver))
@@ -46,6 +103,14 @@ void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, 
         return;
     }
 
+    char renderedMessage[MAX_MESSAGE_LENGTH];
+    Filters_DisguiseMessageForReceiver(
+        receiver,
+        sender,
+        receiver == sender && senderMessage[0] ? senderMessage : message,
+        renderedMessage,
+        sizeof(renderedMessage));
+
     if (Filters_RedlistEnabled()
         && sender > 0
         && sender <= MaxClients
@@ -54,12 +119,14 @@ void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, 
     {
         if (g_PlayerState[receiver].isWhitelisted && Filters_PChatEnabled())
         {
-            CPrintToChatEx(receiver, sender, "{axis}[Fake] %s", receiver == sender && senderMessage[0] ? senderMessage : message);
+            char fakeMessage[MAX_MESSAGE_LENGTH];
+            FormatEx(fakeMessage, sizeof(fakeMessage), "{axis}[Fake] %s", renderedMessage);
+            Filters_PrintRecreatedChat(receiver, sender, fakeMessage);
         }
         return;
     }
 
-    CPrintToChatEx(receiver, sender, "%s", receiver == sender && senderMessage[0] ? senderMessage : message);
+    Filters_PrintRecreatedChat(receiver, sender, renderedMessage);
 }
 
 static void Filters_PrintToChatAllEx(int sender, const char[] message, const char[] senderMessage = "")
@@ -380,4 +447,3 @@ void SendToWhitelistedAdminsBlacklisted(int sender, const char[] message, const 
 {
     SendToWhitelistedAdmins(sender, message, prefix);
 }
-

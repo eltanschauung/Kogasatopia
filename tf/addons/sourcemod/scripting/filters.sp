@@ -174,6 +174,10 @@ StringMap g_PrenameOutputMap = null;
 char g_PrenameDebugLogPath[PLATFORM_MAX_PATH];
 bool g_PrenameDebugMigrate = false;
 bool g_PrenameRulesLoaded = false;
+bool g_DisguiseActive[MAXPLAYERS + 1];
+bool g_DisguiseChatInProgress[MAXPLAYERS + 1];
+char g_DisguiseTargetSteamId64[MAXPLAYERS + 1][32];
+char g_DisguiseDisplayName[MAXPLAYERS + 1][256];
 
 enum struct ConnectEvent
 {
@@ -217,6 +221,7 @@ public Plugin myinfo =
 #include "filters/webchat.sp"
 #include "filters/chat_commands.sp"
 #include "filters/name_styles.sp"
+#include "filters/disguise.sp"
 #include "filters/chat_delivery.sp"
 #include "filters/config.sp"
 #include "filters/preferences_and_natives.sp"

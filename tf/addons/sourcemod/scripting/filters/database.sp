@@ -78,6 +78,7 @@ public void T_Filters_SQLConnect(Database db, const char[] error, any data)
         ... "host_ip VARCHAR(64) NOT NULL DEFAULT '',"
         ... "host_port INT NOT NULL DEFAULT 0,"
         ... "webchatonly TINYINT(1) NOT NULL DEFAULT 0,"
+        ... "parsee_replacement TINYINT(1) NOT NULL DEFAULT 0,"
         ... "alert TINYINT(1) NOT NULL DEFAULT 1,"
         ... "server_ip VARCHAR(64) NULL,"
         ... "server_port INT NULL,"
@@ -91,6 +92,7 @@ public void T_Filters_SQLConnect(Database db, const char[] error, any data)
         "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS host_ip VARCHAR(64) NOT NULL DEFAULT '' AFTER message",
         "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS host_port INT NOT NULL DEFAULT 0 AFTER host_ip",
         "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS webchatonly TINYINT(1) NOT NULL DEFAULT 0 AFTER host_port",
+        "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS parsee_replacement TINYINT(1) NOT NULL DEFAULT 0 AFTER webchatonly",
         "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS alert TINYINT(1) NOT NULL DEFAULT 1 AFTER webchatonly",
         "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS server_ip VARCHAR(64) NULL AFTER webchatonly",
         "ALTER TABLE whaletracker_chat_outbox ADD COLUMN IF NOT EXISTS server_port INT NULL AFTER server_ip",
@@ -179,10 +181,7 @@ public void Filters_SchemaQueryCallback(Database db, DBResultSet results, const 
         {
             Filters_PrenameLoadRules();
         }
-        if (g_hParseeEnabled.BoolValue)
-        {
-            Filters_RefreshArchivedMessageCount(ArchivedSpeaker_Parsee);
-        }
+        Filters_RefreshArchivedMessageCount(ArchivedSpeaker_Parsee);
         Filters_RefreshArchivedMessageCount(ArchivedSpeaker_Memoman);
     }
 }

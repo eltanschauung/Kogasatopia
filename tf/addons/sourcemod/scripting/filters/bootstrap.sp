@@ -131,4 +131,6 @@ static void Filters_RegisterCommands()
     RegConsoleCmd("sm_muteparsee", Command_MuteParsee, "Toggle Parsee and Memoman messages.");
     RegAdminCmd("sm_migrate", Command_PrenameMigrate, ADMFLAG_SLAY, "sm_migrate - Migrates legacy name rules to SteamID rules for connected clients");
     RegConsoleCmd("sm_websay", Command_WebSay, "Relay a web chat message to all players");
+    RegAdminCmd("sm_disguise", Command_Disguise, ADMFLAG_CHAT, "sm_disguise <name|steamid64> - Disguise your chat identity until reset");
+    RegAdminCmd("sm_disguisereset", Command_DisguiseReset, ADMFLAG_CHAT, "sm_disguisereset - Clear your chat disguise");
 }
