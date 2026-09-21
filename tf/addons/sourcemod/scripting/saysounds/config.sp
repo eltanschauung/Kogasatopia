@@ -3,6 +3,7 @@ void LoadSaySoundConfig()
     gSoundMap.Clear();
     gSoundGroupMap.Clear();
     gAPIOnlyGroups.Clear();
+    gAnnouncerOnlyCommands.Clear();
     gForcedSoundGroups.Clear();
     gPaidSaysoundGroups.Clear();
     gGroupAliases.Clear();
@@ -34,6 +35,7 @@ void LoadSaySoundConfig()
     gReadyUnlockGroups.Clear();
     gConfigLoaded = false;
     gConfigInAPIOnlyGroups = false;
+    gConfigInAnnouncerOnlySounds = false;
     gConfigInPaidSaysoundGroups = false;
     gConfigInGroupAliases = false;
     gConfigInRoundStartSirens = false;
@@ -44,6 +46,7 @@ void LoadSaySoundConfig()
     gConfigInUnlockReplacements = false;
     gConfigSectionDepth = 0;
     gConfigAPIOnlyGroupsDepth = -1;
+    gConfigAnnouncerOnlySoundsDepth = -1;
     gConfigPaidSaysoundGroupsDepth = -1;
     gConfigGroupAliasesDepth = -1;
     gConfigRoundStartSirensDepth = -1;
@@ -112,6 +115,11 @@ public SMCResult Config_EnterSection(SMCParser parser, const char[] name, bool o
         gConfigInAPIOnlyGroups = true;
         gConfigAPIOnlyGroupsDepth = gConfigSectionDepth;
     }
+    else if (StrEqual(sectionName, ANNOUNCER_ONLY_SOUNDS_SECTION))
+    {
+        gConfigInAnnouncerOnlySounds = true;
+        gConfigAnnouncerOnlySoundsDepth = gConfigSectionDepth;
+    }
     else if (StrEqual(sectionName, PAID_SAYSOUND_GROUPS_SECTION)
         || StrEqual(sectionName, "paid_saysound_groups")
         || StrEqual(sectionName, "paid-saysound-groups"))
@@ -178,6 +186,13 @@ public SMCResult Config_LeaveSection(SMCParser parser)
     {
         gConfigInAPIOnlyGroups = false;
         gConfigAPIOnlyGroupsDepth = -1;
+    }
+
+    if (gConfigInAnnouncerOnlySounds
+        && gConfigSectionDepth == gConfigAnnouncerOnlySoundsDepth)
+    {
+        gConfigInAnnouncerOnlySounds = false;
+        gConfigAnnouncerOnlySoundsDepth = -1;
     }
 
     if (gConfigInPaidSaysoundGroups && gConfigSectionDepth == gConfigPaidSaysoundGroupsDepth)
@@ -295,13 +310,19 @@ public SMCResult Config_KeyValue(SMCParser parser, const char[] key, const char[
         return SMCParse_Continue;
     }
 
+    Config_SaySoundCommand(key, value, gConfigInAnnouncerOnlySounds);
+    return SMCParse_Continue;
+}
+
+static void Config_SaySoundCommand(const char[] key, const char[] value, bool announcerOnly)
+{
     char commandName[MAX_COMMAND_NAME];
     strcopy(commandName, sizeof(commandName), key);
     TrimString(commandName);
 
     if (!commandName[0])
     {
-        return SMCParse_Continue;
+        return;
     }
 
     if (commandName[0] == '!' || commandName[0] == '/')
@@ -318,7 +339,7 @@ public SMCResult Config_KeyValue(SMCParser parser, const char[] key, const char[
     if (!soundPath[0])
     {
         LogError("[SaySounds] Command '%s' has an empty sound path.", commandName);
-        return SMCParse_Continue;
+        return;
     }
 
     if (!groupName[0])
@@ -336,7 +357,35 @@ public SMCResult Config_KeyValue(SMCParser parser, const char[] key, const char[
 
     gSoundMap.SetString(commandName, soundPath);
     gSoundGroupMap.SetString(commandName, groupName);
-    return SMCParse_Continue;
+    if (announcerOnly)
+    {
+        gAnnouncerOnlyCommands.SetValue(commandName, 1);
+    }
+}
+
+bool IsAnnouncerOnlyCommand(const char[] commandName)
+{
+    int announcerOnly = 0;
+    return gAnnouncerOnlyCommands.GetValue(commandName, announcerOnly)
+        && announcerOnly != 0;
+}
+
+bool IsAnnouncerOnlySoundPath(const char[] soundPath)
+{
+    char commandName[MAX_COMMAND_NAME];
+    char configuredPath[PLATFORM_MAX_PATH];
+    for (int i = 0; i < gCommandNames.Length; i++)
+    {
+        gCommandNames.GetString(i, commandName, sizeof(commandName));
+        if (IsAnnouncerOnlyCommand(commandName)
+            && gSoundMap.GetString(commandName, configuredPath, sizeof(configuredPath))
+            && StrEqual(configuredPath, soundPath, false))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static void Config_APIOnlyGroup(const char[] key)
@@ -878,6 +927,11 @@ bool CanClientUseSaySoundGroup(int client, const char[] groupName, bool bypassAP
 
 bool CanClientUseSaySoundCommand(int client, const char[] commandName, bool bypassAPIOnly = false)
 {
+    if (IsAnnouncerOnlyCommand(commandName))
+    {
+        return false;
+    }
+
     char path[PLATFORM_MAX_PATH];
     char groupName[MAX_GROUP_NAME];
     if (!GetCommandSoundData(commandName, path, sizeof(path), groupName, sizeof(groupName)))
@@ -888,12 +942,12 @@ bool CanClientUseSaySoundCommand(int client, const char[] commandName, bool bypa
     return CanClientUseSaySoundGroup(client, groupName, bypassAPIOnly);
 }
 
-bool CanClientUseSaySoundInput(int client, const char[] inputName, bool bypassAPIOnly = false)
+bool CanClientUseSaySoundInput(int client, const char[] inputName, bool bypassAPIOnly = false, bool allowAnnouncerOnly = false)
 {
     bool restricted = false;
     bool paidRestricted = false;
     char chosen[MAX_COMMAND_NAME];
-    return GetCommandOptionForClient(client, inputName, chosen, sizeof(chosen), restricted, paidRestricted, bypassAPIOnly);
+    return GetCommandOptionForClient(client, inputName, chosen, sizeof(chosen), restricted, paidRestricted, bypassAPIOnly, allowAnnouncerOnly);
 }
 
 bool IsSaySoundInputPaid(const char[] inputName)

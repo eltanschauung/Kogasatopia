@@ -31,6 +31,7 @@
 #define MAX_GROUP_PREF_VALUE 512
 #define DEFAULT_GROUP "all"
 #define API_ONLY_GROUPS_SECTION "apionlygroups"
+#define ANNOUNCER_ONLY_SOUNDS_SECTION "announceronlysaysounds"
 #define PAID_SAYSOUND_GROUPS_SECTION "paidsaysoundgroups"
 #define GROUP_ALIASES_SECTION "groupaliases"
 #define ROUND_START_SIRENS_SECTION "roundstartsirenreplacements"
@@ -76,6 +77,7 @@ public Plugin myinfo =
 StringMap gSoundMap;
 StringMap gSoundGroupMap;
 StringMap gAPIOnlyGroups;
+StringMap gAnnouncerOnlyCommands;
 StringMap gForcedSoundGroups;
 StringMap gPaidSaysoundGroups;
 StringMap gGroupAliases;
@@ -107,6 +109,7 @@ ArrayList gReadyUnlockReplacements;
 ArrayList gReadyUnlockGroups;
 bool gConfigLoaded = false;
 bool gConfigInAPIOnlyGroups = false;
+bool gConfigInAnnouncerOnlySounds = false;
 bool gConfigInPaidSaysoundGroups = false;
 bool gConfigInGroupAliases = false;
 bool gConfigInRoundStartSirens = false;
@@ -117,6 +120,7 @@ bool gConfigInCountdownReplacements = false;
 bool gConfigInUnlockReplacements = false;
 int gConfigSectionDepth = 0;
 int gConfigAPIOnlyGroupsDepth = -1;
+int gConfigAnnouncerOnlySoundsDepth = -1;
 int gConfigPaidSaysoundGroupsDepth = -1;
 int gConfigGroupAliasesDepth = -1;
 int gConfigRoundStartSirensDepth = -1;

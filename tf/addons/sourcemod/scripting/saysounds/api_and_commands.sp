@@ -1,3 +1,10 @@
+static bool IsAnnouncerPluginCaller(Handle plugin)
+{
+    char filename[PLATFORM_MAX_PATH];
+    GetPluginFilename(plugin, filename, sizeof(filename));
+    return StrEqual(filename, "announcers.smx", false);
+}
+
 public int Native_ShouldPlay(Handle plugin, int numParams)
 {
     int client = GetNativeCell(1);
@@ -28,6 +35,11 @@ public int Native_PlaySoundToOptedIn(Handle plugin, int numParams)
     }
 
     NormalizeSoundPath(soundPath, sizeof(soundPath));
+
+    if (IsAnnouncerOnlySoundPath(soundPath) && !IsAnnouncerPluginCaller(plugin))
+    {
+        return 0;
+    }
 
     if (!groupName[0])
     {
@@ -79,7 +91,7 @@ public int Native_PlayCommand(Handle plugin, int numParams)
     bool fromGroup = false;
     bool restricted = false;
     bool paidRestricted = false;
-    if (!GetCommandSoundDataForClientEx(client, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true))
+    if (!GetCommandSoundDataForClientEx(client, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true, IsAnnouncerPluginCaller(plugin)))
     {
         return 0;
     }
@@ -135,7 +147,7 @@ public int Native_PlayCommandAs(Handle plugin, int numParams)
     bool fromGroup = false;
     bool restricted = false;
     bool paidRestricted = false;
-    if (!GetCommandSoundDataForClientEx(sourceClient, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true))
+    if (!GetCommandSoundDataForClientEx(sourceClient, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true, IsAnnouncerPluginCaller(plugin)))
     {
         return 0;
     }
@@ -168,7 +180,7 @@ public int Native_CanClientUseCommand(Handle plugin, int numParams)
         bypassAPIOnly = view_as<bool>(GetNativeCell(3));
     }
 
-    return CanClientUseSaySoundInput(client, commandName, bypassAPIOnly);
+    return CanClientUseSaySoundInput(client, commandName, bypassAPIOnly, IsAnnouncerPluginCaller(plugin));
 }
 
 public int Native_IsCommandPaid(Handle plugin, int numParams)

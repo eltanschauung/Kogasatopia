@@ -131,7 +131,7 @@ public Action Command_ListOptedInClients(int client, int args)
             }
             allSoundsCount++;
         }
-        else if (enabledGroups * 5 > totalGroups * 4)
+        else if (enabledGroups * 2 >= totalGroups)
         {
             AppendOptListClientName(mostlyEnabledNames, sizeof(mostlyEnabledNames), target, mostlyEnabledCount, true);
             AppendOptListClientName(mostlyEnabledPlainNames, sizeof(mostlyEnabledPlainNames), target, mostlyEnabledCount, false);
@@ -157,7 +157,7 @@ public Action Command_ListOptedInClients(int client, int args)
         {
             CPrintToChatEx(client, client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNamesOverflow);
         }
-        CPrintToChatEx(client, client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledNames);
+        CPrintToChatEx(client, client, "[Saysounds] Clients with >=50%% of sound groups enabled: %s", mostlyEnabledNames);
     }
     else
     {
@@ -166,7 +166,7 @@ public Action Command_ListOptedInClients(int client, int args)
         {
             ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsPlainNamesOverflow);
         }
-        ReplyToCommand(client, "[Saysounds] Clients with >80%% of sound groups enabled: %s", mostlyEnabledPlainNames);
+        ReplyToCommand(client, "[Saysounds] Clients with >=50%% of sound groups enabled: %s", mostlyEnabledPlainNames);
     }
 
     return Plugin_Handled;
@@ -319,9 +319,62 @@ public Action Command_TouhouOnly(int client, int args)
         }
     }
 
+    OptClientIntoSaySounds(client);
     SaveDisabledGroupPreferences(client);
     PrintToChat(client, "[SaySounds] Only the touhou sound group is enabled.");
     return Plugin_Handled;
+}
+
+public Action Command_ProjectMoonOnly(int client, int args)
+{
+    if (client <= 0 || !IsClientInGame(client))
+    {
+        return Plugin_Handled;
+    }
+
+    if (!gConfigLoaded || gGroupNames == null || !AreClientCookiesCached(client))
+    {
+        PrintToChat(client, "[SaySounds] Sound preferences are not ready yet. Try again soon.");
+        return Plugin_Handled;
+    }
+
+    static const char limbusGroup[] = "limbus";
+    static const char lobcorpGroup[] = "lobcorp";
+    if (!IsKnownGroup(limbusGroup) || !IsKnownGroup(lobcorpGroup))
+    {
+        PrintToChat(client, "[SaySounds] The limbus or lobcorp sound group is not configured.");
+        return Plugin_Handled;
+    }
+
+    ResetClientDisabledGroups(client);
+
+    char groupName[MAX_GROUP_NAME];
+    for (int i = 0; i < gGroupNames.Length; i++)
+    {
+        gGroupNames.GetString(i, groupName, sizeof(groupName));
+        if (!StrEqual(groupName, DEFAULT_GROUP)
+            && !StrEqual(groupName, limbusGroup)
+            && !StrEqual(groupName, lobcorpGroup))
+        {
+            SetClientGroupDisabled(client, groupName, true);
+        }
+    }
+
+    OptClientIntoSaySounds(client);
+    SaveDisabledGroupPreferences(client);
+    PrintToChat(client, "[SaySounds] Only the limbus and lobcorp sound groups are enabled.");
+    return Plugin_Handled;
+}
+
+static void OptClientIntoSaySounds(int client)
+{
+    if (GetClientVolume(client) > 0.0)
+    {
+        return;
+    }
+
+    g_fClientVolume[client] = GetOptInVolume();
+    SaveVolumePreference(client);
 }
 
 enum SaySoundPreferenceType

@@ -21,6 +21,7 @@ public void OnPluginStart()
     gSoundMap = new StringMap();
     gSoundGroupMap = new StringMap();
     gAPIOnlyGroups = new StringMap();
+    gAnnouncerOnlyCommands = new StringMap();
     gForcedSoundGroups = new StringMap();
     gPaidSaysoundGroups = new StringMap();
     gGroupAliases = new StringMap();
@@ -68,6 +69,7 @@ public void OnPluginStart()
     RegConsoleCmd("sm_optlist", Command_ListOptedInClients);
     RegConsoleCmd("sm_opts", Command_ShowGroupOptions);
     RegConsoleCmd("sm_touhouonly", Command_TouhouOnly);
+    RegConsoleCmd("sm_pmonly", Command_ProjectMoonOnly);
     RegConsoleCmd("sm_sounds", Command_ListSounds);
     RegConsoleCmd("sm_saysounds", Command_ListSounds);
     RegConsoleCmd("sm_groups", Command_ListGroups);
@@ -135,6 +137,8 @@ public void OnPluginEnd()
     gSoundGroupMap = null;
     delete gAPIOnlyGroups;
     gAPIOnlyGroups = null;
+    delete gAnnouncerOnlyCommands;
+    gAnnouncerOnlyCommands = null;
     delete gForcedSoundGroups;
     gForcedSoundGroups = null;
     delete gPaidSaysoundGroups;

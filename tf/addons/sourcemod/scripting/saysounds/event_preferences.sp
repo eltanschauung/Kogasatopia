@@ -227,6 +227,11 @@ static bool CanShowSoundPreferenceGroupInMenu(int client, const char[] groupName
 
 static bool CanShowSoundPreferenceCommandInMenu(int client, const char[] commandName)
 {
+    if (IsAnnouncerOnlyCommand(commandName))
+    {
+        return false;
+    }
+
     char groupName[MAX_GROUP_NAME];
     GetCommandGroupName(commandName, groupName, sizeof(groupName));
     return CanShowSoundPreferenceGroupInMenu(client, groupName);
@@ -384,6 +389,10 @@ static void AddSoundPreferenceCommandMenuItems(Menu menu, int client, const char
     for (int i = 0; i < gCommandNames.Length; i++)
     {
         gCommandNames.GetString(i, commandName, sizeof(commandName));
+        if (IsAnnouncerOnlyCommand(commandName))
+        {
+            continue;
+        }
         if (!gSoundGroupMap.GetString(commandName, groupName, sizeof(groupName)))
         {
             strcopy(groupName, sizeof(groupName), DEFAULT_GROUP);
@@ -521,6 +530,8 @@ public Action Command_ListSounds(int client, int args)
             char sound[PLATFORM_MAX_PATH];
             char group[MAX_GROUP_NAME];
             gCommandNames.GetString(i, command, sizeof(command));
+            if (IsAnnouncerOnlyCommand(command))
+                continue;
             if (!gSoundMap.GetString(command, sound, sizeof(sound)))
                 continue;
             if (!gSoundGroupMap.GetString(command, group, sizeof(group)))
@@ -542,6 +553,8 @@ public Action Command_ListSounds(int client, int args)
         char sound[PLATFORM_MAX_PATH];
         char group[MAX_GROUP_NAME];
         gCommandNames.GetString(i, command, sizeof(command));
+        if (IsAnnouncerOnlyCommand(command))
+            continue;
         if (!gSoundMap.GetString(command, sound, sizeof(sound)))
             continue;
         if (!gSoundGroupMap.GetString(command, group, sizeof(group)))
