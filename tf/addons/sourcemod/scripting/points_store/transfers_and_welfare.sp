@@ -54,7 +54,7 @@ public void Event_WelfareRoundStart(Event event, const char[] name, bool dontBro
 
     char colorTag[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(colorTag, sizeof(colorTag));
-    CPrintToChatAll("%s[Gems]{gold}!volunteer{default}s can collect welfare again!", colorTag);
+    CPrintToChatAll("%s[Gems]{default} {gold}!volunteer{default} bros can collect welfare again!", colorTag);
 }
 
 public Action Command_SendBonusPoints(int client, int args)
