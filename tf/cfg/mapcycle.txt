@@ -3,7 +3,7 @@ koth_touhvest_b6
 koth_harvest_final
 koth_bagel_rc13
 koth_soot_final1
-koth_lumberyard_pro
+koth_highpass
 koth_citadel_a7
 koth_kemptown_rc4
 workshop/koth_rocktop_rc2.ugc454207393
@@ -42,4 +42,4 @@ ctf_well
 
 //Other
 trade_alicehouse
-koth_dolls_playground_a2
+koth_dolls_playground_a3
