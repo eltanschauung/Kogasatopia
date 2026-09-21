@@ -652,13 +652,12 @@ public void SQL_OnVoteMuteHistoryPruned(Database db, DBResultSet results, const 
 
     char query[512];
     Format(query, sizeof(query),
-        "DELETE FROM %s WHERE updated_at < %d AND NOT EXISTS ("
-        ... "SELECT 1 FROM %s WHERE %s.steamid64 = %s.steamid64)",
+        "DELETE targets FROM %s AS targets "
+        ... "LEFT JOIN %s AS history ON history.steamid64 = targets.steamid64 "
+        ... "WHERE targets.updated_at < %d AND history.id IS NULL",
         VOTEMUTE_LOCK_TABLE,
-        GetTime() - VOTEMUTE_HISTORY_SECONDS,
         VOTEMUTE_HISTORY_TABLE,
-        VOTEMUTE_HISTORY_TABLE,
-        VOTEMUTE_LOCK_TABLE);
+        GetTime() - VOTEMUTE_HISTORY_SECONDS);
     g_VoteMuteDatabase.Query(SQL_OnVoteMuteLocksPruned, query);
 }
 
@@ -673,6 +672,174 @@ public void SQL_OnVoteMuteLocksPruned(Database db, DBResultSet results, const ch
             ScheduleVoteMuteDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
         }
     }
+}
+
+stock RecordSuccessfulVoteMute() {
+    decl String:eventKey[64];
+    Format(eventKey, sizeof(eventKey), "%s-%d-%08x",
+        g_VoteMuteTargetSteamId64,
+        GetTime(),
+        GetURandomInt());
+
+    DataPack pack = new DataPack();
+    pack.WriteString(eventKey);
+    pack.WriteString(g_VoteMuteTargetSteamId64);
+    pack.WriteString(g_VoteMuteTargetAuth);
+    pack.WriteCell(g_VoteMuteTargetUserId);
+    pack.WriteString(g_VoteMuteTargetChatName);
+    SubmitVoteMuteRecord(pack);
+}
+
+stock SubmitVoteMuteRecord(DataPack pack) {
+    if (!Db_IsReady(g_VoteMuteDatabase, g_VoteMuteDatabaseReady)) {
+        CreateTimer(VOTEMUTE_RETRY_INTERVAL, Timer_RetryVoteMuteRecord, pack);
+        return;
+    }
+
+    pack.Reset();
+
+    decl String:eventKey[64];
+    decl String:steamId64[32];
+    pack.ReadString(eventKey, sizeof(eventKey));
+    pack.ReadString(steamId64, sizeof(steamId64));
+
+    char escapedEventKey[129];
+    char escapedSteamId64[65];
+    if (!Db_Escape(g_VoteMuteDatabase, eventKey, escapedEventKey, sizeof(escapedEventKey), "PermaMute")
+        || !Db_Escape(g_VoteMuteDatabase, steamId64, escapedSteamId64, sizeof(escapedSteamId64), "PermaMute")) {
+        CreateTimer(VOTEMUTE_RETRY_INTERVAL, Timer_RetryVoteMuteRecord, pack);
+        return;
+    }
+
+    new now = GetTime();
+    new cutoff = now - VOTEMUTE_HISTORY_SECONDS;
+    Transaction transaction = new Transaction();
+    char query[768];
+
+    Format(query, sizeof(query),
+        "INSERT INTO %s (steamid64, updated_at) VALUES ('%s', %d) "
+        ... "ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at)",
+        VOTEMUTE_LOCK_TABLE,
+        escapedSteamId64,
+        now);
+    transaction.AddQuery(query);
+
+    Format(query, sizeof(query),
+        "DELETE FROM %s WHERE steamid64 = '%s' AND voted_at < %d",
+        VOTEMUTE_HISTORY_TABLE,
+        escapedSteamId64,
+        cutoff);
+    transaction.AddQuery(query);
+
+    Format(query, sizeof(query),
+        "INSERT IGNORE INTO %s (event_key, steamid64, voted_at) "
+        ... "VALUES ('%s', '%s', %d)",
+        VOTEMUTE_HISTORY_TABLE,
+        escapedEventKey,
+        escapedSteamId64,
+        now);
+    transaction.AddQuery(query);
+
+    Format(query, sizeof(query),
+        "SELECT COUNT(*) FROM %s WHERE steamid64 = '%s' AND voted_at >= %d",
+        VOTEMUTE_HISTORY_TABLE,
+        escapedSteamId64,
+        cutoff);
+    transaction.AddQuery(query);
+
+    g_VoteMuteDatabase.Execute(
+        transaction,
+        SQLTxn_OnVoteMuteRecordSuccess,
+        SQLTxn_OnVoteMuteRecordFailure,
+        pack);
+}
+
+public Action:Timer_RetryVoteMuteRecord(Handle:timer, any data) {
+    SubmitVoteMuteRecord(view_as<DataPack>(data));
+    return Plugin_Stop;
+}
+
+public void SQLTxn_OnVoteMuteRecordSuccess(
+    Database db,
+    any data,
+    int numQueries,
+    DBResultSet[] results,
+    any[] queryData
+) {
+    DataPack pack = view_as<DataPack>(data);
+    pack.Reset();
+
+    decl String:eventKey[64];
+    decl String:steamId64[32];
+    decl String:steamId2[32];
+    decl String:chatName[256];
+    pack.ReadString(eventKey, sizeof(eventKey));
+    pack.ReadString(steamId64, sizeof(steamId64));
+    pack.ReadString(steamId2, sizeof(steamId2));
+    new targetUserId = pack.ReadCell();
+    pack.ReadString(chatName, sizeof(chatName));
+    delete pack;
+
+    if (numQueries < 4 || results[3] == null || !results[3].FetchRow()) {
+        LogError("[PermaMute] Votemute history transaction '%s' returned no count.", eventKey);
+        return;
+    }
+
+    new recentVoteMutes = results[3].FetchInt(0);
+    if (recentVoteMutes >= 3) {
+        PermanentlySilenceVoteMuteTarget(steamId64, steamId2, targetUserId, chatName);
+    }
+}
+
+public void SQLTxn_OnVoteMuteRecordFailure(
+    Database db,
+    any data,
+    int numQueries,
+    const char[] error,
+    int failIndex,
+    any[] queryData
+) {
+    DataPack pack = view_as<DataPack>(data);
+    LogError("[PermaMute] Could not record successful votemute at query %d: %s", failIndex, error);
+
+    if (Db_IsTransientError(error)) {
+        ScheduleVoteMuteDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
+    }
+
+    CreateTimer(VOTEMUTE_RETRY_INTERVAL, Timer_RetryVoteMuteRecord, pack);
+}
+
+stock PermanentlySilenceVoteMuteTarget(
+    const String:steamId64[],
+    const String:steamId2[],
+    targetUserId,
+    const String:savedChatName[]
+) {
+    SetAuthIdCookie(steamId2, g_cookies[COOKIE_PMUTE], "1");
+    SetAuthIdCookie(steamId2, g_cookies[COOKIE_PGAG], "1");
+
+    new target = GetClientOfUserId(targetUserId);
+    if (target > 0 && IsClientInGame(target) && !IsFakeClient(target)) {
+        decl String:currentSteamId64[32];
+        if (GetClientAuthId(target, AuthId_SteamID64, currentSteamId64, sizeof(currentSteamId64), true)
+            && StrEqual(currentSteamId64, steamId64)) {
+            PerformPMute(0, target, PCommType_PSilence);
+
+            decl String:chatName[256];
+            BuildVoteMuteChatName(target, chatName, sizeof(chatName));
+            CPrintToChatAllEx(target,
+                "{gold}[PermaMute]%s{default} reached three successful votemutes within 30 days and is now permanently silenced!",
+                chatName);
+            return;
+        }
+    }
+
+    decl String:chatName[256];
+    strcopy(chatName, sizeof(chatName), savedChatName);
+    ReplaceString(chatName, sizeof(chatName), "{teamcolor}", "{default}", false);
+    CPrintToChatAll(
+        "{gold}[PermaMute]%s{default} reached three successful votemutes within 30 days and is now permanently silenced!",
+        chatName);
 }
 
 stock bool:VoteMutePointsStoreReady() {
@@ -909,6 +1076,7 @@ stock ApplySuccessfulVoteMute() {
     decl String:value[32];
     IntToString(expiresAt, value, sizeof(value));
     SetAuthIdCookie(g_VoteMuteTargetAuth, g_cookies[COOKIE_VOTESILENCE], value);
+    RecordSuccessfulVoteMute();
 
     new target = GetClientOfUserId(g_VoteMuteTargetUserId);
     if (target > 0 && IsClientInGame(target) && !IsFakeClient(target)) {
@@ -1003,6 +1171,7 @@ stock BuildVoteMuteChatName(client, String:buffer[], maxlen) {
 stock ResetVoteMuteState() {
     g_VoteMuteTargetUserId = 0;
     g_VoteMuteTargetAuth[0] = '\0';
+    g_VoteMuteTargetSteamId64[0] = '\0';
     g_VoteMuteTargetName[0] = '\0';
     g_VoteMuteTargetChatName[0] = '\0';
     ResetVoteMuteWeightedState();
