@@ -14,7 +14,7 @@ enum struct RewardDefinition
     char id[BP_REWARD_ID_MAX];
     int amount;
     int perMapLimit;
-    int classId;
+    int classMask;
     char longName[BP_REWARD_NAME_MAX];
     char shortDescription[BP_REWARD_SHORT_DESCRIPTION_MAX];
     char longDescription[BP_REWARD_LONG_DESCRIPTION_MAX];
@@ -46,7 +46,7 @@ void ResetRewardConfigEntry()
     g_RewardConfigEntry.id[0] = '\0';
     g_RewardConfigEntry.amount = 0;
     g_RewardConfigEntry.perMapLimit = 0;
-    g_RewardConfigEntry.classId = BP_REWARD_CLASS_ALL;
+    g_RewardConfigEntry.classMask = BP_REWARD_CLASS_ALL;
     g_RewardConfigEntry.longName[0] = '\0';
     g_RewardConfigEntry.shortDescription[0] = '\0';
     g_RewardConfigEntry.longDescription[0] = '\0';
@@ -181,7 +181,7 @@ public SMCResult RewardConfig_KeyValue(
     }
     else if (StrEqual(key, "class", false))
     {
-        g_RewardConfigEntry.classId = GetRewardClassId(value);
+        g_RewardConfigEntry.classMask = GetRewardClassMask(value);
     }
     else if (StrEqual(key, "long_name", false))
     {
@@ -206,13 +206,48 @@ int GetRewardClassId(const char[] value)
     if (StrEqual(value, "scout", false)) return view_as<int>(TFClass_Scout);
     if (StrEqual(value, "soldier", false)) return view_as<int>(TFClass_Soldier);
     if (StrEqual(value, "pyro", false)) return view_as<int>(TFClass_Pyro);
-    if (StrEqual(value, "demoman", false)) return view_as<int>(TFClass_DemoMan);
+    if (StrEqual(value, "demo", false) || StrEqual(value, "demoman", false)) return view_as<int>(TFClass_DemoMan);
     if (StrEqual(value, "heavy", false)) return view_as<int>(TFClass_Heavy);
-    if (StrEqual(value, "engineer", false)) return view_as<int>(TFClass_Engineer);
+    if (StrEqual(value, "engi", false) || StrEqual(value, "engineer", false)) return view_as<int>(TFClass_Engineer);
     if (StrEqual(value, "sniper", false)) return view_as<int>(TFClass_Sniper);
     if (StrEqual(value, "medic", false)) return view_as<int>(TFClass_Medic);
     if (StrEqual(value, "spy", false)) return view_as<int>(TFClass_Spy);
     return BP_REWARD_CLASS_ALL;
+}
+
+int GetRewardClassMask(const char[] value)
+{
+    char classNames[16][32];
+    int classCount = ExplodeString(value, ",", classNames, sizeof(classNames), sizeof(classNames[]));
+    int classMask = BP_REWARD_CLASS_ALL;
+
+    for (int i = 0; i < classCount; i++)
+    {
+        TrimString(classNames[i]);
+        if (StrEqual(classNames[i], "all", false))
+        {
+            return BP_REWARD_CLASS_ALL;
+        }
+
+        int classId = GetRewardClassId(classNames[i]);
+        if (classId != BP_REWARD_CLASS_ALL)
+        {
+            classMask |= (1 << classId);
+        }
+    }
+
+    return classMask;
+}
+
+bool RewardMatchesClass(RewardDefinition reward, int classId)
+{
+    if (classId == BP_REWARD_CLASS_ALL)
+    {
+        return reward.classMask == BP_REWARD_CLASS_ALL;
+    }
+
+    return reward.classMask != BP_REWARD_CLASS_ALL
+        && (reward.classMask & (1 << classId)) != 0;
 }
 
 bool GetRewardDefinition(const char[] rewardId, RewardDefinition definition)

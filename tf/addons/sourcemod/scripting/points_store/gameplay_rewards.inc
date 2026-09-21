@@ -439,7 +439,18 @@ public void OnSandmanCleaverCombo(int attacker, int victim)
 
 public void OnMeatshotKill(int attacker, int victim)
 {
-	AwardGameplayReward(attacker, "meatshot_kill", victim);
+        TFClassType playerClass = TF2_GetPlayerClass(attacker);
+        if (playerClass == TFClass_Scout)
+        {
+                AwardGameplayReward(attacker, "meatshot_kill_scout", victim);
+        }
+        else if (playerClass == TFClass_Soldier
+                || playerClass == TFClass_Pyro
+                || playerClass == TFClass_Heavy
+                || playerClass == TFClass_Engineer)
+        {
+                AwardGameplayReward(attacker, "meatshot_kill_other", victim);
+        }
 }
 
 public void OnEnvironmentalKill(int attacker, int victim)

@@ -7,7 +7,8 @@
 
 static const char g_DailyGemTypes[][] =
 {
-    "meatshot_kill",
+    "meatshot_kill_scout",
+    "meatshot_kill_other",
     "sandman_cleaver_combo",
     "meatshot_kills_life_5",
     "Sandman moonshot",
@@ -90,7 +91,7 @@ int GetDailyClassProgress(int client, int classId)
         {
             continue;
         }
-        if (reward.classId != classId)
+        if (!RewardMatchesClass(reward, classId))
         {
             continue;
         }
@@ -114,7 +115,7 @@ void PrintDailyClassGroup(int client, int classId)
         {
             continue;
         }
-        if (reward.classId != classId)
+        if (!RewardMatchesClass(reward, classId))
         {
             continue;
         }
