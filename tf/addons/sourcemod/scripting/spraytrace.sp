@@ -249,12 +249,15 @@
 #include <clientprefs>
 #undef REQUIRE_PLUGIN
 #include <adminmenu>
+#include <whaletracker_api>
+#define REQUIRE_PLUGIN
 
 #define PLUGIN_VERSION "5.8a"
 #define SPRAY_SOUND "player/sprayer.wav"
 #define SPRAY_MUTE_DATABASE "default"
 #define SPRAY_MUTE_TABLE "spray_mutes"
 #define SPRAY_MUTE_DURATION (7 * 24 * 60 * 60)
+#define SPRAY_MUTE_GLOBAL_VIEWER "*"
 #define MAXDIS 0
 #define REFRESHRATE 1
 #define TBANTIME 2
@@ -313,10 +316,17 @@ public Plugin:myinfo =
 	url = "http://www.sourcemod.net/"
 };
 
+public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], errMax) {
+        MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeSeconds");
+        return APLRes_Success;
+}
+
 public OnPluginStart() {
         RegConsoleCmd("sm_mutesprays", ToggleSpraySounds, "Toggle spray sound effects.");
         RegConsoleCmd("sm_spraymute", Command_SprayMute, "Mute spray sounds, or hide a player's sprays for seven days.");
         RegConsoleCmd("sm_sprayunmute", Command_SprayUnmute, "Stop hiding a player's sprays.");
+        RegAdminCmd("sm_sprayban", Command_SprayBan, ADMFLAG_BAN, "Hide a player's sprays from everyone for seven days.");
+        RegAdminCmd("sm_sprayunban", Command_SprayUnban, ADMFLAG_UNBAN, "Remove a player's global spray ban.");
 
         g_hMuteSpraySoundsCookie = RegClientCookie("spraytrace_mute_sounds", "Mute spray sound effects", CookieAccess_Private);
         g_hSprayMuteMap = CreateTrie();
@@ -537,6 +547,207 @@ public Action:Command_SprayUnmute(client, args) {
         return Plugin_Handled;
 }
 
+public Action:Command_SprayBan(client, args) {
+        if(!IsValidClient(client))
+                return Plugin_Handled;
+
+        if(!g_bSprayMutesLoaded) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 Spray mute data is not ready yet.");
+                return Plugin_Handled;
+        }
+
+        if(args < 1) {
+                DisplaySprayBanTargetMenu(client);
+                return Plugin_Handled;
+        }
+
+        new target = FindSprayBanTarget(client);
+        if(target > 0)
+                ApplyGlobalSprayBan(client, target);
+
+        return Plugin_Handled;
+}
+
+public Action:Command_SprayUnban(client, args) {
+        if(!IsValidClient(client))
+                return Plugin_Handled;
+
+        if(args < 1) {
+                ReplyToCommand(client, "[Spray Trace] Usage: sm_sprayunban <name>");
+                return Plugin_Handled;
+        }
+
+        if(!g_bSprayMutesLoaded) {
+                PrintToChat(client, "\x04[Spray Trace]\x01 Spray mute data is not ready yet.");
+                return Plugin_Handled;
+        }
+
+        new target = FindSprayBanTarget(client);
+        if(target > 0)
+                RemoveGlobalSprayBan(client, target);
+
+        return Plugin_Handled;
+}
+
+stock FindSprayBanTarget(client) {
+        new String:pattern[MAX_TARGET_LENGTH];
+        GetCmdArgString(pattern, sizeof(pattern));
+        StripQuotes(pattern);
+        return FindTarget(client, pattern, true);
+}
+
+stock ApplyGlobalSprayBan(admin, target) {
+        new String:sprayerSteamId64[32];
+        if(!GetSprayMuteSteamId64(target, sprayerSteamId64, sizeof(sprayerSteamId64))) {
+                PrintToChat(admin, "\x04[Spray Trace]\x01 Steam authentication is not ready yet.");
+                return;
+        }
+
+        new expiresAt = GetTime() + SPRAY_MUTE_DURATION;
+        new String:key[72];
+        BuildSprayMuteKey(SPRAY_MUTE_GLOBAL_VIEWER, sprayerSteamId64, key, sizeof(key));
+        SetTrieValue(g_hSprayMuteMap, key, expiresAt);
+        PersistSprayMute(SPRAY_MUTE_GLOBAL_VIEWER, sprayerSteamId64, expiresAt);
+
+        new Float:zero[3];
+        for(new viewer = 1; viewer <= MaxClients; viewer++) {
+                if(IsValidClient(viewer))
+                        SendPlayerDecalToClient(target, viewer, 0, zero);
+        }
+
+        PrintToChatAll("\x04[Spray Trace]\x01 %N has been spray-banned for seven days.", target);
+        LogAction(admin, target, "\"%L\" spray-banned \"%L\" for seven days", admin, target);
+}
+
+stock RemoveGlobalSprayBan(admin, target) {
+        new String:sprayerSteamId64[32];
+        if(!GetSprayMuteSteamId64(target, sprayerSteamId64, sizeof(sprayerSteamId64))) {
+                PrintToChat(admin, "\x04[Spray Trace]\x01 Steam authentication is not ready yet.");
+                return;
+        }
+
+        new String:key[72];
+        new expiresAt;
+        BuildSprayMuteKey(SPRAY_MUTE_GLOBAL_VIEWER, sprayerSteamId64, key, sizeof(key));
+        if(!GetTrieValue(g_hSprayMuteMap, key, expiresAt) || expiresAt <= GetTime()) {
+                RemoveFromTrie(g_hSprayMuteMap, key);
+                DeleteSprayMute(SPRAY_MUTE_GLOBAL_VIEWER, sprayerSteamId64);
+                PrintToChat(admin, "\x04[Spray Trace]\x01 %N is not spray-banned.", target);
+                return;
+        }
+
+        RemoveFromTrie(g_hSprayMuteMap, key);
+        DeleteSprayMute(SPRAY_MUTE_GLOBAL_VIEWER, sprayerSteamId64);
+
+        if(SprayPositionIsSet(target)) {
+                for(new viewer = 1; viewer <= MaxClients; viewer++) {
+                        if(IsValidClient(viewer) && !IsSprayerMutedForViewer(viewer, target))
+                                SendPlayerDecalToClient(target, viewer, g_arrSprayEntity[target], g_arrSprayTrace[target]);
+                }
+        }
+
+        PrintToChatAll("\x04[Spray Trace]\x01 %N is no longer spray-banned.", target);
+        LogAction(admin, target, "\"%L\" removed the spray ban from \"%L\"", admin, target);
+}
+
+stock bool:IsSprayBanTargetRanked(client) {
+        return GetFeatureStatus(FeatureType_Native, "WhaleTracker_GetRankedPlaytimeSeconds") == FeatureStatus_Available
+                && WhaleTracker_GetRankedPlaytimeSeconds(client) > 0;
+}
+
+stock bool:SprayBanTargetComesBefore(left, right, bool:leftRanked, bool:rightRanked,
+        Float:leftConnectedTime, Float:rightConnectedTime) {
+        if(leftRanked != rightRanked)
+                return !leftRanked;
+
+        if(leftConnectedTime != rightConnectedTime) {
+                if(leftRanked)
+                        return leftConnectedTime > rightConnectedTime;
+                return leftConnectedTime < rightConnectedTime;
+        }
+
+        new String:leftName[MAX_NAME_LENGTH];
+        new String:rightName[MAX_NAME_LENGTH];
+        GetClientName(left, leftName, sizeof(leftName));
+        GetClientName(right, rightName, sizeof(rightName));
+        return strcmp(leftName, rightName, false) < 0;
+}
+
+stock FormatSprayBanConnectedTime(client, String:output[], maxLength) {
+        new totalSeconds = RoundToFloor(GetClientTime(client));
+        new seconds = totalSeconds % 60;
+        new totalMinutes = totalSeconds / 60;
+
+        if(totalMinutes >= 60) {
+                Format(output, maxLength, "%d:%02d:%02d", totalMinutes / 60, totalMinutes % 60, seconds);
+                return;
+        }
+
+        Format(output, maxLength, "%d:%02d", totalMinutes, seconds);
+}
+
+stock DisplaySprayBanTargetMenu(client) {
+        new targets[MAXPLAYERS + 1];
+        new bool:ranked[MAXPLAYERS + 1];
+        new Float:connectedTime[MAXPLAYERS + 1];
+        new targetCount;
+
+        for(new target = 1; target <= MaxClients; target++) {
+                if(!IsClientInGame(target) || IsFakeClient(target) || !CanUserTarget(client, target))
+                        continue;
+
+                ranked[target] = IsSprayBanTargetRanked(target);
+                connectedTime[target] = GetClientTime(target);
+
+                new insertAt = targetCount;
+                while(insertAt > 0) {
+                        new previous = targets[insertAt - 1];
+                        if(!SprayBanTargetComesBefore(target, previous, ranked[target], ranked[previous],
+                                connectedTime[target], connectedTime[previous]))
+                                break;
+
+                        targets[insertAt] = previous;
+                        insertAt--;
+                }
+
+                targets[insertAt] = target;
+                targetCount++;
+        }
+
+        new Handle:menu = CreateMenu(MenuHandler_SprayBanTarget);
+        SetMenuTitle(menu, "Spray-ban player:");
+
+        for(new index = 0; index < targetCount; index++) {
+                new target = targets[index];
+                new String:userId[16];
+                new String:connected[24];
+                new String:display[MAX_NAME_LENGTH + 32];
+                IntToString(GetClientUserId(target), userId, sizeof(userId));
+                FormatSprayBanConnectedTime(target, connected, sizeof(connected));
+                Format(display, sizeof(display), "%N (%s)", target, connected);
+                AddMenuItem(menu, userId, display);
+        }
+
+        DisplayMenu(menu, client, MENU_TIME_FOREVER);
+}
+
+public MenuHandler_SprayBanTarget(Handle:menu, MenuAction:action, client, selection) {
+        if(action == MenuAction_End) {
+                CloseHandle(menu);
+        } else if(action == MenuAction_Select) {
+                new String:userId[16];
+                GetMenuItem(menu, selection, userId, sizeof(userId));
+                new target = GetClientOfUserId(StringToInt(userId));
+
+                if(target == 0)
+                        PrintToChat(client, "[SM] %t", "Player no longer available");
+                else if(!CanUserTarget(client, target))
+                        PrintToChat(client, "[SM] %t", "Unable to target");
+                else
+                        ApplyGlobalSprayBan(client, target);
+        }
+}
+
 stock FindSprayMuteTarget(client) {
         new String:pattern[MAX_TARGET_LENGTH];
         GetCmdArgString(pattern, sizeof(pattern));
@@ -572,16 +783,7 @@ stock BuildSprayMuteKey(const String:viewerSteamId64[], const String:sprayerStea
         Format(key, maxLength, "%s|%s", viewerSteamId64, sprayerSteamId64);
 }
 
-stock bool:IsSprayerMutedForViewer(viewer, sprayer) {
-        if(!g_bSprayMutesLoaded || !IsValidClient(viewer) || !IsValidClient(sprayer))
-                return false;
-
-        new String:viewerSteamId64[32];
-        new String:sprayerSteamId64[32];
-        if(!GetSprayMuteSteamId64(viewer, viewerSteamId64, sizeof(viewerSteamId64))
-                || !GetSprayMuteSteamId64(sprayer, sprayerSteamId64, sizeof(sprayerSteamId64)))
-                return false;
-
+stock bool:IsSprayMuteActive(const String:viewerSteamId64[], const String:sprayerSteamId64[]) {
         new String:key[72];
         new expiresAt;
         BuildSprayMuteKey(viewerSteamId64, sprayerSteamId64, key, sizeof(key));
@@ -594,6 +796,24 @@ stock bool:IsSprayerMutedForViewer(viewer, sprayer) {
         RemoveFromTrie(g_hSprayMuteMap, key);
         DeleteSprayMute(viewerSteamId64, sprayerSteamId64);
         return false;
+}
+
+stock bool:IsSprayerMutedForViewer(viewer, sprayer) {
+        if(!g_bSprayMutesLoaded || !IsValidClient(viewer) || !IsValidClient(sprayer))
+                return false;
+
+        new String:sprayerSteamId64[32];
+        if(!GetSprayMuteSteamId64(sprayer, sprayerSteamId64, sizeof(sprayerSteamId64)))
+                return false;
+
+        if(IsSprayMuteActive(SPRAY_MUTE_GLOBAL_VIEWER, sprayerSteamId64))
+                return true;
+
+        new String:viewerSteamId64[32];
+        if(!GetSprayMuteSteamId64(viewer, viewerSteamId64, sizeof(viewerSteamId64)))
+                return false;
+
+        return IsSprayMuteActive(viewerSteamId64, sprayerSteamId64);
 }
 
 stock PersistSprayMute(const String:viewerSteamId64[], const String:sprayerSteamId64[], expiresAt) {
