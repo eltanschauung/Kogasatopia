@@ -26,7 +26,8 @@
 #define MINOR	"1"
 #define PATCH	"0"
 #define ENGIPADS_PLUGIN_VERSION	MAJOR..."."...MINOR..."."...PATCH
-#define ATTRIBUTE_WEAPON_SLOT 3 // Build PDA
+#define ATTRIBUTE_PDA_SLOT_FIRST 3
+#define ATTRIBUTE_PDA_SLOT_LAST 4
 #define ATTRIBUTE_BUILD_SPEED "engineer teleporter build rate multiplier"
 #define ATTRIBUTE_BUILD_SPEED_FACTOR 3.0
 
@@ -332,7 +333,7 @@ public void ObjectBuilt(Event event, const char[] name, bool dontBroadcast)
     bool deployed = !GetEntProp(obj, Prop_Send, "m_bCarryDeploy");
 
     int padForce = cvarPads[PadForce].IntValue;
-    bool padsEnabled = GetClientPadsEnabled(builder) || GetClientEngipadsAttribute(builder, ATTRIBUTE_WEAPON_SLOT);
+    bool padsEnabled = GetClientPadsEnabled(builder) || GetClientEngipadsAttribute(builder);
 
     if (padForce == 2)
     {
@@ -1189,13 +1190,23 @@ stock bool GetClientPadsEnabled(int iClient)
 	return view_as<bool>(StringToInt(szToggle));
 }
 
-stock bool GetClientEngipadsAttribute(int iClient, int slot)
+stock bool GetClientEngipadsAttribute(int iClient)
 {
-	int weapon = GetPlayerWeaponSlot(iClient, slot);
-	if (weapon <= MaxClients || !IsValidEntity(weapon))
-		return false;
+    for (int slot = ATTRIBUTE_PDA_SLOT_FIRST; slot <= ATTRIBUTE_PDA_SLOT_LAST; slot++)
+    {
+        int weapon = GetPlayerWeaponSlot(iClient, slot);
+        if (weapon <= MaxClients || !IsValidEntity(weapon))
+        {
+            continue;
+        }
 
-	return TF2CustAttr_GetInt(weapon, "engipads attributes") != 0;
+        if (TF2CustAttr_GetInt(weapon, "engipads attributes") != 0)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 stock void SetClientPadsEnabled(int iClient, bool bEnabled)
