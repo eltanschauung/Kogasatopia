@@ -563,11 +563,14 @@ public void SQL_OnVoteMuteDatabaseConnected(Database db, const char[] error, any
         ... "updated_at BIGINT NOT NULL"
         ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         VOTEMUTE_LOCK_TABLE);
-    g_VoteMuteDatabase.Query(SQL_OnVoteMuteLockSchemaReady, query);
+    g_VoteMuteDatabase.Query(
+        SQL_OnVoteMuteLockSchemaReady,
+        query,
+        g_VoteMuteDatabaseGeneration);
 }
 
 public void SQL_OnVoteMuteLockSchemaReady(Database db, DBResultSet results, const char[] error, any data) {
-    if (db != g_VoteMuteDatabase) {
+    if (data != g_VoteMuteDatabaseGeneration) {
         return;
     }
 
@@ -592,11 +595,11 @@ public void SQL_OnVoteMuteLockSchemaReady(Database db, DBResultSet results, cons
         ... "KEY idx_permavote_time (voted_at)"
         ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         VOTEMUTE_HISTORY_TABLE);
-    g_VoteMuteDatabase.Query(SQL_OnVoteMuteHistorySchemaReady, query);
+    g_VoteMuteDatabase.Query(SQL_OnVoteMuteHistorySchemaReady, query, data);
 }
 
 public void SQL_OnVoteMuteHistorySchemaReady(Database db, DBResultSet results, const char[] error, any data) {
-    if (db != g_VoteMuteDatabase) {
+    if (data != g_VoteMuteDatabaseGeneration) {
         return;
     }
 
@@ -609,6 +612,7 @@ public void SQL_OnVoteMuteHistorySchemaReady(Database db, DBResultSet results, c
     }
 
     g_VoteMuteDatabaseReady = true;
+    LogMessage("[PermaMute] Votemute history database is ready.");
     PruneVoteMuteHistory();
     if (g_VoteMutePruneTimer == null) {
         g_VoteMutePruneTimer = CreateTimer(
@@ -634,11 +638,14 @@ stock PruneVoteMuteHistory() {
         "DELETE FROM %s WHERE voted_at < %d",
         VOTEMUTE_HISTORY_TABLE,
         GetTime() - VOTEMUTE_HISTORY_SECONDS);
-    g_VoteMuteDatabase.Query(SQL_OnVoteMuteHistoryPruned, query);
+    g_VoteMuteDatabase.Query(
+        SQL_OnVoteMuteHistoryPruned,
+        query,
+        g_VoteMuteDatabaseGeneration);
 }
 
 public void SQL_OnVoteMuteHistoryPruned(Database db, DBResultSet results, const char[] error, any data) {
-    if (db != g_VoteMuteDatabase) {
+    if (data != g_VoteMuteDatabaseGeneration) {
         return;
     }
 
@@ -658,11 +665,11 @@ public void SQL_OnVoteMuteHistoryPruned(Database db, DBResultSet results, const 
         VOTEMUTE_LOCK_TABLE,
         VOTEMUTE_HISTORY_TABLE,
         GetTime() - VOTEMUTE_HISTORY_SECONDS);
-    g_VoteMuteDatabase.Query(SQL_OnVoteMuteLocksPruned, query);
+    g_VoteMuteDatabase.Query(SQL_OnVoteMuteLocksPruned, query, data);
 }
 
 public void SQL_OnVoteMuteLocksPruned(Database db, DBResultSet results, const char[] error, any data) {
-    if (db != g_VoteMuteDatabase) {
+    if (data != g_VoteMuteDatabaseGeneration) {
         return;
     }
 
