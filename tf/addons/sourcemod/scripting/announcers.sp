@@ -353,6 +353,7 @@ public void OnClientCookiesCached(int client)
 
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 {
+    CreateNative("Announcers_IsGroupEnabled", Native_IsAnnouncerGroupEnabled);
     MarkNativeAsOptional(ANNOUNCER_SOUND_NATIVE);
     MarkNativeAsOptional(ANNOUNCER_SOUND_PLAY_AS_NATIVE);
     MarkNativeAsOptional(ANNOUNCER_SOUND_CAN_USE_NATIVE);
@@ -364,6 +365,48 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
     MarkNativeAsOptional("DGM_GetGameModeKey");
     MarkNativeAsOptional("Filters_GetChatName");
     return APLRes_Success;
+}
+
+public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
+{
+    int client = GetNativeCell(1);
+    if (!IsHumanAnnouncerClient(client)
+        || !IsClientInGame(client)
+        || !AreClientCookiesCached(client)
+        || !CanInspectSaySoundGroups())
+    {
+        return false;
+    }
+
+    char requestedGroup[ANNOUNCER_MAX_GROUP_NAME];
+    GetNativeString(2, requestedGroup, sizeof(requestedGroup));
+    TrimString(requestedGroup);
+    Strings_ToLower(requestedGroup, sizeof(requestedGroup));
+    if (!requestedGroup[0] || IsAnnouncerGroupDisabled(client, requestedGroup))
+    {
+        return false;
+    }
+
+    ArrayList groups = new ArrayList(ByteCountToCells(ANNOUNCER_MAX_GROUP_NAME));
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_KillstreakSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MultikillSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
+
+    bool enabled = false;
+    char groupName[ANNOUNCER_MAX_GROUP_NAME];
+    for (int i = 0; i < groups.Length; i++)
+    {
+        groups.GetString(i, groupName, sizeof(groupName));
+        if (StrEqual(groupName, requestedGroup, false))
+        {
+            enabled = true;
+            break;
+        }
+    }
+
+    delete groups;
+    return enabled;
 }
 
 public Action Command_Announcers(int client, int args)
