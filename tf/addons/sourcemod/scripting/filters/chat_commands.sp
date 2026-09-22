@@ -82,6 +82,21 @@ Action Filters_RunFiltersHelpCommand(int client)
     return Plugin_Handled;
 }
 
+Action Filters_FinalizeChat(bool sourceModCommand, bool passthroughSayAlias)
+{
+    if (sourceModCommand)
+    {
+        return Plugin_Handled;
+    }
+
+    if (passthroughSayAlias)
+    {
+        return Plugin_Continue;
+    }
+
+    return Plugin_Stop;
+}
+
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
 {
     if (!client)
@@ -91,6 +106,9 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     // chat and chat-triggered commands before any Filters delivery path runs.
     if (FiltersBaseComm_IsClientGagged(client))
         return Plugin_Stop;
+
+    bool sourceModCommand = IsChatTrigger();
+    bool passthroughSayAlias = CheckConfiguredBareCommand(sArgs);
 
     char dead[64];
     BuildDeathPrefix(client, dead, sizeof(dead));
@@ -115,12 +133,6 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
         return Plugin_Continue;
     }
 
-    if (CheckCommands(sArgs, !Filters_IsConnectedParseeClient(client)))
-    {
-        PrintToServer("%s", sArgs);
-        return Plugin_Continue;
-    }
-
     g_DisguiseChatInProgress[client] = g_DisguiseActive[client];
     Filters_ScheduleArchivedMessageTriggers(client, sArgs);
     bool blacklistRateLimited = Filters_IsBlacklistChatRateLimited(client);
@@ -128,7 +140,7 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (TryHandleTeamChat(client, command, sArgs, dead, blacklistRateLimited))
     {
         g_DisguiseChatInProgress[client] = false;
-        return Plugin_Stop;
+        return Filters_FinalizeChat(sourceModCommand, passthroughSayAlias);
     }
 
     ChatContext context;
@@ -174,30 +186,30 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (HandleRestrictedMessage(client, output, context, senderOutput))
     {
         g_DisguiseChatInProgress[client] = false;
-        return Plugin_Stop;
+        return Filters_FinalizeChat(sourceModCommand, passthroughSayAlias);
     }
 
     if (HandleCordModeBlacklistedChat(client, output, context, senderOutput))
     {
         g_DisguiseChatInProgress[client] = false;
-        return Plugin_Stop;
+        return Filters_FinalizeChat(sourceModCommand, passthroughSayAlias);
     }
 
     if (Filters_TryReplaceConnectedParseeMessage(client, output, senderOutput, sArgs))
     {
         g_DisguiseChatInProgress[client] = false;
-        return Plugin_Stop;
+        return Filters_FinalizeChat(sourceModCommand, passthroughSayAlias);
     }
 
     if (HandleEnabledChat(client, output, context, senderOutput))
     {
         g_DisguiseChatInProgress[client] = false;
-        return Plugin_Stop;
+        return Filters_FinalizeChat(sourceModCommand, passthroughSayAlias);
     }
 
     SendFallbackMessage(client);
     g_DisguiseChatInProgress[client] = false;
-    return Plugin_Stop;
+    return Filters_FinalizeChat(sourceModCommand, passthroughSayAlias);
 }
 
 void BuildChatContext(int client, const char[] sArgs, ChatContext context,

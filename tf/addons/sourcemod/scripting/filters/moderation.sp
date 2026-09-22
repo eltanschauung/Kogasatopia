@@ -185,21 +185,12 @@ public Action Command_Colors(int client, int args)
     return Plugin_Handled;
 }
 
-bool CheckCommands(const char[] sArgs, bool allowPercentBypass = true)
+bool CheckConfiguredBareCommand(const char[] sArgs)
 {
-    // Leave public and silent SourceMod command triggers to their command handlers.
-    if (sArgs[0] == '!' || sArgs[0] == '/') {
-        return true;
-    }
-    
-    // Allow any message containing %
-    if (allowPercentBypass && StrContains(sArgs, "%", false) != -1) {
-        return true;
-    }
-    
-    // Check against allowed commands list from config
-    for (int i = 0; i < g_AllowedCommandsCount; i++) {
-        if (StrEqual(sArgs, g_AllowedCommands[i], false)) {
+    for (int i = 0; i < g_AllowedCommandsCount; i++)
+    {
+        if (StrEqual(sArgs, g_AllowedCommands[i], false))
+        {
             return true;
         }
     }
