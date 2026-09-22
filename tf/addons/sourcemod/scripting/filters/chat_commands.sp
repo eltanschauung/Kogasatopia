@@ -91,7 +91,9 @@ Action Filters_FinalizeChat(bool sourceModCommand, bool passthroughSayAlias)
 
     if (passthroughSayAlias)
     {
-        return Plugin_Continue;
+        // Suppress TF2's stock chat line while still allowing SourceMod's
+        // OnClientSayCommand_Post handlers and other command hooks to run.
+        return Plugin_Handled;
     }
 
     return Plugin_Stop;
