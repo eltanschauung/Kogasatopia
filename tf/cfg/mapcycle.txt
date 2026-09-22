@@ -7,7 +7,7 @@ koth_highpass
 koth_citadel_a7
 koth_kemptown_rc4
 workshop/koth_rocktop_rc2.ugc454207393
-koth_slaughterhouse_72_rc1
+koth_heaven_b1
 workshop/koth_brine_rc3a.ugc2965195337
 koth_nerve
 
@@ -33,7 +33,6 @@ plr_bananabay
 
 //AD
 cp_steel_trad
-cp_mercenarypark
 cp_mossrock
 
 //CTF
