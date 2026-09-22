@@ -93,11 +93,16 @@ bool StartFavoredWhaleRankPairSwap(int issuer, int favoredTeam)
 
     TeamBalance_FinishScramble(true, false);
     SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
-    CPrintToChatAll(
-        "{tomato}[{purple}Gap{tomato}]{default} Whale rank swap: {gold}%N{default} to %s for {gold}%N{default}.",
-        highestRankedOpponent,
-        favoredTeam == TEAM_RED ? "RED" : "BLU",
-        lowestFavoredClient);
+    if (opposingTeam == TEAM_RED)
+    {
+        CPrintToChatAll(
+            "{gold}[WhaleScramble]{default} The best player on {red}RED{default} has been swapped to team {blue}BLU{default}!");
+    }
+    else
+    {
+        CPrintToChatAll(
+            "{gold}[WhaleScramble]{default} The best player on {blue}BLU{default} has been swapped to team {red}RED{default}!");
+    }
     LogWhaleStat(
         "scramble_result",
         "mode=whaletracker_rank_pair|result=executed|favored_team=%d|source_points=%d|target_points=%d|target_unranked=%d",
