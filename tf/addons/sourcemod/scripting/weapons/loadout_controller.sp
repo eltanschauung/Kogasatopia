@@ -215,23 +215,29 @@ void Weapons_ApplyLoadoutPass(int client, int playerClass, int serial)
             {
                 continue;
             }
-            Weapons_MarkValidatedAttachedEntity(entity, client, "loadout_apply");
             g_CurrentLoadout[client][playerClass][slot].entity = EntIndexToEntRef(entity);
         }
         else
         {
-            EnsureCustomItemRuntimeAttributes(entity, item, client, "persisted_loadout");
+            bool repaired = EnsureCustomItemRuntimeAttributes(
+                entity,
+                item,
+                client,
+                "persisted_loadout");
             if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity))
             {
                 return;
             }
-            Weapons_MarkValidatedAttachedEntity(entity, client, "persisted_loadout");
-            Weapons_NotifyItemRuntimeStateReady(client, entity);
+            if (repaired)
+            {
+                Weapons_MarkValidatedAttachedEntity(
+                    entity,
+                    client,
+                    "persisted_loadout_repair",
+                    false);
+                Weapons_NotifyItemRuntimeStateReady(client, entity);
+            }
         }
-    }
-    if (GetClientFromSerial(serial) == client && IsClientInGame(client))
-    {
-        WeaponsGameplay_QueueWearerAttributeRefresh(client);
     }
 }
 
@@ -341,7 +347,11 @@ MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams)
         TF2Econ_TranslateWeaponEntForClass(classname, sizeof(classname), playerClass);
         SetEntProp(entity, Prop_Send, "m_iItemDefinitionIndex", item.defindex);
         SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
-        Weapons_MarkValidatedAttachedEntity(entity, client, "manage_regular_weapons");
+        Weapons_MarkValidatedAttachedEntity(
+            entity,
+            client,
+            "manage_regular_weapons",
+            false);
     }
     return MRES_Ignored;
 }

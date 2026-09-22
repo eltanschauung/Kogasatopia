@@ -21,6 +21,7 @@
 #define MODEL_OFFHAND_ACTIVE (1 << 3)
 
 #define TF_ITEM_DEFINDEX_GUNSLINGER 142
+#define WEAPONS_MODEL_VALIDATION_DELAY 0.25
 
 #define ATTR_EXTRA_WEARABLE_MODEL_OVERRIDE "extra wearable model override"
 #define ATTR_PROJECTILE_MODEL_OVERRIDE "projectile model override"
@@ -28,6 +29,7 @@
 #define ATTR_CLASS_KILLSTREAK_IDLEEFFECT "killstreak_idleeffect"
 
 bool g_bIgnoreWeaponSwitch[MAXPLAYERS + 1];
+bool g_bClientModelUpdateQueued[MAXPLAYERS + 1];
 ConVar sm_weapons_model_edict_reserve;
 bool g_bLoggedEdictReserve;
 
@@ -181,8 +183,8 @@ void WeaponsModels_OnInventoryAppliedPost(Event event, const char[] name, bool d
 	if (!Weapons_IsValidClient(client)) {
 		return;
 	}
-	UpdateClientWeaponModel(client);
-	ScheduleClientModelRefresh(client);
+	QueueClientModelUpdate(client);
+	ScheduleClientModelValidation(client);
 	
 	/**
 	 * start processing weapon switches, since other plugins may be equipping new weapons in
@@ -191,21 +193,24 @@ void WeaponsModels_OnInventoryAppliedPost(Event event, const char[] name, bool d
 	g_bIgnoreWeaponSwitch[client] = false;
 }
 
-Action Timer_DelayedUpdateClientWeaponModel(Handle timer, any userid) {
-	int client = GetClientOfUserId(userid);
-	if (Weapons_IsValidClient(client)
-			&& ClientWeaponModelNeedsRefresh(client)) {
-		UpdateClientWeaponModel(client);
-	}
-	return Plugin_Stop;
-}
-
 void Frame_UpdateClientWeaponModel(any userid) {
 	int client = GetClientOfUserId(userid);
+	if (client > 0 && client <= MaxClients) {
+		g_bClientModelUpdateQueued[client] = false;
+	}
 	if (Weapons_IsValidClient(client)
 			&& ClientWeaponModelNeedsRefresh(client)) {
 		UpdateClientWeaponModel(client);
 	}
+}
+
+void QueueClientModelUpdate(int client) {
+	if (!Weapons_IsValidClient(client) || g_bClientModelUpdateQueued[client]) {
+		return;
+	}
+
+	g_bClientModelUpdateQueued[client] = true;
+	RequestFrame(Frame_UpdateClientWeaponModel, GetClientUserId(client));
 }
 
 /**
@@ -240,42 +245,44 @@ void Frame_UpdateClientWeaponModelForWeapon(any data) {
 	}
 
 	UpdateClientWeaponModel(client, weapon);
-	ScheduleClientModelValidationRetries(client);
 }
 
-void ScheduleClientModelUpdate(int client, float delay) {
+void ScheduleClientModelValidation(int client) {
 	if (Weapons_IsValidClient(client)) {
-		CreateTimer(delay, Timer_DelayedUpdateClientWeaponModel, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(WEAPONS_MODEL_VALIDATION_DELAY, Timer_ValidateClientWeaponModel,
+			GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
-void ScheduleClientModelUpdateRetries(int client) {
-	ScheduleClientModelUpdate(client, 0.1);
-	ScheduleClientModelUpdate(client, 0.35);
-	ScheduleClientModelUpdate(client, 1.0);
-}
-
-void ScheduleClientModelValidation(int client, float delay) {
-	if (Weapons_IsValidClient(client)) {
-		CreateTimer(delay, Timer_ValidateClientWeaponModel, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+void ScheduleWeaponBoundModelValidation(int client, int weapon) {
+	if (!Weapons_IsValidClient(client) || weapon <= MaxClients || !IsValidEntity(weapon)) {
+		return;
 	}
-}
 
-void ScheduleClientModelValidationRetries(int client) {
-	ScheduleClientModelValidation(client, 1.5);
-	ScheduleClientModelValidation(client, 3.0);
-	ScheduleClientModelValidation(client, 5.0);
-}
-
-void ScheduleClientModelRefresh(int client) {
-	ScheduleClientModelUpdateRetries(client);
-	ScheduleClientModelValidationRetries(client);
+	DataPack pack;
+	CreateDataTimer(WEAPONS_MODEL_VALIDATION_DELAY,
+		Timer_ValidateClientWeaponModelForWeapon, pack, TIMER_FLAG_NO_MAPCHANGE);
+	pack.WriteCell(GetClientUserId(client));
+	pack.WriteCell(EntIndexToEntRef(weapon));
 }
 
 Action Timer_ValidateClientWeaponModel(Handle timer, any userid) {
 	int client = GetClientOfUserId(userid);
 	if (Weapons_IsValidClient(client) && ClientWeaponModelNeedsRefresh(client)) {
 		UpdateClientWeaponModel(client);
+	}
+	return Plugin_Stop;
+}
+
+Action Timer_ValidateClientWeaponModelForWeapon(Handle timer, any data) {
+	DataPack pack = view_as<DataPack>(data);
+	pack.Reset();
+	int client = GetClientOfUserId(pack.ReadCell());
+	int weapon = EntRefToEntIndex(pack.ReadCell());
+	if (Weapons_IsValidClient(client) && weapon > MaxClients && IsValidEntity(weapon)
+			&& weapon == TF2_GetClientActiveWeapon(client)
+			&& ClientWeaponModelNeedsRefresh(client)) {
+		UpdateClientWeaponModel(client, weapon);
 	}
 	return Plugin_Stop;
 }
@@ -288,8 +295,6 @@ Action WeaponsModels_OnPlayerSpawnPre(int client) {
 void WeaponsModels_OnPlayerSpawnPost(int client) {
 	g_bForceReequipItems[client] = false;
 	g_bIgnoreWeaponSwitch[client] = false;
-	RequestFrame(Frame_UpdateClientWeaponModel, GetClientUserId(client));
-	ScheduleClientModelRefresh(client);
 }
 
 void WeaponsModels_OnItemRuntimeStateReady(int client, int entity) {
@@ -300,7 +305,7 @@ void WeaponsModels_OnItemRuntimeStateReady(int client, int entity) {
 		char model[PLATFORM_MAX_PATH];
 		if (GetEntityClientModelOverride(entity, model, sizeof(model))) {
 			ApplyWearableModelOverride(entity, model);
-			ScheduleClientModelUpdate(client, 0.1);
+			QueueClientModelUpdate(client);
 		}
 		return;
 	}
@@ -309,13 +314,12 @@ void WeaponsModels_OnItemRuntimeStateReady(int client, int entity) {
 	}
 
 	QueueWeaponBoundModelUpdate(client, entity);
-	ScheduleClientModelValidationRetries(client);
 }
 
 void WeaponsModels_OnWeaponSwitchPost(int client, int weapon) {
 	if (!g_bIgnoreWeaponSwitch[client]) {
 		QueueWeaponBoundModelUpdate(client, weapon);
-		ScheduleClientModelUpdate(client, 0.1);
+		ScheduleWeaponBoundModelValidation(client, weapon);
 	}
 }
 
@@ -425,7 +429,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			&& FileExistsAndLog(wm, true)) {
 		// this allows other players to see the given weapon with the correct model
 		SetWeaponWorldModel(weapon, wm);
-		Weapons_MarkValidatedAttachedEntity(weapon, client, "active_weapon_worldmodel", true, weapon);
+		Weapons_MarkValidatedAttachedEntity(weapon, client, "active_weapon_worldmodel", false, weapon);
 		
 		// the following shows the weapon in third-person, as m_nModelIndexOverrides is messy
 		int weaponwm = CanCreateOverrideWearable() ? TF2_SpawnWearable() : -1;
@@ -527,7 +531,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 				&& FileExistsAndLog(ohvm, true)) {
 			PrecacheModelAndLog(ohvm);
 			SetEntityModel(shield, ohvm);
-			Weapons_MarkValidatedAttachedEntity(shield, client, "demoman_shield", true, weapon);
+			Weapons_MarkValidatedAttachedEntity(shield, client, "demoman_shield", false, weapon);
 			
 			if (TF2Util_IsEntityWeapon(weapon)
 					&& TF2Util_GetWeaponSlot(weapon) == TFWeaponSlot_Melee) {
@@ -703,7 +707,7 @@ bool ApplyWearableModelOverride(int wearable, const char[] model) {
 	PrecacheModelAndLog(model);
 	SetEntityModel(wearable, model);
 	Weapons_MarkValidatedAttachedEntity(wearable, GetEntityOwner(wearable),
-		"wearable_model_override", true, wearable);
+		"wearable_model_override", false, wearable);
 	return true;
 }
 
@@ -836,7 +840,7 @@ void WeaponsModels_OnObjectSappedPost(Event event, const char[] name, bool dontB
 			|| TF2CustAttr_GetString(sapper, "worldmodel override", wm, sizeof(wm))) {
 		int attachedSapper = event.GetInt("sapperid");
 		if (SetAttachedSapperModel(attachedSapper, wm)) {
-			Weapons_MarkValidatedAttachedEntity(attachedSapper, client, "attached_sapper", true, sapper);
+			Weapons_MarkValidatedAttachedEntity(attachedSapper, client, "attached_sapper", false, sapper);
 		}
 	}
 }
@@ -952,6 +956,7 @@ void ResetClientModelRefs(int client) {
 	g_iLastOffHandViewmodelRef[client] = INVALID_ENT_REFERENCE;
 	g_iAppliedWeaponRef[client] = INVALID_ENT_REFERENCE;
 	g_bIgnoreWeaponSwitch[client] = false;
+	g_bClientModelUpdateQueued[client] = false;
 }
 
 bool MaybeRemoveWearable(int client, int wearableRef) {
@@ -978,7 +983,6 @@ stock int TF2_SpawnWearableViewmodel() {
 	if (IsValidEntity(wearable)) {
 		SetEntProp(wearable, Prop_Send, "m_iItemDefinitionIndex", DEFINDEX_UNDEFINED);
 		DispatchSpawn(wearable);
-		Weapons_MarkValidatedAttachedEntity(wearable, 0, "spawn_wearable_vm");
 	}
 	return wearable;
 }

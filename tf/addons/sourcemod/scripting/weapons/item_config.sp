@@ -312,6 +312,10 @@ static bool ComputeEquipSlotPosition(KeyValues kv, int itemdef,
  * Returns the item entity if successful.
  */
 int EquipCustomItem(int client, const CustomItemDefinition item) {
+	if (!Weapons_IsValidClient(client)) {
+		return INVALID_ENT_REFERENCE;
+	}
+
 	char itemClass[128];
 	
 	strcopy(itemClass, sizeof(itemClass), item.className);
@@ -320,6 +324,10 @@ int EquipCustomItem(int client, const CustomItemDefinition item) {
 	
 	// create our item
 	int itemEntity = TF2_CreateItem(item.defindex, itemClass);
+	if (itemEntity <= MaxClients || !IsValidEntity(itemEntity)) {
+		return INVALID_ENT_REFERENCE;
+	}
+	int itemReference = EntIndexToEntRef(itemEntity);
 	
 	if (!IsFakeClient(client)) {
 		// prevent item from being thrown in resupply
@@ -372,7 +380,7 @@ int EquipCustomItem(int client, const CustomItemDefinition item) {
 	}
 	
 	// remove existing item(s) on player
-	bool bRemovedWeaponInSlot;
+	bool bRemovedWeaponInSlot = false;
 	if (TF2Util_IsEntityWeapon(itemEntity)) {
 		// replace item by slot for cross-class equip compatibility
 		int weaponSlot = TF2Util_GetWeaponSlot(itemEntity);
@@ -385,8 +393,14 @@ int EquipCustomItem(int client, const CustomItemDefinition item) {
 		 * Calling this a second time (after TF2_CreateItem) may have side effects that I'm not
 		 * aware of, but we'll burn that bridge when we cross it.
 		 */
-		DispatchSpawn(itemEntity);
-		Weapons_MarkValidatedAttachedEntity(itemEntity, client, "custom_weapon_second_spawn", false);
+		bool spawned = DispatchSpawn(itemEntity);
+		itemEntity = EntRefToEntIndex(itemReference);
+		if (!spawned || itemEntity <= MaxClients || !IsValidEntity(itemEntity)) {
+			if (itemEntity > MaxClients && IsValidEntity(itemEntity)) {
+				RemoveEntity(itemEntity);
+			}
+			return INVALID_ENT_REFERENCE;
+		}
 	}
 
 	/*
@@ -414,13 +428,26 @@ int EquipCustomItem(int client, const CustomItemDefinition item) {
 		
 		TF2_RemoveItemByLoadoutSlot(client, loadoutSlot);
 	}
-	TF2_EquipPlayerEconItem(client, itemEntity);
+
+	itemEntity = EntRefToEntIndex(itemReference);
+	if (itemEntity <= MaxClients || !IsValidEntity(itemEntity)
+			|| !TF2_EquipPlayerEconItem(client, itemEntity)) {
+		if (itemEntity > MaxClients && IsValidEntity(itemEntity)) {
+			RemoveEntity(itemEntity);
+		}
+		return INVALID_ENT_REFERENCE;
+	}
+
+	itemEntity = EntRefToEntIndex(itemReference);
+	if (itemEntity <= MaxClients || !IsValidEntity(itemEntity)) {
+		return INVALID_ENT_REFERENCE;
+	}
 	Weapons_NotifyItemRuntimeStateReady(client, itemEntity);
 	return itemEntity;
 }
 
 static bool ApplyCustomItemNativeAttributes(int itemEntity,
-		const CustomItemDefinition item) {
+		const CustomItemDefinition item, bool onlyMissing = false) {
 	if (!IsValidEntity(itemEntity) || !item.nativeAttributes) {
 		return false;
 	}
@@ -432,10 +459,13 @@ static bool ApplyCustomItemNativeAttributes(int itemEntity,
 			item.nativeAttributes.GetSectionName(key, sizeof(key));
 			item.nativeAttributes.GetString(NULL_STRING, value, sizeof(value));
 
-			if (!TF2Attrib_GetByName(itemEntity, key)) {
+			bool missing = !TF2Attrib_GetByName(itemEntity, key);
+			if (missing) {
 				restored = true;
 			}
-			TF2Attrib_SetFromStringValue(itemEntity, key, value);
+			if (!onlyMissing || missing) {
+				TF2Attrib_SetFromStringValue(itemEntity, key, value);
+			}
 		} while (item.nativeAttributes.GotoNextKey(false));
 		item.nativeAttributes.GoBack();
 	}
@@ -449,7 +479,7 @@ bool EnsureCustomItemRuntimeAttributes(int itemEntity,
 		return false;
 	}
 
-	bool restored = ApplyCustomItemNativeAttributes(itemEntity, item);
+	bool restored = ApplyCustomItemNativeAttributes(itemEntity, item, true);
 	if (!TF2Attrib_GetByName(itemEntity, ATTRIB_NAME_CUSTOM_UID)) {
 		TF2Attrib_SetFromStringValue(itemEntity, ATTRIB_NAME_CUSTOM_UID, item.uid);
 		restored = true;

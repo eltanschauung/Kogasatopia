@@ -3,14 +3,13 @@
  * Delayed work owns its DataPack and keeps entity/client serial identities.
  */
 
-#define Weapons_VALIDATE_DELAY_SHORT 0.1
-#define Weapons_VALIDATE_DELAY_LONG 0.5
+#define Weapons_VALIDATE_DELAY 0.25
 
 // Sendtable offsets are immutable for a netclass during this plugin's lifetime.
 StringMap g_WeaponsItemMetadataOffsets = null;
 
 stock void Weapons_MarkValidatedAttachedEntity(int entity, int client = 0,
-        const char[] context = "unknown", bool scheduleChecks = true,
+        const char[] context = "unknown", bool scheduleCheck = false,
         int sourceEntity = INVALID_ENT_REFERENCE) {
     if (entity <= MaxClients || !IsValidEntity(entity)) {
         return;
@@ -23,18 +22,19 @@ stock void Weapons_MarkValidatedAttachedEntity(int entity, int client = 0,
     }
 
     int before = GetEntProp(entity, Prop_Send, "m_bValidatedAttachedEntity");
-    SetEntProp(entity, Prop_Send, "m_bValidatedAttachedEntity", true);
+    if (!before) {
+        SetEntProp(entity, Prop_Send, "m_bValidatedAttachedEntity", true);
+    }
     if (Weapons_ValidateDebugEnabled()) {
         int after = GetEntProp(entity, Prop_Send, "m_bValidatedAttachedEntity");
-        Weapons_LogValidatedAttachedEntityState("set", entity, client, sourceEntity,
+        Weapons_LogValidatedAttachedEntityState(before ? "already_set" : "set",
+            entity, client, sourceEntity,
             context, before, after, false);
     }
 
-    if (scheduleChecks && (Weapons_ValidateDebugEnabled() || Weapons_ValidationRepairEnabled())) {
+    if (scheduleCheck && (Weapons_ValidateDebugEnabled() || Weapons_ValidationRepairEnabled())) {
         Weapons_QueueValidatedAttachedEntityCheck(entity, client, sourceEntity, context,
-            Weapons_VALIDATE_DELAY_SHORT);
-        Weapons_QueueValidatedAttachedEntityCheck(entity, client, sourceEntity, context,
-            Weapons_VALIDATE_DELAY_LONG);
+            Weapons_VALIDATE_DELAY);
     }
 }
 
@@ -219,7 +219,6 @@ stock int TF2_CreateItem(int defindex, const char[] itemClass) {
         RemoveEntity(weapon);
         return -1;
     }
-    Weapons_MarkValidatedAttachedEntity(weapon, 0, "create_post_spawn", false);
     return weapon;
 }
 
@@ -259,9 +258,9 @@ bool TF2_RemoveItemByLoadoutSlot(int client, int loadoutSlot) {
 }
 
 /** Engine equip/activate calls can re-enter plugin hooks and destroy their input entity. */
-void TF2_EquipPlayerEconItem(int client, int item) {
+bool TF2_EquipPlayerEconItem(int client, int item) {
     if (!Weapons_IsValidClient(client) || item <= MaxClients || !IsValidEntity(item)) {
-        return;
+        return false;
     }
     int serial = GetClientSerial(client);
     int reference = EntIndexToEntRef(item);
@@ -278,30 +277,36 @@ void TF2_EquipPlayerEconItem(int client, int item) {
     item = EntRefToEntIndex(reference);
     if (GetClientFromSerial(serial) != client || !Weapons_IsValidClient(client)
         || item <= MaxClients || !IsValidEntity(item)) {
-        return;
+        return false;
     }
     if (HasEntProp(item, Prop_Send, "m_hOwnerEntity")
         && GetEntPropEnt(item, Prop_Send, "m_hOwnerEntity") != client) {
-        return;
+        return false;
     }
 
     if (wearable) {
-        Weapons_MarkValidatedAttachedEntity(item, client, "equip_wearable");
-        return;
+        Weapons_MarkValidatedAttachedEntity(item, client, "final_equip_wearable", true);
+        return true;
     }
 
-    Weapons_MarkValidatedAttachedEntity(item, client, "equip_weapon", false);
     TF2_ResetWeaponAmmo(item);
     item = EntRefToEntIndex(reference);
     if (GetClientFromSerial(serial) != client || !Weapons_IsValidClient(client)
         || item <= MaxClients || !IsValidEntity(item)) {
-        return;
+        return false;
     }
     // Calls GiveDefaultAmmo() for auto_fires_full_clip weapons, as before.
     ActivateEntity(item);
     item = EntRefToEntIndex(reference);
-    if (item > MaxClients && IsValidEntity(item)) {
-        client = GetClientFromSerial(serial);
-        Weapons_MarkValidatedAttachedEntity(item, client, "activate_weapon");
+    if (GetClientFromSerial(serial) != client || !Weapons_IsValidClient(client)
+        || item <= MaxClients || !IsValidEntity(item)) {
+        return false;
     }
+    if (HasEntProp(item, Prop_Send, "m_hOwnerEntity")
+        && GetEntPropEnt(item, Prop_Send, "m_hOwnerEntity") != client) {
+        return false;
+    }
+
+    Weapons_MarkValidatedAttachedEntity(item, client, "final_equip_weapon", true);
+    return true;
 }
