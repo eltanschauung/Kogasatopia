@@ -32,6 +32,9 @@
 #define VOTEMENU_HIDE_VOTES 1
 #define VOTEMENU_HIDE_AND_AUTO_YES 2
 #define VOTEMENU_HIDE_AND_AUTO_NO 3
+#define VOTEMENU_RIGGED_MIN_MARGIN 0.10
+#define VOTEMENU_RIGGED_MAX_MARGIN 0.20
+#define VOTEMENU_RIGGED_MAX_EXTRA_VOTES 100
 
 enum struct VoteOption
 {
@@ -44,6 +47,7 @@ enum struct VoteOption
     char loseFile[128];
     char excludedGamemodes[VOTEMENU_EXCLUDED_GAMEMODES_MAX];
     float ratio;
+    bool rigged;
 }
 
 ArrayList g_VoteOptions = null;
@@ -866,7 +870,7 @@ public int YesNoVoteHandler(Menu menu, MenuAction action, int param1, int param2
             int noVotes = 0;
             int totalVotes = 0;
             GetWeightedVoteTotals(yesVotes, noVotes, totalVotes);
-            if (totalVotes > 0)
+            if (totalVotes > 0 || g_CurrentVote.rigged)
             {
                 ResolveCurrentWeightedVote();
                 return 0;
@@ -972,10 +976,33 @@ static void ResolveCurrentWeightedVote()
     int totalVotes = 0;
     GetWeightedVoteTotals(yesVotes, noVotes, totalVotes);
 
-    float ratio = (totalVotes > 0) ? float(yesVotes) / float(totalVotes) : 0.0;
-    bool passed = (totalVotes > 0) && (ratio >= g_CurrentVote.ratio);
+    int actualYesVotes = yesVotes;
+    int actualNoVotes = noVotes;
+    int actualTotalVotes = totalVotes;
+    float actualRatio = (actualTotalVotes > 0) ? float(actualYesVotes) / float(actualTotalVotes) : 0.0;
+    float ratio = actualRatio;
 
-    LogVoteMenuVoteResult(passed ? "passed" : "failed", yesVotes, noVotes, totalVotes, ratio);
+    if (g_CurrentVote.rigged)
+    {
+        ApplyRiggedVoteResult(yesVotes, noVotes, totalVotes, ratio);
+    }
+
+    float requiredRatio = g_CurrentVote.rigged
+        ? ClampVoteRatio(g_CurrentVote.ratio)
+        : g_CurrentVote.ratio;
+    bool passed = (totalVotes > 0) && (ratio >= requiredRatio);
+
+    LogVoteMenuVoteResult(
+        passed ? "passed" : "failed",
+        yesVotes,
+        noVotes,
+        totalVotes,
+        ratio,
+        actualYesVotes,
+        actualNoVotes,
+        actualTotalVotes,
+        actualRatio
+    );
     AnnounceVoteResult(yesVotes, noVotes, ratio, passed);
     if (passed)
     {
@@ -987,6 +1014,80 @@ static void ResolveCurrentWeightedVote()
         ClearPendingVoteCharge();
         ExecuteVoteOutcome(false);
     }
+}
+
+static void ApplyRiggedVoteResult(int &yesVotes, int &noVotes, int &totalVotes, float &ratio)
+{
+    float minimumRatio = ClampVoteRatio(g_CurrentVote.ratio);
+    float maximumRatio = minimumRatio + GetRandomFloat(
+        VOTEMENU_RIGGED_MIN_MARGIN,
+        VOTEMENU_RIGGED_MAX_MARGIN
+    );
+    maximumRatio = ClampVoteRatio(maximumRatio);
+
+    float desiredRatio = (totalVotes > 0) ? float(yesVotes) / float(totalVotes) : minimumRatio;
+    if (desiredRatio < minimumRatio)
+    {
+        desiredRatio = minimumRatio;
+    }
+    else if (desiredRatio > maximumRatio)
+    {
+        desiredRatio = maximumRatio;
+    }
+
+    // Keep the real turnout whenever an integer yes/no split fits the selected
+    // range. For very small turnouts, grow the denominator only as much as is
+    // necessary to represent a passing percentage inside that range.
+    int candidateTotal = totalVotes > 0 ? totalVotes : 1;
+    int maximumTotal = candidateTotal + VOTEMENU_RIGGED_MAX_EXTRA_VOTES;
+    int minimumYes = 0;
+    int maximumYes = 0;
+
+    while (candidateTotal <= maximumTotal)
+    {
+        minimumYes = RoundToCeil(minimumRatio * float(candidateTotal));
+        maximumYes = RoundToFloor(maximumRatio * float(candidateTotal));
+        if (minimumYes <= maximumYes)
+        {
+            break;
+        }
+        candidateTotal++;
+    }
+
+    if (minimumYes > maximumYes)
+    {
+        candidateTotal = 100;
+        minimumYes = RoundToCeil(minimumRatio * float(candidateTotal));
+        maximumYes = RoundToFloor(maximumRatio * float(candidateTotal));
+    }
+
+    int candidateYes = RoundToNearest(desiredRatio * float(candidateTotal));
+    if (candidateYes < minimumYes)
+    {
+        candidateYes = minimumYes;
+    }
+    else if (candidateYes > maximumYes)
+    {
+        candidateYes = maximumYes;
+    }
+
+    yesVotes = candidateYes;
+    totalVotes = candidateTotal;
+    noVotes = totalVotes - yesVotes;
+    ratio = float(yesVotes) / float(totalVotes);
+}
+
+static float ClampVoteRatio(float ratio)
+{
+    if (ratio < 0.0)
+    {
+        return 0.0;
+    }
+    if (ratio > 1.0)
+    {
+        return 1.0;
+    }
+    return ratio;
 }
 
 static void ChargePassedVoteAndExecuteOutcome()
@@ -1276,9 +1377,9 @@ static void LogVoteMenuVoteStarted(int client, const char[] detail)
     GetCurrentVoteInitiatorStatsFields(steamId, sizeof(steamId), playerName, sizeof(playerName));
     SanitizeVoteMenuStatsField(detail, cleanDetail, sizeof(cleanDetail));
 
-    char message[512];
+    char message[640];
     Format(message, sizeof(message),
-        "event=vote_started|option_id=%s|option_name=%s|detail=%s|client=%d|userid=%d|steamid64=%s|name=%s|required_ratio=%.4f|required_percent=%d|map_elapsed_seconds=%d|cost=%d|shop_enabled=%d",
+        "event=vote_started|option_id=%s|option_name=%s|detail=%s|client=%d|userid=%d|steamid64=%s|name=%s|required_ratio=%.4f|required_percent=%d|rigged=%d|map_elapsed_seconds=%d|cost=%d|shop_enabled=%d",
         optionId,
         optionName,
         cleanDetail,
@@ -1288,13 +1389,24 @@ static void LogVoteMenuVoteStarted(int client, const char[] detail)
         playerName,
         g_CurrentVote.ratio,
         GetVoteRequiredPercent(g_CurrentVote.ratio),
+        g_CurrentVote.rigged ? 1 : 0,
         GetVoteMenuMapElapsedSeconds(),
         g_PendingChargeCost,
         g_PendingVoteCharge ? 1 : 0);
     PluginStats_Record("vote_started", message);
 }
 
-static void LogVoteMenuVoteResult(const char[] result, int yesVotes, int noVotes, int totalVotes, float yesRatio)
+static void LogVoteMenuVoteResult(
+    const char[] result,
+    int yesVotes,
+    int noVotes,
+    int totalVotes,
+    float yesRatio,
+    int actualYesVotes,
+    int actualNoVotes,
+    int actualTotalVotes,
+    float actualYesRatio
+)
 {
     char optionId[96];
     char optionName[160];
@@ -1303,9 +1415,9 @@ static void LogVoteMenuVoteResult(const char[] result, int yesVotes, int noVotes
     GetCurrentVoteStatsFields(optionId, sizeof(optionId), optionName, sizeof(optionName));
     GetCurrentVoteInitiatorStatsFields(steamId, sizeof(steamId), playerName, sizeof(playerName));
 
-    char message[512];
+    char message[768];
     Format(message, sizeof(message),
-        "event=vote_result|result=%s|option_id=%s|option_name=%s|userid=%d|steamid64=%s|name=%s|yes_votes=%d|no_votes=%d|total_votes=%d|yes_ratio=%.4f|required_ratio=%.4f|required_percent=%d|map_elapsed_seconds=%d|cost=%d|shop_enabled=%d",
+        "event=vote_result|result=%s|option_id=%s|option_name=%s|userid=%d|steamid64=%s|name=%s|yes_votes=%d|no_votes=%d|total_votes=%d|yes_ratio=%.4f|required_ratio=%.4f|required_percent=%d|rigged=%d|actual_yes_votes=%d|actual_no_votes=%d|actual_total_votes=%d|actual_yes_ratio=%.4f|map_elapsed_seconds=%d|cost=%d|shop_enabled=%d",
         result,
         optionId,
         optionName,
@@ -1318,6 +1430,11 @@ static void LogVoteMenuVoteResult(const char[] result, int yesVotes, int noVotes
         yesRatio,
         g_CurrentVote.ratio,
         GetVoteRequiredPercent(g_CurrentVote.ratio),
+        g_CurrentVote.rigged ? 1 : 0,
+        actualYesVotes,
+        actualNoVotes,
+        actualTotalVotes,
+        actualYesRatio,
         GetVoteMenuMapElapsedSeconds(),
         g_PendingChargeCost,
         g_PendingVoteCharge ? 1 : 0);
@@ -1370,6 +1487,19 @@ static bool IsGamemodeExcluded(const char[] excludedGamemodes, const char[] game
     return false;
 }
 
+static bool GetVoteMenuConfigBool(KeyValues kv, const char[] key, bool defaultValue = false)
+{
+    char value[16];
+    strcopy(value, sizeof(value), defaultValue ? "true" : "false");
+    kv.GetString(key, value, sizeof(value), value);
+    TrimString(value);
+
+    return StrEqual(value, "true", false)
+        || StrEqual(value, "yes", false)
+        || StrEqual(value, "on", false)
+        || StringToInt(value) != 0;
+}
+
 static void LoadVoteMenuConfig()
 {
     g_VoteOptions.Clear();
@@ -1404,6 +1534,7 @@ static void LoadVoteMenuConfig()
         kv.GetString("listener", opt.listener, sizeof(opt.listener), "");
         kv.GetString("excluded_gamemodes", opt.excludedGamemodes, sizeof(opt.excludedGamemodes), "");
         opt.ratio = kv.GetFloat("ratio", 0.6);
+        opt.rigged = GetVoteMenuConfigBool(kv, "rigged");
         kv.GetString("win", opt.winFile, sizeof(opt.winFile), "");
         // Accept a stray key name if the config has a typo like lose'
         kv.GetString("lose", opt.loseFile, sizeof(opt.loseFile), "");
