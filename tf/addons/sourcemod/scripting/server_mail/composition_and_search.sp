@@ -18,7 +18,7 @@ public int MenuHandler_MailMain(Menu menu, MenuAction action, int client, int it
         return 0;
     }
 
-    if (action != MenuAction_Select || !IsMailClient(client))
+    if (action != MenuAction_Select || !CanClientUseMailCommands(client))
     {
         return 0;
     }
@@ -141,7 +141,8 @@ public void SQL_OnMailPlayerSearch(Database db, DBResultSet rows, const char[] e
     int generation = pack.ReadCell();
     delete pack;
 
-    if (!IsMailClient(client) || generation != g_MailSearchGeneration[client])
+    if (!CanClientUseMailCommands(client, false)
+        || generation != g_MailSearchGeneration[client])
     {
         return;
     }
@@ -296,7 +297,7 @@ public int MenuHandler_MailSearchResults(Menu menu, MenuAction action, int clien
         return 0;
     }
 
-    if (action != MenuAction_Select || !IsMailClient(client)
+    if (action != MenuAction_Select || !CanClientUseMailCommands(client)
         || g_MailPendingContents[client][0] == '\0')
     {
         return 0;
@@ -342,7 +343,7 @@ public int MenuHandler_RtdMailCost(Menu menu, MenuAction action, int client, int
         ClearClientMailState(client);
         return 0;
     }
-    if (action != MenuAction_Select || !IsMailClient(client))
+    if (action != MenuAction_Select || !CanClientUseMailCommands(client))
     {
         return 0;
     }

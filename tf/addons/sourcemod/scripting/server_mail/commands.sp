@@ -1,6 +1,6 @@
 public Action Command_Mail(int client, int args)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }
@@ -22,7 +22,7 @@ public Action Command_Mail(int client, int args)
 
 public Action Command_Inbox(int client, int args)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }
@@ -33,7 +33,7 @@ public Action Command_Inbox(int client, int args)
 
 public Action Command_Unread(int client, int args)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }
@@ -44,7 +44,7 @@ public Action Command_Unread(int client, int args)
 
 public Action Command_ReadAll(int client, int args)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }
@@ -103,7 +103,7 @@ public void SQL_OnAllMailMarkedRead(Database db, DBResultSet results, const char
 
 public Action Command_RedeemAll(int client, int args)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }
@@ -160,11 +160,14 @@ public void SQL_OnRedeemAllLoaded(Database db, DBResultSet rows, const char[] er
     pack.ReadString(steamId, sizeof(steamId));
     delete pack;
 
-    if (!IsMailClient(client))
+    if (client > 0)
+    {
+        g_MailRedeemAllPending[client] = false;
+    }
+    if (!CanClientUseMailCommands(client, false))
     {
         return;
     }
-    g_MailRedeemAllPending[client] = false;
 
     if (error[0] != '\0' || rows == null)
     {
@@ -231,7 +234,7 @@ public void SQL_OnRedeemAllLoaded(Database db, DBResultSet rows, const char[] er
 
 public Action Command_Gift(int client, int args)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }
@@ -339,7 +342,7 @@ bool IsRtdMailAvailable()
 
 public Action BeginAttachmentMailCommand(int client, int args, const char[] attachmentType)
 {
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client))
     {
         return Plugin_Handled;
     }

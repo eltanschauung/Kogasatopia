@@ -40,6 +40,10 @@ void BuildMailListDisplay(
 
 void RequestMailList(int client, MailViewMode mode)
 {
+    if (!CanClientUseMailCommands(client, false))
+    {
+        return;
+    }
     if (!g_MailDatabaseReady)
     {
         CPrintToChat(client, "%s Mail is temporarily unavailable.", MAIL_PREFIX);
@@ -104,7 +108,7 @@ public void SQL_OnMailListLoaded(Database db, DBResultSet rows, const char[] err
     MailViewMode mode = view_as<MailViewMode>(pack.ReadCell());
     delete pack;
 
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client, false))
     {
         return;
     }
@@ -168,12 +172,13 @@ public int MenuHandler_MailList(Menu menu, MenuAction action, int client, int it
         delete menu;
         return 0;
     }
-    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsMailClient(client))
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack
+        && CanClientUseMailCommands(client))
     {
         ShowMailMainMenu(client);
         return 0;
     }
-    if (action != MenuAction_Select || !IsMailClient(client))
+    if (action != MenuAction_Select || !CanClientUseMailCommands(client))
     {
         return 0;
     }
@@ -191,6 +196,10 @@ public int MenuHandler_MailList(Menu menu, MenuAction action, int client, int it
 
 void RequestMailDetails(int client, int mailId, MailViewMode mode)
 {
+    if (!CanClientUseMailCommands(client, false))
+    {
+        return;
+    }
     if (!g_MailDatabaseReady || g_MailDatabase == null)
     {
         CPrintToChat(client, "%s Mail is temporarily unavailable.", MAIL_PREFIX);
@@ -258,7 +267,7 @@ public void SQL_OnMailDetailsLoaded(Database db, DBResultSet rows, const char[] 
     MailViewMode mode = view_as<MailViewMode>(pack.ReadCell());
     delete pack;
 
-    if (!IsMailClient(client))
+    if (!CanClientUseMailCommands(client, false))
     {
         return;
     }

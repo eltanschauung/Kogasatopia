@@ -23,6 +23,8 @@ public void OnPluginStart()
     RegConsoleCmd("sm_mailrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
     RegConsoleCmd("sm_sendrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
     RegConsoleCmd("sm_giftrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
+    RegAdminCmd("sm_mailban", Command_MailBan, ADMFLAG_BAN, "sm_mailban <target> - Ban a player from mail commands.");
+    RegAdminCmd("sm_mailunban", Command_MailUnban, ADMFLAG_BAN, "sm_mailunban <target> - Unban a player from mail commands.");
     HookEvent("player_team", Event_MailPlayerTeam, EventHookMode_Post);
     g_MailUnreadReminderCookie = new Cookie("server_mail_unread_reminder_day",
         "Last date the unread-mail reminder was displayed.", CookieAccess_Private);
@@ -35,6 +37,7 @@ public void OnPluginStart()
     g_MailPendingAttachments = new StringMap();
     for (int client = 1; client <= MaxClients; client++)
     {
+        ResetMailBanState(client);
         if (IsClientInGame(client))
         {
             ClearClientMailState(client);
@@ -43,6 +46,16 @@ public void OnPluginStart()
         }
     }
     ConnectMailDatabase();
+}
+
+public void OnClientConnected(int client)
+{
+    ResetMailBanState(client);
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+    RequestMailBanState(client);
 }
 
 public void OnPluginEnd()
@@ -73,6 +86,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    ResetMailBanState(client);
     ResetUnreadMailReminder(client);
     ClearClientMailState(client);
     g_MailNextSendAllowedAt[client] = 0.0;

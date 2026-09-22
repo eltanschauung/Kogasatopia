@@ -16,6 +16,7 @@
 // Session-owned reminder lifecycle is implemented in server_mail/lifecycle.sp.
 #define MAIL_DB_CONFIG "server_mail"
 #define MAIL_TABLE "mail"
+#define MAIL_BAN_TABLE "mail_bans"
 #define MAIL_STEAMID_MAX 32
 #define MAIL_NAME_MAX 128
 #define MAIL_TITLE_MAX 128
@@ -70,6 +71,10 @@ float g_MailNextSendAllowedAt[MAXPLAYERS + 1];
 bool g_MailUserSendPending[MAXPLAYERS + 1];
 bool g_MailRedeemAllPending[MAXPLAYERS + 1];
 bool g_MailReadAllPending[MAXPLAYERS + 1];
+bool g_MailBanLoaded[MAXPLAYERS + 1];
+bool g_MailBanned[MAXPLAYERS + 1];
+bool g_MailBanQueryPending[MAXPLAYERS + 1];
+int g_MailBanGeneration[MAXPLAYERS + 1];
 StringMap g_MailPendingRedemptions = null;
 StringMap g_MailRedemptionUsers = null;
 StringMap g_MailRedemptionTitles = null;
@@ -114,6 +119,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
 
 #include "server_mail/lifecycle.sp"
 #include "server_mail/database.sp"
+#include "server_mail/bans.sp"
 #include "server_mail/commands.sp"
 #include "server_mail/composition_and_search.sp"
 #include "server_mail/delivery.sp"

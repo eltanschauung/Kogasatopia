@@ -1,6 +1,7 @@
 void ConnectMailDatabase()
 {
     g_MailDatabaseReady = false;
+    ResetAllMailBanStates();
     delete g_MailDatabase;
     g_MailDatabase = null;
 
@@ -238,12 +239,53 @@ public void SQL_OnMailAttachmentStateColumnReady(Database db, DBResultSet result
         return;
     }
 
+    EnsureMailBanSchema();
+}
+
+void EnsureMailBanSchema()
+{
+    char query[1024];
+    if (g_MailDatabaseIsMySql)
+    {
+        FormatEx(query, sizeof(query),
+            "CREATE TABLE IF NOT EXISTS %s ("
+            ... "steamid64 VARCHAR(32) NOT NULL, "
+            ... "banned_by_steamid64 VARCHAR(32) NOT NULL DEFAULT '', "
+            ... "banned_by_name VARCHAR(128) NOT NULL DEFAULT '', "
+            ... "banned_at INT NOT NULL, "
+            ... "PRIMARY KEY (steamid64)"
+            ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            MAIL_BAN_TABLE);
+    }
+    else
+    {
+        FormatEx(query, sizeof(query),
+            "CREATE TABLE IF NOT EXISTS %s ("
+            ... "steamid64 VARCHAR(32) NOT NULL PRIMARY KEY, "
+            ... "banned_by_steamid64 VARCHAR(32) NOT NULL DEFAULT '', "
+            ... "banned_by_name VARCHAR(128) NOT NULL DEFAULT '', "
+            ... "banned_at INTEGER NOT NULL)",
+            MAIL_BAN_TABLE);
+    }
+    g_MailDatabase.Query(SQL_OnMailBanSchemaReady, query);
+}
+
+public void SQL_OnMailBanSchemaReady(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (error[0] != '\0')
+    {
+        LogError("[server_mail] Mail-ban schema creation failed: %s", error);
+        ScheduleMailReconnect();
+        return;
+    }
+
     Stimulus_EnsureSchema();
 }
 
 void FinishMailSchemaReady()
 {
     g_MailDatabaseReady = true;
+    RefreshMailBanStateForAllClients();
     char recoveryQuery[256];
     // Preserve at-most-once delivery if the server stops between applying an
     // attachment and persisting its final redeemed state.
