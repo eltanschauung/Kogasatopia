@@ -61,7 +61,8 @@ enum AnnouncerConfigMode
     AnnouncerConfig_None = 0,
     AnnouncerConfig_Killstreaks,
     AnnouncerConfig_Multikills,
-    AnnouncerConfig_Shutdown,
+    AnnouncerConfig_ShutdownYours,
+    AnnouncerConfig_ShutdownTheirs,
     AnnouncerConfig_MedicDrops
 }
 
@@ -83,6 +84,7 @@ ConVar g_cvMultikillFileLogging = null;
 StringMap g_KillstreakSoundMap = null;
 StringMap g_MultikillSoundMap = null;
 StringMap g_ShutdownSoundMap = null;
+StringMap g_ShutdownTheirsSoundMap = null;
 StringMap g_MedicDropSoundMap = null;
 AnnouncerConfigMode g_ConfigMode = AnnouncerConfig_None;
 int g_ConfigDepth = 0;
@@ -108,6 +110,7 @@ public void OnPluginStart()
     g_KillstreakSoundMap = new StringMap();
     g_MultikillSoundMap = new StringMap();
     g_ShutdownSoundMap = new StringMap();
+    g_ShutdownTheirsSoundMap = new StringMap();
     g_MedicDropSoundMap = new StringMap();
     g_hAnnouncerGroupsCookie = RegClientCookie(
         ANNOUNCER_GROUP_COOKIE,
@@ -287,6 +290,7 @@ public void OnPluginEnd()
     ClearSoundMap(g_KillstreakSoundMap);
     ClearSoundMap(g_MultikillSoundMap);
     ClearSoundMap(g_ShutdownSoundMap);
+    ClearSoundMap(g_ShutdownTheirsSoundMap);
     ClearSoundMap(g_MedicDropSoundMap);
 
     if (g_KillstreakSoundMap != null)
@@ -305,6 +309,12 @@ public void OnPluginEnd()
     {
         delete g_ShutdownSoundMap;
         g_ShutdownSoundMap = null;
+    }
+
+    if (g_ShutdownTheirsSoundMap != null)
+    {
+        delete g_ShutdownTheirsSoundMap;
+        g_ShutdownTheirsSoundMap = null;
     }
 
     if (g_MedicDropSoundMap != null)
@@ -391,6 +401,7 @@ public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_KillstreakSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MultikillSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
 
     bool enabled = false;
@@ -438,6 +449,7 @@ void ShowAnnouncerGroupsMenu(int client)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_KillstreakSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MultikillSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
 
     if (groups.Length == 0)
@@ -523,6 +535,8 @@ public void OnKillstreakEnd(int attacker, int victim, int killstreak)
         return;
     }
 
+    // The five-kill audio tier must not be gated by the chat announcement minimum.
+    PlayShutdownSounds(attacker, victim, killstreak);
     AnnounceKillstreakEnd(victim, killstreak);
 }
 
@@ -581,8 +595,6 @@ void AnnounceKillstreakEnd(int client, int killstreak)
         return;
     }
 
-    PlayShutdownSound(client, killstreak);
-
     if (g_cvStreakEndsChat.BoolValue)
     {
         char displayName[256];
@@ -596,15 +608,12 @@ void AnnounceKillstreakEnd(int client, int killstreak)
     PrintCenterTextAll("%s's killstreak was shut down! (%d)", clientName, killstreak);
 }
 
-void PlayShutdownSound(int client, int killstreak)
+void PlayShutdownSounds(int attacker, int victim, int killstreak)
 {
     if (!Announcer_ShouldPlaySound(true))
     {
         return;
     }
-
-    char commandName[ANNOUNCER_MAX_COMMAND_NAME];
-    GetShutdownSoundCommand(client, killstreak, commandName, sizeof(commandName));
 
     int shutdownMinimum = 10;
     if (g_cvShutdownMin != null)
@@ -612,59 +621,63 @@ void PlayShutdownSound(int client, int killstreak)
         shutdownMinimum = g_cvShutdownMin.IntValue;
     }
 
-    if (killstreak < shutdownMinimum)
-    {
-        if (IsHumanAnnouncerClient(client))
-        {
-            Announcer_PlayShutdownSound(client, client, killstreak, commandName);
-        }
-        return;
-    }
+    bool attackerIsEnemy = attacker != victim
+        && IsHumanAnnouncerClient(attacker)
+        && GetClientTeam(attacker) != GetClientTeam(victim);
 
-    Announcer_PlayShutdownSound(0, client, killstreak, commandName);
-}
+    char yoursCommand[ANNOUNCER_MAX_COMMAND_NAME];
+    bool haveYours = GetShutdownSoundCommand(
+        g_ShutdownSoundMap, victim, killstreak, yoursCommand, sizeof(yoursCommand));
+    char theirsCommand[ANNOUNCER_MAX_COMMAND_NAME];
+    bool haveTheirs = attackerIsEnemy && GetShutdownSoundCommand(
+        g_ShutdownTheirsSoundMap, attacker, killstreak, theirsCommand, sizeof(theirsCommand));
 
-static bool Announcer_PlayShutdownSound(
-    int target,
-    int sourceClient,
-    int killstreak,
-    const char[] sourceCommand)
-{
-    if (sourceCommand[0])
-    {
-        return Announcer_PlaySound(target, sourceClient, sourceCommand);
-    }
-
-    if (target > 0)
-    {
-        return Announcer_PlayShutdownSoundForClient(target, sourceClient, killstreak);
-    }
-
-    bool played = false;
+    // Keep the existing high-streak broadcast, but give the killer their own
+    // perspective and let both participants hear their sound below that limit.
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (IsHumanAnnouncerClient(client)
-            && Announcer_PlayShutdownSoundForClient(client, sourceClient, killstreak))
+        if (!IsHumanAnnouncerClient(client))
         {
-            played = true;
+            continue;
+        }
+
+        if (attackerIsEnemy && client == attacker)
+        {
+            if (haveTheirs)
+            {
+                Announcer_PlaySound(client, attacker, theirsCommand);
+            }
+            continue;
+        }
+
+        if (client == victim || killstreak >= shutdownMinimum)
+        {
+            Announcer_PlayShutdownYoursForClient(client, victim, killstreak,
+                yoursCommand, haveYours);
         }
     }
-
-    return played;
 }
 
-static bool Announcer_PlayShutdownSoundForClient(
+static bool Announcer_PlayShutdownYoursForClient(
     int listener,
-    int sourceClient,
-    int killstreak)
+    int victim,
+    int killstreak,
+    const char[] sourceCommand,
+    bool haveSourceCommand)
 {
+    if (haveSourceCommand)
+    {
+        return Announcer_PlaySound(listener, victim, sourceCommand);
+    }
+
     char commandName[ANNOUNCER_MAX_COMMAND_NAME];
-    if (!GetShutdownSoundCommand(listener, killstreak, commandName, sizeof(commandName)))
+    if (!GetShutdownSoundCommand(g_ShutdownSoundMap, listener, killstreak,
+        commandName, sizeof(commandName)))
     {
         return false;
     }
 
-    return Announcer_PlaySoundCommand(listener, sourceClient, commandName);
+    return Announcer_PlaySound(listener, listener, commandName);
 }
 
 void PlayMedicDropSound(int attacker, int medic)
@@ -1074,6 +1087,10 @@ void LoadAnnouncerConfig()
     {
         g_ShutdownSoundMap = new StringMap();
     }
+    if (g_ShutdownTheirsSoundMap == null)
+    {
+        g_ShutdownTheirsSoundMap = new StringMap();
+    }
     if (g_MedicDropSoundMap == null)
     {
         g_MedicDropSoundMap = new StringMap();
@@ -1082,6 +1099,7 @@ void LoadAnnouncerConfig()
     ClearSoundMap(g_KillstreakSoundMap);
     ClearSoundMap(g_MultikillSoundMap);
     ClearSoundMap(g_ShutdownSoundMap);
+    ClearSoundMap(g_ShutdownTheirsSoundMap);
     ClearSoundMap(g_MedicDropSoundMap);
 
     g_ConfigDepth = 0;
@@ -1133,9 +1151,13 @@ public SMCResult AnnouncerConfig_EnterSection(SMCParser parser, const char[] nam
         {
             g_ConfigMode = AnnouncerConfig_Multikills;
         }
-        else if (StrEqual(sectionName, "shutdown"))
+        else if (StrEqual(sectionName, "shutdown_yours") || StrEqual(sectionName, "shutdown"))
         {
-            g_ConfigMode = AnnouncerConfig_Shutdown;
+            g_ConfigMode = AnnouncerConfig_ShutdownYours;
+        }
+        else if (StrEqual(sectionName, "shutdown_theirs"))
+        {
+            g_ConfigMode = AnnouncerConfig_ShutdownTheirs;
         }
         else if (StrEqual(sectionName, "medicdrops") || StrEqual(sectionName, "medicdrop") || StrEqual(sectionName, "medic_drops") || StrEqual(sectionName, "medic_drop"))
         {
@@ -1175,7 +1197,8 @@ public SMCResult AnnouncerConfig_LeaveSection(SMCParser parser)
 
 public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, const char[] value, bool keyQuoted, bool valueQuoted)
 {
-    if (g_ConfigMode == AnnouncerConfig_Shutdown)
+    if (g_ConfigMode == AnnouncerConfig_ShutdownYours
+        || g_ConfigMode == AnnouncerConfig_ShutdownTheirs)
     {
         if (g_ConfigDepth != 2 && (g_ConfigDepth != 3 || g_ConfigLevel <= 0))
         {
@@ -1186,7 +1209,9 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
         GetConfigCommandName(key, value, commandName, sizeof(commandName));
         if (commandName[0])
         {
-            AddAnnouncerSoundCommand(g_ShutdownSoundMap, g_ConfigDepth == 3 ? g_ConfigLevel : 0, commandName);
+            StringMap map = g_ConfigMode == AnnouncerConfig_ShutdownYours
+                ? g_ShutdownSoundMap : g_ShutdownTheirsSoundMap;
+            AddAnnouncerSoundCommand(map, g_ConfigDepth == 3 ? g_ConfigLevel : 0, commandName);
         }
         return SMCParse_Continue;
     }
@@ -1507,6 +1532,12 @@ static ArrayList FindAnnouncerSoundCommandList(const char[] commandName)
         return commands;
     }
 
+    commands = FindAnnouncerSoundCommandListInMap(g_ShutdownTheirsSoundMap, commandName);
+    if (commands != null)
+    {
+        return commands;
+    }
+
     return FindAnnouncerSoundCommandListInMap(g_MedicDropSoundMap, commandName);
 }
 
@@ -1676,11 +1707,11 @@ void AddEligiblePaidSoundCommands(ArrayList commands, int sourceClient, ArrayLis
     }
 }
 
-bool GetShutdownSoundCommand(int sourceClient, int killstreak, char[] commandName, int commandLen)
+bool GetShutdownSoundCommand(StringMap map, int sourceClient, int killstreak, char[] commandName, int commandLen)
 {
     commandName[0] = '\0';
 
-    if (g_ShutdownSoundMap == null)
+    if (map == null)
     {
         return false;
     }
@@ -1688,13 +1719,13 @@ bool GetShutdownSoundCommand(int sourceClient, int killstreak, char[] commandNam
     int roundedKillstreak = killstreak - (killstreak % WHALE_KILLSTREAK_BONUS_INTERVAL);
     for (int level = roundedKillstreak; level >= WHALE_KILLSTREAK_BONUS_INTERVAL; level -= WHALE_KILLSTREAK_BONUS_INTERVAL)
     {
-        if (GetAnnouncerSoundCommand(g_ShutdownSoundMap, level, "", sourceClient, commandName, commandLen))
+        if (GetAnnouncerSoundCommand(map, level, "", sourceClient, commandName, commandLen))
         {
             return true;
         }
     }
 
-    return GetAnnouncerSoundCommand(g_ShutdownSoundMap, 0, "", sourceClient, commandName, commandLen);
+    return GetAnnouncerSoundCommand(map, 0, "", sourceClient, commandName, commandLen);
 }
 
 void ClearSoundMap(StringMap map)
