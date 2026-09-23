@@ -10,6 +10,7 @@ public void OnPluginStart()
     g_ItemDurations = new ArrayList();
     g_ItemUses = new ArrayList();
     g_PerMapAwardCounts = new StringMap();
+    g_PendingPlayerGemsCacheSteamIds = new ArrayList(ByteCountToCells(32));
     g_PerMapIgnoreInitialMapStart = g_PerMapLateLoad;
     g_PerMapStateAction = g_PerMapLateLoad ? BP_PER_MAP_ACTION_RESTORE : BP_PER_MAP_ACTION_RESET;
     RefreshPerMapAwardScope();
@@ -110,6 +111,7 @@ public void OnPluginEnd()
     delete g_ItemDurations;
     delete g_ItemUses;
     delete g_PerMapAwardCounts;
+    delete g_PendingPlayerGemsCacheSteamIds;
     Rewards_OnPluginEnd();
 
     for (int i = 1; i <= MaxClients; i++)
@@ -168,5 +170,6 @@ public void OnClientDisconnect(int client)
     g_NextSendAllowedAt[client] = 0.0;
     ClearClientStoreCache(client);
     Lotteries_OnClientDisconnect(client);
+    CachePlayerGemsOnDisconnect(client);
 }
 

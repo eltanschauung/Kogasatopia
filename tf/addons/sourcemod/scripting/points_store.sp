@@ -28,6 +28,7 @@
 #define BP_ECONOMY_TABLE "points_store_economy"
 #define BP_CURRENCY_SNAPSHOT_TABLE "points_store_currency_snapshot"
 #define BP_CURRENCY_SNAPSHOT_TTL_SECONDS 43200
+#define BP_PLAYER_GEMS_CACHE_TABLE "points_store_player_gems_cache"
 #define BP_IDEMPOTENT_AWARDS_TABLE "points_store_idempotent_awards"
 #define BP_PER_MAP_AWARDS_TABLE "points_store_per_map_awards"
 #define BP_IDEMPOTENT_KEY_MAX 128
@@ -77,6 +78,8 @@ bool g_ClientBonusPointsPending[MAXPLAYERS + 1];
 char g_ClientShopDetailItem[MAXPLAYERS + 1][BP_TRANS_ITEM_KEY_MAX];
 Database g_Database = null;
 int g_CurrencySnapshotGeneration = 0;
+bool g_PlayerGemsCacheReady = false;
+ArrayList g_PendingPlayerGemsCacheSteamIds = null;
 ConVar g_CvarDatabase = null;
 ConVar g_CvarEventLogging = null;
 ConVar g_CvarLogRandomMisses = null;
@@ -173,6 +176,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 #include "points_store/lifecycle.sp"
 #include "points_store/database.sp"
 #include "points_store/currency_snapshot.sp"
+#include "points_store/player_gems_cache.sp"
 #include "points_store/command_listeners.sp"
 #include "points_store/catalog.sp"
 #include "points_store/client_state.sp"

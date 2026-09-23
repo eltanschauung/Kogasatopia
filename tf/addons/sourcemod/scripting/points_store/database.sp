@@ -1,6 +1,7 @@
 void ConnectDatabase()
 {
     g_CurrencySnapshotGeneration++;
+    g_PlayerGemsCacheReady = false;
     Db_CancelTimer(g_hDatabaseReconnectTimer);
     Db_Close(g_Database, g_DatabaseReady);
     g_IdempotentAwardsReady = false;
@@ -301,6 +302,7 @@ public void SQLTxn_OnEconomyRowsReady(Database db, any data, int numQueries, DBR
     FinishSchemaReady();
     LoadEconomyState();
     EnsureCurrencySnapshotSchema();
+    EnsurePlayerGemsCacheSchema();
 }
 
 public void SQLTxn_OnEconomyRowsFailure(Database db, any data, int numQueries, const char[] error, int failIndex, any[] queryData)
