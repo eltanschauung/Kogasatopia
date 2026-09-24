@@ -63,7 +63,8 @@ enum AnnouncerConfigMode
     AnnouncerConfig_Multikills,
     AnnouncerConfig_ShutdownYours,
     AnnouncerConfig_ShutdownTheirs,
-    AnnouncerConfig_MedicDrops
+    AnnouncerConfig_MedicDrops,
+    AnnouncerConfig_Airshots
 }
 
 ConVar g_cvMultikillsChat = null;
@@ -86,6 +87,7 @@ StringMap g_MultikillSoundMap = null;
 StringMap g_ShutdownSoundMap = null;
 StringMap g_ShutdownTheirsSoundMap = null;
 StringMap g_MedicDropSoundMap = null;
+StringMap g_AirshotSoundMap = null;
 AnnouncerConfigMode g_ConfigMode = AnnouncerConfig_None;
 int g_ConfigDepth = 0;
 int g_ConfigLevel = 0;
@@ -112,6 +114,7 @@ public void OnPluginStart()
     g_ShutdownSoundMap = new StringMap();
     g_ShutdownTheirsSoundMap = new StringMap();
     g_MedicDropSoundMap = new StringMap();
+    g_AirshotSoundMap = new StringMap();
     g_hAnnouncerGroupsCookie = RegClientCookie(
         ANNOUNCER_GROUP_COOKIE,
         "Disabled paid announcer sound groups.",
@@ -292,6 +295,7 @@ public void OnPluginEnd()
     ClearSoundMap(g_ShutdownSoundMap);
     ClearSoundMap(g_ShutdownTheirsSoundMap);
     ClearSoundMap(g_MedicDropSoundMap);
+    ClearSoundMap(g_AirshotSoundMap);
 
     if (g_KillstreakSoundMap != null)
     {
@@ -321,6 +325,12 @@ public void OnPluginEnd()
     {
         delete g_MedicDropSoundMap;
         g_MedicDropSoundMap = null;
+    }
+
+    if (g_AirshotSoundMap != null)
+    {
+        delete g_AirshotSoundMap;
+        g_AirshotSoundMap = null;
     }
 
     for (int i = 1; i <= MaxClients; i++)
@@ -363,7 +373,9 @@ public void OnClientCookiesCached(int client)
 
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 {
+    RegPluginLibrary("announcers");
     CreateNative("Announcers_IsGroupEnabled", Native_IsAnnouncerGroupEnabled);
+    CreateNative("Announcers_PlayAirshot", Native_PlayAirshot);
     MarkNativeAsOptional(ANNOUNCER_SOUND_NATIVE);
     MarkNativeAsOptional(ANNOUNCER_SOUND_PLAY_AS_NATIVE);
     MarkNativeAsOptional(ANNOUNCER_SOUND_CAN_USE_NATIVE);
@@ -375,6 +387,27 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
     MarkNativeAsOptional("DGM_GetGameModeKey");
     MarkNativeAsOptional("Filters_GetChatName");
     return APLRes_Success;
+}
+
+public int Native_PlayAirshot(Handle plugin, int numParams)
+{
+    int attacker = GetNativeCell(1);
+    int victim = GetNativeCell(2);
+    if (!IsValidAnnouncerClient(attacker)
+        || !IsValidAnnouncerClient(victim)
+        || !Announcer_ShouldPlaySound(true))
+    {
+        return false;
+    }
+
+    char commandName[ANNOUNCER_MAX_COMMAND_NAME];
+    if (!GetAnnouncerSoundCommand(g_AirshotSoundMap, 0, "", attacker,
+        commandName, sizeof(commandName)))
+    {
+        return false;
+    }
+
+    return Announcer_PlaySound(0, attacker, commandName);
 }
 
 public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
@@ -403,6 +436,7 @@ public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_AirshotSoundMap);
 
     bool enabled = false;
     char groupName[ANNOUNCER_MAX_GROUP_NAME];
@@ -451,6 +485,7 @@ void ShowAnnouncerGroupsMenu(int client)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_AirshotSoundMap);
 
     if (groups.Length == 0)
     {
@@ -1095,12 +1130,17 @@ void LoadAnnouncerConfig()
     {
         g_MedicDropSoundMap = new StringMap();
     }
+    if (g_AirshotSoundMap == null)
+    {
+        g_AirshotSoundMap = new StringMap();
+    }
 
     ClearSoundMap(g_KillstreakSoundMap);
     ClearSoundMap(g_MultikillSoundMap);
     ClearSoundMap(g_ShutdownSoundMap);
     ClearSoundMap(g_ShutdownTheirsSoundMap);
     ClearSoundMap(g_MedicDropSoundMap);
+    ClearSoundMap(g_AirshotSoundMap);
 
     g_ConfigDepth = 0;
     g_ConfigLevel = 0;
@@ -1163,6 +1203,10 @@ public SMCResult AnnouncerConfig_EnterSection(SMCParser parser, const char[] nam
         {
             g_ConfigMode = AnnouncerConfig_MedicDrops;
         }
+        else if (StrEqual(sectionName, "airshot"))
+        {
+            g_ConfigMode = AnnouncerConfig_Airshots;
+        }
         else
         {
             g_ConfigMode = AnnouncerConfig_None;
@@ -1216,7 +1260,8 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
         return SMCParse_Continue;
     }
 
-    if (g_ConfigMode == AnnouncerConfig_MedicDrops)
+    if (g_ConfigMode == AnnouncerConfig_MedicDrops
+        || g_ConfigMode == AnnouncerConfig_Airshots)
     {
         if (g_ConfigDepth != 2)
         {
@@ -1227,7 +1272,9 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
         GetConfigCommandName(key, value, commandName, sizeof(commandName));
         if (commandName[0])
         {
-            AddAnnouncerSoundCommand(g_MedicDropSoundMap, 0, commandName);
+            StringMap map = g_ConfigMode == AnnouncerConfig_MedicDrops
+                ? g_MedicDropSoundMap : g_AirshotSoundMap;
+            AddAnnouncerSoundCommand(map, 0, commandName);
         }
         return SMCParse_Continue;
     }
@@ -1538,7 +1585,13 @@ static ArrayList FindAnnouncerSoundCommandList(const char[] commandName)
         return commands;
     }
 
-    return FindAnnouncerSoundCommandListInMap(g_MedicDropSoundMap, commandName);
+    commands = FindAnnouncerSoundCommandListInMap(g_MedicDropSoundMap, commandName);
+    if (commands != null)
+    {
+        return commands;
+    }
+
+    return FindAnnouncerSoundCommandListInMap(g_AirshotSoundMap, commandName);
 }
 
 static ArrayList FindAnnouncerSoundCommandListInMap(StringMap map, const char[] commandName)
