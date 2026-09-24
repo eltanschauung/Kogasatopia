@@ -54,6 +54,13 @@ void CustomHats_OnPluginStart()
 void CustomHats_OnConfigsExecuted()
 {
 	LoadConfig();
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (g_bHatStateLoaded[client] && NormalizeClientHatSlots(client))
+		{
+			QueueHatStateSave(client);
+		}
+	}
 	RecalculateAllClientEnabledHatCounts();
 	PrecacheConfiguredHats();
 	RefreshAllClientHats();

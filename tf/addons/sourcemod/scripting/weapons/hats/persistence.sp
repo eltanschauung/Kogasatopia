@@ -94,7 +94,7 @@ void LoadHatStateCookie(int client)
 		{
 			SetClientDefaultHat(client);
 		}
-		RecalculateClientEnabledHatCount(client);
+		NormalizeClientHatSlots(client);
 		if (needsResave)
 		{
 			SaveHatStateCookie(client);
@@ -161,7 +161,10 @@ void LoadHatStateCookie(int client)
 	{
 		SetClientDefaultHat(client);
 	}
-	RecalculateClientEnabledHatCount(client);
+	if (NormalizeClientHatSlots(client))
+	{
+		needsResave = true;
+	}
 
 	if (needsResave)
 	{

@@ -18,6 +18,8 @@ void ResetHatConfig(HatConfig hat)
 	hat.force = false;
 	hat.id[0] = '\0';
 	hat.name[0] = '\0';
+	strcopy(hat.slot, sizeof(hat.slot), "default");
+	strcopy(hat.hatColor, sizeof(hat.hatColor), "peachpuff");
 	hat.prefix[0] = '\0';
 	hat.bluPrefix[0] = '\0';
 	hat.pointsStorePurchase[0] = '\0';

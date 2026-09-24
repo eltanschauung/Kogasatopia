@@ -174,7 +174,32 @@ void RecalculateAllClientEnabledHatCounts()
 	}
 }
 
-void SetClientHatEnabled(int client, int hatIndex, bool enabled)
+bool NormalizeClientHatSlots(int client)
+{
+	bool changed = false;
+	for (int i = 0; i < g_iHatCount; i++)
+	{
+		if (!g_bHatEnabled[client][i])
+		{
+			continue;
+		}
+		for (int j = 0; j < i; j++)
+		{
+			if (g_bHatEnabled[client][j]
+				&& StrEqual(g_Hats[i].slot, g_Hats[j].slot, false))
+			{
+				g_bHatEnabled[client][i] = false;
+				RemoveHatIndex(client, i);
+				changed = true;
+				break;
+			}
+		}
+	}
+	RecalculateClientEnabledHatCount(client);
+	return changed;
+}
+
+void SetClientHatEnabled(int client, int hatIndex, bool enabled, bool announceConflicts = false)
 {
 	if (client <= 0 || client > MaxClients)
 	{
@@ -184,8 +209,29 @@ void SetClientHatEnabled(int client, int hatIndex, bool enabled)
 	{
 		return;
 	}
+	if (enabled)
+	{
+		for (int i = 0; i < g_iHatCount; i++)
+		{
+			if (i == hatIndex || !g_bHatEnabled[client][i]
+				|| !StrEqual(g_Hats[i].slot, g_Hats[hatIndex].slot, false))
+			{
+				continue;
+			}
+
+			g_bHatEnabled[client][i] = false;
+			RemoveHatIndex(client, i);
+			if (announceConflicts && Client_IsInGame(client))
+			{
+				CPrintToChat(client,
+					"{gold}[CustomHats]{default} {%s}%s{default} was uneqipped due to sharing slot '%s'.",
+					g_Hats[i].hatColor, g_Hats[i].name, g_Hats[i].slot);
+			}
+		}
+	}
 	if (g_bHatEnabled[client][hatIndex] == enabled)
 	{
+		RecalculateClientEnabledHatCount(client);
 		return;
 	}
 	g_bHatEnabled[client][hatIndex] = enabled;

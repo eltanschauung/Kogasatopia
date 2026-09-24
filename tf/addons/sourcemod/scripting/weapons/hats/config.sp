@@ -65,6 +65,21 @@ void LoadConfig()
 				ResetHatConfig(hat);
 				strcopy(hat.id, sizeof(hat.id), hatId);
 				kv.GetString("name", hat.name, sizeof(hat.name), hatId);
+				kv.GetString("slot", hat.slot, sizeof(hat.slot), "default");
+				TrimString(hat.slot);
+				Strings_ToLower(hat.slot, sizeof(hat.slot));
+				if (!hat.slot[0])
+				{
+					strcopy(hat.slot, sizeof(hat.slot), "default");
+				}
+				kv.GetString("hat_color", hat.hatColor, sizeof(hat.hatColor), "peachpuff");
+				TrimString(hat.hatColor);
+				Strings_ToLower(hat.hatColor, sizeof(hat.hatColor));
+				if (!CColorExists(hat.hatColor))
+				{
+					LogError("[CustomHats] Invalid hat_color for %s: %s", hat.id, hat.hatColor);
+					strcopy(hat.hatColor, sizeof(hat.hatColor), "peachpuff");
+				}
 				kv.GetString("prefix", hat.prefix, sizeof(hat.prefix), "");
 				TrimString(hat.prefix);
 				kv.GetString("blu_prefix", hat.bluPrefix, sizeof(hat.bluPrefix), "");
@@ -142,6 +157,8 @@ void CreateDefaultConfig(const char[] path)
 	file.WriteLine("        \"mercenary_derby\"");
 	file.WriteLine("        {");
 	file.WriteLine("            \"name\" \"mercenary_derby\"");
+	file.WriteLine("            \"slot\" \"default\"");
+	file.WriteLine("            \"hat_color\" \"peachpuff\"");
 	file.WriteLine("            \"enabled\" \"1\"");
 	file.WriteLine("            \"force\" \"0\"");
 	file.WriteLine("            \"model\" \"%s\"", DEFAULT_SCOUT_MODEL);

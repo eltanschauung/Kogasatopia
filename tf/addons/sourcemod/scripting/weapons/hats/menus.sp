@@ -48,13 +48,70 @@ int ClampPaintIndex(int paint)
 
 void ShowHatMenu(int client)
 {
-	Menu menu = new Menu(MenuHandler_Hats);
+	Menu menu = new Menu(MenuHandler_HatSlots);
 	menu.SetTitle("Custom Hats");
 	TFClassType playerClass = TF2_GetPlayerClass(client);
 	int added = 0;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
 		if (g_Hats[i].force || !CanClientViewHatForClass(i, playerClass))
+		{
+			continue;
+		}
+		bool alreadyListed = false;
+		for (int j = 0; j < i; j++)
+		{
+			if (!g_Hats[j].force && CanClientViewHatForClass(j, playerClass)
+				&& StrEqual(g_Hats[i].slot, g_Hats[j].slot, false))
+			{
+				alreadyListed = true;
+				break;
+			}
+		}
+		if (alreadyListed)
+		{
+			continue;
+		}
+		menu.AddItem(g_Hats[i].slot, g_Hats[i].slot);
+		added++;
+	}
+	if (added == 0)
+	{
+		delete menu;
+		PrintToChat(client, "[Hats] No hats are available right now.");
+		return;
+	}
+	menu.ExitBackButton = false;
+	menu.Display(client, 20);
+}
+
+public int MenuHandler_HatSlots(Menu menu, MenuAction action, int client, int item)
+{
+	if (action == MenuAction_Select)
+	{
+		char slot[64];
+		menu.GetItem(item, slot, sizeof(slot));
+		ShowHatsInSlotMenu(client, slot);
+	}
+	else if (action == MenuAction_End)
+	{
+		delete menu;
+	}
+	return 0;
+}
+
+void ShowHatsInSlotMenu(int client, const char[] slot)
+{
+	Menu menu = new Menu(MenuHandler_Hats);
+	char title[96];
+	Format(title, sizeof(title), "Custom Hats: %s", slot);
+	menu.SetTitle(title);
+	TFClassType playerClass = TF2_GetPlayerClass(client);
+	int added = 0;
+	for (int i = 0; i < g_iHatCount; i++)
+	{
+		if (g_Hats[i].force || !CanClientViewHatForClass(i, playerClass)
+			|| !StrEqual(g_Hats[i].slot, slot, false))
 		{
 			continue;
 		}
@@ -69,10 +126,10 @@ void ShowHatMenu(int client)
 	if (added == 0)
 	{
 		delete menu;
-		PrintToChat(client, "[Hats] No hats are available right now.");
+		ShowHatMenu(client);
 		return;
 	}
-	menu.ExitBackButton = false;
+	menu.ExitBackButton = true;
 	menu.Display(client, 20);
 }
 
@@ -87,7 +144,14 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 		if (hatIndex < 0 || !CanClientUseHatForClass(client, hatIndex, TF2_GetPlayerClass(client)))
 		{
 			PrintHatLockedMessage(client, hatIndex);
-			ShowHatMenu(client);
+			if (hatIndex >= 0)
+			{
+				ShowHatsInSlotMenu(client, g_Hats[hatIndex].slot);
+			}
+			else
+			{
+				ShowHatMenu(client);
+			}
 			return 0;
 		}
 		if (hatIndex >= 0)
@@ -95,6 +159,10 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 			g_iHatPaintChoice[client][hatIndex] = ClampPaintIndex(g_Hats[hatIndex].defaultPaint);
 		}
 		ShowHatToggleMenu(client);
+	}
+	else if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && Client_IsInGame(client))
+	{
+		ShowHatMenu(client);
 	}
 	else if (action == MenuAction_End)
 	{
@@ -154,15 +222,13 @@ public int MenuHandler_HatToggle(Menu menu, MenuAction action, int client, int i
 
 		if (StrEqual(info, "enable"))
 		{
-			SetClientHatEnabled(client, hatIndex, true);
-			QueueHatStateSave(client);
 			if (g_Hats[hatIndex].paintable)
 			{
 				ShowHatPaintMenu(client);
 			}
 			else
 			{
-				EquipHat(client, hatIndex);
+				EquipSelectedHatFromMenu(client, hatIndex);
 			}
 		}
 		else if (StrEqual(info, "disable"))
@@ -175,6 +241,18 @@ public int MenuHandler_HatToggle(Menu menu, MenuAction action, int client, int i
 		else if (StrEqual(info, "paint"))
 		{
 			ShowHatPaintMenu(client);
+		}
+	}
+	else if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && Client_IsInGame(client))
+	{
+		int hatIndex = GetSelectedHatIndex(client);
+		if (hatIndex >= 0)
+		{
+			ShowHatsInSlotMenu(client, g_Hats[hatIndex].slot);
+		}
+		else
+		{
+			ShowHatMenu(client);
 		}
 	}
 	else if (action == MenuAction_End)
@@ -225,11 +303,11 @@ public int MenuHandler_HatPaint(Menu menu, MenuAction action, int client, int it
 			return 0;
 		}
 		g_iHatPaintChoice[client][hatIndex] = paint;
-		SetClientHatEnabled(client, hatIndex, true);
-		QueueHatStateSave(client);
-
-		EquipHat(client, hatIndex);
-		PrintToChat(client, "[Hats] %s applied.", g_PaintNames[paint]);
+		EquipSelectedHatFromMenu(client, hatIndex);
+	}
+	else if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && Client_IsInGame(client))
+	{
+		ShowHatToggleMenu(client);
 	}
 	else if (action == MenuAction_End)
 	{
@@ -237,5 +315,14 @@ public int MenuHandler_HatPaint(Menu menu, MenuAction action, int client, int it
 	}
 
 	return 0;
+}
+
+void EquipSelectedHatFromMenu(int client, int hatIndex)
+{
+	SetClientHatEnabled(client, hatIndex, true, true);
+	QueueHatStateSave(client);
+	EquipHat(client, hatIndex);
+	CPrintToChat(client, "{gold}[CustomHats]{default} {%s}%s{default} equipped.",
+		g_Hats[hatIndex].hatColor, g_Hats[hatIndex].name);
 }
 
