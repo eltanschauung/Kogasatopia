@@ -74,6 +74,7 @@ public void OnPluginStart()
     RegConsoleCmd("sm_sendgem", Command_SendBonusPoints, "Send currency to another player.");
     RegConsoleCmd("sm_gemsend", Command_SendBonusPoints, "Send currency to another player.");
     RegConsoleCmd("sm_welfare", Command_Welfare, "Collect once-per-map welfare currency.");
+    RegConsoleCmd("sm_snap", Command_Welfare, "Collect once-per-map welfare currency.");
     RegConsoleCmd("sm_collectwelfare", Command_Welfare, "Collect once-per-map welfare currency.");
     RegConsoleCmd("sm_handout", Command_Welfare, "Collect once-per-map welfare currency.");
     RegConsoleCmd("sm_gibs", Command_Welfare, "Collect once-per-map welfare currency.");
