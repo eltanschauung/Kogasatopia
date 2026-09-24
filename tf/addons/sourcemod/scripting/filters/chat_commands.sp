@@ -109,6 +109,13 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (FiltersBaseComm_IsClientGagged(client))
         return Plugin_Stop;
 
+    // Slash commands are silent chat triggers. Saysounds also recognizes
+    // /soundname through a say listener, so do not render or relay them here.
+    // Continue lets the listener handle known sounds and preserves ordinary
+    // chat behavior for an unrecognized slash command.
+    if (sArgs[0] == '/')
+        return Plugin_Continue;
+
     bool sourceModCommand = IsChatTrigger();
     bool passthroughSayAlias = CheckConfiguredBareCommand(sArgs);
 
