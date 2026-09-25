@@ -124,7 +124,7 @@ void LoadConfig()
 	hat.bluSkin = kv.GetNum("blu_skin", -1);
 
 	char classes[128];
-	kv.GetString("classes", classes, sizeof(classes), "scout");
+	kv.GetString("classes", classes, sizeof(classes), "all");
 	hat.classMask = ParseClassMask(classes);
 
 				LoadClassOverrides(kv, "soldier", TFClass_Soldier, hat);

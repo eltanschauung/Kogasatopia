@@ -14,7 +14,7 @@ static const int g_ClassMaskByIndex[10] =
 
 void ResetHatConfig(HatConfig hat)
 {
-	hat.enabled = false;
+	hat.enabled = true;
 	hat.force = false;
 	hat.id[0] = '\0';
 	hat.name[0] = '\0';
@@ -32,7 +32,7 @@ void ResetHatConfig(HatConfig hat)
 	hat.paintable = false;
 	hat.style = 0;
 	hat.bluSkin = -1;
-	hat.classMask = CLASSMASK_SCOUT;
+	hat.classMask = CLASSMASK_ALL;
 	hat.baseDefIndex = 0;
 	hat.baseHideDefIndex = 0;
 	for (int i = 0; i < sizeof(hat.defindexByClass); i++)
@@ -247,7 +247,7 @@ int ParseClassMask(const char[] list)
 
 	if (!buffer[0])
 	{
-		return CLASSMASK_SCOUT;
+		return CLASSMASK_ALL;
 	}
 	if (StrEqual(buffer, "all"))
 	{
