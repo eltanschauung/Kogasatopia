@@ -61,6 +61,7 @@ koth_namicott_j
 koth_lumberyard_pro
 koth_king
 pl_badwater
+koth_citadel_a7
 koth_citadel_a8
 pl_pier
 cp_sunshine
