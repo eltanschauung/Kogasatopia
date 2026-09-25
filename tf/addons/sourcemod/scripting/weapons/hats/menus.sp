@@ -322,7 +322,9 @@ void EquipSelectedHatFromMenu(int client, int hatIndex)
 	SetClientHatEnabled(client, hatIndex, true, true);
 	QueueHatStateSave(client);
 	EquipHat(client, hatIndex);
+	char color[32];
+	GetHatChatColorForClientTeam(client, hatIndex, color, sizeof(color));
 	CPrintToChat(client, "{gold}[CustomHats]{default} {%s}%s{default} equipped.",
-		g_Hats[hatIndex].hatColor, g_Hats[hatIndex].name);
+		color, g_Hats[hatIndex].name);
 }
 

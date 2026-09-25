@@ -1,17 +1,26 @@
 static bool GetHatPrefixForClientTeam(int client, int hatIndex, char[] buffer, int maxlen)
 {
 	buffer[0] = '\0';
+	char prefixText[128];
 
 	if (GetClientTeam(client) == view_as<int>(TFTeam_Blue) && g_Hats[hatIndex].bluPrefix[0])
 	{
-		strcopy(buffer, maxlen, g_Hats[hatIndex].bluPrefix);
+		strcopy(prefixText, sizeof(prefixText), g_Hats[hatIndex].bluPrefix);
 	}
 	else
 	{
-		strcopy(buffer, maxlen, g_Hats[hatIndex].prefix);
+		strcopy(prefixText, sizeof(prefixText), g_Hats[hatIndex].prefix);
 	}
 
-	return buffer[0] != '\0';
+	if (!prefixText[0])
+	{
+		return false;
+	}
+
+	char color[32];
+	GetHatChatColorForClientTeam(client, hatIndex, color, sizeof(color));
+	Format(buffer, maxlen, "{%s}%s", color, prefixText);
+	return true;
 }
 
 static bool AppendJoinedPrefix(char[] buffer, int maxlen, const char[] prefix)
@@ -166,7 +175,11 @@ static bool FindClientHatTagSource(int client, const char[] prefix, char[] hatId
 			continue;
 		}
 
-		if (StrEqual(prefix, g_Hats[i].prefix, false) || (g_Hats[i].bluPrefix[0] && StrEqual(prefix, g_Hats[i].bluPrefix, false)))
+		char display[128];
+		if ((GetHatPrefixForClientTeam(client, i, display, sizeof(display))
+				&& StrEqual(prefix, display, false))
+			|| StrEqual(prefix, g_Hats[i].prefix, false)
+			|| (g_Hats[i].bluPrefix[0] && StrEqual(prefix, g_Hats[i].bluPrefix, false)))
 		{
 			strcopy(hatId, maxlen, g_Hats[i].id);
 			return true;

@@ -19,7 +19,8 @@ void ResetHatConfig(HatConfig hat)
 	hat.id[0] = '\0';
 	hat.name[0] = '\0';
 	strcopy(hat.slot, sizeof(hat.slot), "default");
-	strcopy(hat.hatColor, sizeof(hat.hatColor), "peachpuff");
+	strcopy(hat.chatColor, sizeof(hat.chatColor), "peachpuff");
+	hat.chatColorBlu[0] = '\0';
 	hat.prefix[0] = '\0';
 	hat.bluPrefix[0] = '\0';
 	hat.pointsStorePurchase[0] = '\0';
@@ -39,6 +40,18 @@ void ResetHatConfig(HatConfig hat)
 	{
 		hat.defindexByClass[i] = 0;
 		hat.hideDefindexByClass[i] = 0;
+	}
+}
+
+void GetHatChatColorForClientTeam(int client, int hatIndex, char[] buffer, int maxlen)
+{
+	if (GetClientTeam(client) == view_as<int>(TFTeam_Blue) && g_Hats[hatIndex].chatColorBlu[0])
+	{
+		strcopy(buffer, maxlen, g_Hats[hatIndex].chatColorBlu);
+	}
+	else
+	{
+		strcopy(buffer, maxlen, g_Hats[hatIndex].chatColor);
 	}
 }
 

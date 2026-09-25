@@ -42,7 +42,8 @@ enum struct HatConfig
 	char id[64];
 	char name[64];
 	char slot[64];
-	char hatColor[32];
+	char chatColor[32];
+	char chatColorBlu[32];
 	char prefix[128];
 	char bluPrefix[128];
 	char pointsStorePurchase[64];

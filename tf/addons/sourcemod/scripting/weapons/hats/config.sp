@@ -72,13 +72,21 @@ void LoadConfig()
 				{
 					strcopy(hat.slot, sizeof(hat.slot), "default");
 				}
-				kv.GetString("hat_color", hat.hatColor, sizeof(hat.hatColor), "peachpuff");
-				TrimString(hat.hatColor);
-				Strings_ToLower(hat.hatColor, sizeof(hat.hatColor));
-				if (!CColorExists(hat.hatColor))
+				kv.GetString("chat_color", hat.chatColor, sizeof(hat.chatColor), "peachpuff");
+				TrimString(hat.chatColor);
+				Strings_ToLower(hat.chatColor, sizeof(hat.chatColor));
+				if (!CColorExists(hat.chatColor))
 				{
-					LogError("[CustomHats] Invalid hat_color for %s: %s", hat.id, hat.hatColor);
-					strcopy(hat.hatColor, sizeof(hat.hatColor), "peachpuff");
+					LogError("[CustomHats] Invalid chat_color for %s: %s", hat.id, hat.chatColor);
+					strcopy(hat.chatColor, sizeof(hat.chatColor), "peachpuff");
+				}
+				kv.GetString("chat_color_blu", hat.chatColorBlu, sizeof(hat.chatColorBlu), "");
+				TrimString(hat.chatColorBlu);
+				Strings_ToLower(hat.chatColorBlu, sizeof(hat.chatColorBlu));
+				if (hat.chatColorBlu[0] && !CColorExists(hat.chatColorBlu))
+				{
+					LogError("[CustomHats] Invalid chat_color_blu for %s: %s", hat.id, hat.chatColorBlu);
+					hat.chatColorBlu[0] = '\0';
 				}
 				kv.GetString("prefix", hat.prefix, sizeof(hat.prefix), "");
 				TrimString(hat.prefix);
@@ -158,7 +166,8 @@ void CreateDefaultConfig(const char[] path)
 	file.WriteLine("        {");
 	file.WriteLine("            \"name\" \"mercenary_derby\"");
 	file.WriteLine("            \"slot\" \"default\"");
-	file.WriteLine("            \"hat_color\" \"peachpuff\"");
+	file.WriteLine("            \"chat_color\" \"peachpuff\"");
+	file.WriteLine("            \"chat_color_blu\" \"\"");
 	file.WriteLine("            \"enabled\" \"1\"");
 	file.WriteLine("            \"force\" \"0\"");
 	file.WriteLine("            \"model\" \"%s\"", DEFAULT_SCOUT_MODEL);

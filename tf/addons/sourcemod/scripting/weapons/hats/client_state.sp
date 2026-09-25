@@ -223,9 +223,11 @@ void SetClientHatEnabled(int client, int hatIndex, bool enabled, bool announceCo
 			RemoveHatIndex(client, i);
 			if (announceConflicts && Client_IsInGame(client))
 			{
+				char color[32];
+				GetHatChatColorForClientTeam(client, i, color, sizeof(color));
 				CPrintToChat(client,
 					"{gold}[CustomHats]{default} {%s}%s{default} was uneqipped due to sharing slot '%s'.",
-					g_Hats[i].hatColor, g_Hats[i].name, g_Hats[i].slot);
+					color, g_Hats[i].name, g_Hats[i].slot);
 			}
 		}
 	}
