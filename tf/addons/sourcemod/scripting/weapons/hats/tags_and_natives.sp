@@ -1,25 +1,14 @@
 static bool GetHatPrefixForClientTeam(int client, int hatIndex, char[] buffer, int maxlen)
 {
 	buffer[0] = '\0';
-	char prefixText[128];
-
-	if (GetClientTeam(client) == view_as<int>(TFTeam_Blue) && g_Hats[hatIndex].bluPrefix[0])
-	{
-		strcopy(prefixText, sizeof(prefixText), g_Hats[hatIndex].bluPrefix);
-	}
-	else
-	{
-		strcopy(prefixText, sizeof(prefixText), g_Hats[hatIndex].prefix);
-	}
-
-	if (!prefixText[0])
+	if (!g_Hats[hatIndex].prefix[0])
 	{
 		return false;
 	}
 
 	char color[32];
 	GetHatChatColorForClientTeam(client, hatIndex, color, sizeof(color));
-	Format(buffer, maxlen, "{%s}%s", color, prefixText);
+	Format(buffer, maxlen, "{%s}%s", color, g_Hats[hatIndex].prefix);
 	return true;
 }
 
@@ -178,8 +167,7 @@ static bool FindClientHatTagSource(int client, const char[] prefix, char[] hatId
 		char display[128];
 		if ((GetHatPrefixForClientTeam(client, i, display, sizeof(display))
 				&& StrEqual(prefix, display, false))
-			|| StrEqual(prefix, g_Hats[i].prefix, false)
-			|| (g_Hats[i].bluPrefix[0] && StrEqual(prefix, g_Hats[i].bluPrefix, false)))
+			|| StrEqual(prefix, g_Hats[i].prefix, false))
 		{
 			strcopy(hatId, maxlen, g_Hats[i].id);
 			return true;

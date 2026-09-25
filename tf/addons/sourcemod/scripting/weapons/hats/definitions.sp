@@ -22,7 +22,6 @@ void ResetHatConfig(HatConfig hat)
 	strcopy(hat.chatColor, sizeof(hat.chatColor), "peachpuff");
 	hat.chatColorBlu[0] = '\0';
 	hat.prefix[0] = '\0';
-	hat.bluPrefix[0] = '\0';
 	hat.pointsStorePurchase[0] = '\0';
 	hat.model[0] = '\0';
 	hat.hasModelScale = false;

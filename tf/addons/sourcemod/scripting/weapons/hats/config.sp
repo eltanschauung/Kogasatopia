@@ -90,8 +90,6 @@ void LoadConfig()
 				}
 				kv.GetString("prefix", hat.prefix, sizeof(hat.prefix), "");
 				TrimString(hat.prefix);
-				kv.GetString("blu_prefix", hat.bluPrefix, sizeof(hat.bluPrefix), "");
-				TrimString(hat.bluPrefix);
 				kv.GetString("points_store_purchase", hat.pointsStorePurchase, sizeof(hat.pointsStorePurchase), "");
 				TrimString(hat.pointsStorePurchase);
 				kv.GetString("model", hat.model, sizeof(hat.model), DEFAULT_SCOUT_MODEL);
@@ -182,7 +180,6 @@ void CreateDefaultConfig(const char[] path)
 	file.WriteLine("            \"classes\" \"all\"");
 	file.WriteLine("            \"points_store_purchase\" \"\"");
 	file.WriteLine("            \"prefix\" \"\"");
-	file.WriteLine("            \"blu_prefix\" \"\"");
 	file.WriteLine("        }");
 	file.WriteLine("    }");
 	file.WriteLine("}");

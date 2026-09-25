@@ -45,7 +45,6 @@ enum struct HatConfig
 	char chatColor[32];
 	char chatColorBlu[32];
 	char prefix[128];
-	char bluPrefix[128];
 	char pointsStorePurchase[64];
 	char model[PLATFORM_MAX_PATH];
 	bool hasModelScale;
