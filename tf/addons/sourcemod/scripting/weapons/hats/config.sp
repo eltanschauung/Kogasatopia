@@ -107,7 +107,7 @@ void LoadConfig()
 				}
 				hat.enabled = (kv.GetNum("enabled", 1) != 0) && hat.model[0];
 				hat.force = kv.GetNum("force", 0) != 0;
-				hat.baseDefIndex = kv.GetNum("defindex", 0);
+				hat.baseDefIndex = kv.GetNum("defindex", 125);
 				hat.baseHideDefIndex = kv.GetNum("hide_defindex", 0);
 				hat.quality = kv.GetNum("quality", 6);
 				hat.level = kv.GetNum("level", 10);

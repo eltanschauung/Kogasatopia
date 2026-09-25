@@ -33,7 +33,7 @@ void ResetHatConfig(HatConfig hat)
 	hat.style = 0;
 	hat.bluSkin = -1;
 	hat.classMask = CLASSMASK_ALL;
-	hat.baseDefIndex = 0;
+	hat.baseDefIndex = 125;
 	hat.baseHideDefIndex = 0;
 	for (int i = 0; i < sizeof(hat.defindexByClass); i++)
 	{
