@@ -2,7 +2,7 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
-koth_dolls_playground_a4
+koth_dolls_playground_a5
 workshop/ctf_mandrillmaze_b2.ugc2908762556
 workshop/koth_spillway_rc3a.ugc1962574007
 workshop/pl_harpyhills_b8.ugc3758709084
@@ -179,7 +179,6 @@ workshop/koth_banter.ugc2346825994
 cp_fastlane
 cp_kogasaville_a2
 pl_halfacre
-htf_sm64whompsfortress
 koth_gachimuchi
 workshop/mario_kart.ugc3278880637
 cp_granary_snowy_v2
