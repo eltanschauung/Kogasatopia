@@ -191,6 +191,11 @@ static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 	{
 		return;
 	}
+	if (TF2_GetPlayerClass(client) == TFClass_Spy
+		&& TF2_IsPlayerInCondition(client, TFCond_Cloaked))
+	{
+		return;
+	}
 
 	int slot = view_as<int>(TF2Util_GetWeaponSlot(weapon));
 	if (slot < 0 || slot > WEAPONS_LAST_WEAPON_SLOT)
