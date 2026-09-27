@@ -91,7 +91,12 @@ Thus **a loose manifest cannot enable these effects on a map containing a
 packed particle manifest**. This includes koth_brine_rc3a.
 
 The publisher reports such maps and leaves BSPs untouched. The hats module
-reports the limitation and does not mark custom particles ready on those maps.
+logs a **cache-dependent fallback**, still validates the PCF and exact effect
+name, registers valid names, and allows their wearable emitters to spawn.
+This only renders for clients whose particle definitions are already loaded
+from a compatible map or local mod. Merely downloading/caching the PCF file
+does not load its definitions on a blocked map. Missing/invalid PCFs and absent
+effect names remain rejected; packed manifests are never rewritten or replaced.
 The initial inventory found 112 affected BSPs out of 425 installed BSPs
 (419 distinct loose manifest basenames). Compatible maps do not require a
 client `tf/custom/kogasa_particles` pack. Supporting the blocked maps without

@@ -167,7 +167,7 @@ void CustomHats_PrecacheParticles()
 
 		// A packed manifest wins over loose files in Valve's parser, on clients too.
 		if (FileExists("particles.txt", true, "BSP") || FileExists(path, true, "BSP"))
-			LogError("[CustomHats] %s has a packed particle manifest; merge custom PCFs into the BSP to enable particle hats.", map);
+			LogMessage("[CustomHats] %s has a packed particle manifest; preserving it. Valid custom effects will use the cache-dependent fallback.", map);
 		else if (!CustomHats_ReadParticleManifest(path, files))
 			LogError("[CustomHats] Refusing to overwrite invalid manifest: %s", path);
 		else
@@ -258,6 +258,7 @@ void CustomHats_PrecacheParticles()
 	delete files;
 
 	int table = FindStringTable("ParticleEffectNames");
+	bool fallbackLogged;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
 		if (!IsHatEnabled(i) || table == INVALID_STRING_TABLE)
@@ -270,12 +271,22 @@ void CustomHats_PrecacheParticles()
 				continue;
 			if (classAssets.particleFile[0])
 			{
-				if (!canLoad || !CustomHats_ValidParticleFile(classAssets.particleFile))
+				if (!CustomHats_ValidParticleFile(classAssets.particleFile))
+				{
+					LogError("[CustomHats] Invalid/missing PCF for %s class %d: %s", g_Hats[i].id, classIndex, classAssets.particleFile);
 					continue;
+				}
 				if (!CustomHats_PCFHasEffect(classAssets.particleFile, classAssets.particleEffect))
 				{
 					LogError("[CustomHats] Effect absent or unsupported PCF encoding: %s (%s)", classAssets.particleEffect, classAssets.particleFile);
 					continue;
+				}
+				AddFileToDownloadsTable(classAssets.particleFile);
+				PrecacheGeneric(classAssets.particleFile, true);
+				if (!canLoad && !fallbackLogged)
+				{
+					LogMessage("[CustomHats] Cache-dependent fallback: the map cannot load custom PCFs. Registering validated effect names and allowing emitters; clients must already have these definitions loaded from a compatible map or local mod. Downloading a PCF alone does not load it on this map.");
+					fallbackLogged = true;
 				}
 				bool locked = LockStringTables(false);
 				if (FindStringIndex(table, classAssets.particleEffect) == INVALID_STRING_INDEX)
@@ -290,7 +301,8 @@ void CustomHats_PrecacheParticles()
 			}
 			classAssets.particleInModel = CustomHats_ModelHasParticle(classAssets.model, classAssets.particleEffect);
 			g_HatClassVariants[i][classIndex] = classAssets;
-			LogMessage("[CustomHats] Loaded particle %s for %s class %d (%s).", classAssets.particleEffect,
+			LogMessage("[CustomHats] %s particle %s for %s class %d (%s).",
+				!canLoad && classAssets.particleFile[0] ? "Registered cache-dependent fallback" : "Loaded", classAssets.particleEffect,
 				g_Hats[i].id, classIndex, classAssets.particleInModel ? "model attachment" : "wearable emitter");
 		}
 	}

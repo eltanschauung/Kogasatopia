@@ -56,7 +56,7 @@ public Plugin myinfo =
     name = "Particle hat regression probe",
     author = "Kogasatopia",
     description = "Isolated class-variant, particle and cleanup checks",
-    version = "2.1"
+    version = "2.2"
 };
 
 static void Require(bool value, const char[] message)
@@ -77,6 +77,35 @@ static void ReadHat(KeyValues config, int index)
         config.GoBack();
     }
     CustomHats_LoadClassVariants(config, index);
+}
+
+static void Probe_TestCacheFallback()
+{
+    // Simulate an unavailable map loader without touching the BSP or manifest.
+    Handle loader = g_hHatParseParticleMap;
+    g_hHatParseParticleMap = null;
+    HatClassVariant validScout;
+    HatClassVariant validSniper;
+    validScout = g_HatClassVariants[0][1];
+    validSniper = g_HatClassVariants[0][2];
+    strcopy(g_HatClassVariants[0][1].particleFile,
+        sizeof(g_HatClassVariants[][].particleFile), "particles/probe_missing.pcf");
+    strcopy(g_HatClassVariants[0][2].particleEffect,
+        sizeof(g_HatClassVariants[][].particleEffect), "probe_absent_effect");
+    CustomHats_PrecacheParticles();
+    bool missingRejected = !g_HatClassVariants[0][1].particleReady;
+    bool absentRejected = !g_HatClassVariants[0][2].particleReady;
+    g_HatClassVariants[0][1] = validScout;
+    g_HatClassVariants[0][2] = validSniper;
+    CustomHats_PrecacheParticles();
+    g_hHatParseParticleMap = loader;
+    Require(missingRejected, "fallback rejects missing PCF");
+    Require(absentRejected, "fallback rejects absent effect");
+    for (int cls = 1; cls <= 9; cls++)
+        Require(g_HatClassVariants[0][cls].particleReady,
+            "fallback registers every validated class effect");
+    Require(g_HatClassVariants[1][1].particleReady, "fallback registers embedded effect");
+    LogMessage("PASS: cache-dependent fallback registers valid effects; missing PCFs and absent effects rejected.");
 }
 
 public void OnPluginStart()
@@ -118,6 +147,7 @@ public void OnPluginStart()
     delete revisionFiles;
     CustomHats_PrecacheParticles();
     int downloads = FindStringTable("downloadables");
+    Probe_TestCacheFallback();
     Require(FindStringIndex(downloads, "particles/kogasa_particles_r01.pcf") != INVALID_STRING_INDEX,
         "published revision downloaded");
     for (int revision = 2; revision <= HAT_PARTICLE_REVISION_COUNT; revision++)
@@ -138,14 +168,6 @@ public void OnPluginStart()
     modelOverride.GetString(probeModel, sizeof(probeModel));
     Require(FileExists(probeModel, true), "test model exists");
     PrecacheModel(probeModel, true);
-    int previous = -1;
-    while ((previous = FindEntityByClassname(previous, "prop_dynamic")) != -1)
-    {
-        char model[PLATFORM_MAX_PATH];
-        GetEntPropString(previous, Prop_Data, "m_ModelName", model, sizeof(model));
-        if (StrEqual(model, probeModel) || StrEqual(model, g_Hats[0].model))
-            RemoveEntity(previous);
-    }
     int prop = CreateEntityByName("prop_dynamic");
     Require(prop > MaxClients, "test model entity");
     DispatchKeyValue(prop, "model", probeModel);
