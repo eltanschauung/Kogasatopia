@@ -1,0 +1,15 @@
+"vertexlitgeneric"
+{
+	"$basetexture" "models/bluearchive/maki/maki_halo_metal"
+   "$lightwarptexture" "models/bluearchive/maki/basewarp"
+   "$bumpmap" "models/bluearchive/maki/normal"
+   "$nocull" 1
+   //$translucent 1
+	"$nodecal" 1
+	"$phong" "1"
+	"$phongboost"	".02"
+	"$phongalbedotint" "1"
+	"$phongfresnelranges"	"[1 .1 .1]"
+	"$phongexponent" "1.0"
+	"$halflambert" "1"
+}
