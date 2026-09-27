@@ -9,6 +9,8 @@ void CustomHats_RegisterNatives()
 
 void CustomHats_OnPluginStart()
 {
+	CustomHats_InitParticles();
+	HookEvent("player_death", CustomHats_EventParticleDeath, EventHookMode_Post);
 	HookEvent("post_inventory_application", CustomHats_EventPostInventory, EventHookMode_Post);
 	RegConsoleCmd("sm_hats", Command_Hats, "Open the custom hats menu");
 	RegConsoleCmd("sm_hat", Command_Hats, "Open the custom hats menu");
@@ -53,6 +55,7 @@ void CustomHats_OnPluginStart()
 
 void CustomHats_OnConfigsExecuted()
 {
+	RemoveAllHats();
 	LoadConfig();
 	for (int client = 1; client <= MaxClients; client++)
 	{
@@ -68,6 +71,8 @@ void CustomHats_OnConfigsExecuted()
 
 void CustomHats_OnMapStart()
 {
+	CustomHats_ResetParticles();
+	LoadConfig();
 	PrecacheConfiguredHats();
 }
 
@@ -101,6 +106,7 @@ static void RefreshAllClientHats()
 void CustomHats_OnPluginEnd()
 {
 	RemoveAllHats();
+	delete g_hHatParseParticleMap;
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (g_hPostInventoryTimer[i] != INVALID_HANDLE)

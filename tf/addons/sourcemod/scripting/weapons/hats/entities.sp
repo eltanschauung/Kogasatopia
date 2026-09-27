@@ -39,6 +39,7 @@ void EquipHat(int client, int hatIndex)
 			SetEntProp(wearable, Prop_Send, "m_nSkin", g_Hats[hatIndex].bluSkin);
 		}
 		g_iHatRef[client][hatIndex] = EntIndexToEntRef(wearable);
+		CustomHats_AttachParticle(wearable, hatIndex);
 	}
 }
 
@@ -52,6 +53,7 @@ void RemoveHatIndex(int client, int hatIndex)
 	int ent = EntRefToEntIndex(g_iHatRef[client][hatIndex]);
 	if (ent != INVALID_ENT_REFERENCE)
 	{
+		CustomHats_RemoveWearableParticle(ent);
 		RemoveEntity(ent);
 	}
 	g_iHatRef[client][hatIndex] = INVALID_ENT_REFERENCE;

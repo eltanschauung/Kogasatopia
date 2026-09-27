@@ -314,6 +314,8 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+    RemoveAllHats();
+    CustomHats_ResetParticles();
     for (int client = 1; client <= MaxClients; client++)
     {
         Weapons_ResetLoadoutRequests(client);

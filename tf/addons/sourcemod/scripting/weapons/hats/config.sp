@@ -11,6 +11,7 @@ void RemoveAllHats()
 
 void PrecacheConfiguredHats()
 {
+	CustomHats_PrecacheParticles();
 	for (int i = 0; i < g_iHatCount; i++)
 	{
 		if (!IsHatEnabled(i))
@@ -93,6 +94,13 @@ void LoadConfig()
 				kv.GetString("points_store_purchase", hat.pointsStorePurchase, sizeof(hat.pointsStorePurchase), "");
 				TrimString(hat.pointsStorePurchase);
 				kv.GetString("model", hat.model, sizeof(hat.model), DEFAULT_SCOUT_MODEL);
+				if (kv.JumpToKey("particle"))
+				{
+					kv.GetString("effect", hat.particleEffect, sizeof(hat.particleEffect));
+					kv.GetString("pcf", hat.particleFile, sizeof(hat.particleFile));
+					kv.GetString("attachment", hat.particleAttachment, sizeof(hat.particleAttachment));
+					kv.GoBack();
+				}
 				char modelScale[32];
 				kv.GetString("model_scale", modelScale, sizeof(modelScale), "");
 				TrimString(modelScale);

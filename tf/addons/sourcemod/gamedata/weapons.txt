@@ -4,6 +4,12 @@
 	{
 		"Signatures"
 		{
+			"ParseParticleEffectsMap"
+			{
+				"library" "server"
+				"linux" "@_Z23ParseParticleEffectsMapPKcb"
+				"linux64" "@_Z23ParseParticleEffectsMapPKcb"
+			}
 			"CTFPlayer::GetLoadoutItem()"
 			{
 				"library"		"server"

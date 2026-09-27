@@ -24,6 +24,11 @@ void ResetHatConfig(HatConfig hat)
 	hat.prefix[0] = '\0';
 	hat.pointsStorePurchase[0] = '\0';
 	hat.model[0] = '\0';
+	hat.particleEffect[0] = '\0';
+	hat.particleFile[0] = '\0';
+	hat.particleAttachment[0] = '\0';
+	hat.particleReady = false;
+	hat.particleInModel = false;
 	hat.hasModelScale = false;
 	hat.modelScale = 1.0;
 	hat.quality = 6;

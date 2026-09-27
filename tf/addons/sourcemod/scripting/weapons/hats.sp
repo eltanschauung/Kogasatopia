@@ -47,6 +47,11 @@ enum struct HatConfig
 	char prefix[128];
 	char pointsStorePurchase[64];
 	char model[PLATFORM_MAX_PATH];
+	char particleEffect[128];
+	char particleFile[PLATFORM_MAX_PATH];
+	char particleAttachment[64];
+	bool particleReady;
+	bool particleInModel;
 	bool hasModelScale;
 	float modelScale;
 	int quality;
@@ -78,6 +83,7 @@ enum
 	CLASSMASK_SNIPER = (1 << 7),
 	CLASSMASK_SPY = (1 << 8)
 };
+#include "hats/particles.sp"
 #include "hats/lifecycle.sp"
 #include "hats/client_state.sp"
 #include "hats/menus.sp"
