@@ -79,6 +79,7 @@ static const char g_AmplifierMaterialFiles[][] =
 #define ATTR_FIRE_RATE "fire rate bonus HIDDEN"
 #define ATTR_RELOAD_RATE "reload time increased hidden" // Set to < 1 for more speed
 #define BEGGARS_BAZOOKA 730
+#define SHORTSTOP 220
 #define AMPLIFIER_HEALTH 150
 #define AMPLIFIER_MODEL_TOP_Z 66.629
 #define AMPLIFIER_RING_CLEARANCE 3.0
@@ -1727,7 +1728,7 @@ stock bool AddAmplifierEffect(int client)
         {
 			float factor_reloadrate = 0.60;
             int defIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-			if (defIndex == BEGGARS_BAZOOKA)
+			if (defIndex == BEGGARS_BAZOOKA || defIndex == SHORTSTOP)
 			{
 				factor_reloadrate = 1.0;
 			}
@@ -1755,7 +1756,7 @@ void RemoveAmplifierWeaponEffects(int client)
 			continue;
 
 		int defIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-		if (defIndex == BEGGARS_BAZOOKA)
+		if (defIndex == BEGGARS_BAZOOKA || defIndex == SHORTSTOP)
 		{
 			//TF2Attrib_SetByName(weapon, ATTR_FIRE_RATE, 0.30);
 			TF2Attrib_SetByName(weapon, ATTR_RELOAD_RATE, 1.30);
