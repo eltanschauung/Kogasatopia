@@ -1,0 +1,22 @@
+[Unit]
+Description=VPS resource watchdog (stops MGE only)
+After=network.target
+
+[Service]
+Type=simple
+User=kogasa
+Group=kogasa
+WorkingDirectory=/home/kogasa
+Environment=HOME=/home/kogasa
+Environment=STATE_DIR=/home/kogasa/resource-guard
+Environment=BREACHES_REQUIRED=2
+Environment=STOP_MODE=systemctl
+ExecStart=/home/kogasa/resource_guard.sh watchdog-loop
+Restart=always
+RestartSec=5
+UMask=0077
+StandardOutput=append:/home/kogasa/resource-guard/watchdog.out
+StandardError=append:/home/kogasa/resource-guard/watchdog.out
+
+[Install]
+WantedBy=multi-user.target
