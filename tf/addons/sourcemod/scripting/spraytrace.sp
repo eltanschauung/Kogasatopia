@@ -329,6 +329,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], errMax) {
 public OnPluginStart() {
         RegConsoleCmd("sm_mutesprays", ToggleSpraySounds, "Toggle spray sound effects.");
         RegConsoleCmd("sm_spraymute", Command_SprayMute, "Mute spray sounds, or hide a player's current spray for seven days.");
+        RegConsoleCmd("sm_mutespray", Command_SprayMute, "Mute spray sounds, or hide a player's current spray for seven days.");
         RegConsoleCmd("sm_sprayunmute", Command_SprayUnmute, "Stop hiding a player's current spray.");
         RegAdminCmd("sm_sprayban", Command_SprayBan, ADMFLAG_BAN, "Hide a player's sprays from everyone for seven days.");
         RegAdminCmd("sm_sprayunban", Command_SprayUnban, ADMFLAG_UNBAN, "Remove a player's global spray ban.");
