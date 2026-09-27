@@ -10,6 +10,7 @@
 #include <dgm_api>
 #include <filters_api>
 #include <saysounds>
+#include <server_mail>
 #include <team_balance_api>
 #include <weapons>
 #include <whaletracker_api>
@@ -187,5 +188,6 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 #include "points_store/leaderboard.sp"
 #include "points_store/balance_commands.sp"
 #include "points_store/transfers_and_welfare.sp"
+#include "points_store/stimulus.sp"
 #include "points_store/shop.sp"
 #include "points_store/native_api.sp"

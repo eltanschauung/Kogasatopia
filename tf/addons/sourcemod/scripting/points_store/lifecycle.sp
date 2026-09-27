@@ -16,6 +16,7 @@ public void OnPluginStart()
     RefreshPerMapAwardScope();
     Rewards_OnPluginStart();
     Welfare_OnPluginStart();
+    Stimulus_OnPluginStart();
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -103,6 +104,7 @@ public void OnPluginEnd()
     Lotteries_OnPluginEnd();
     Bounties_OnPluginEnd();
     MemomanEvent_OnPluginEnd();
+    Stimulus_OnPluginEnd();
     delete g_IdempotentAwardForward;
 
     delete g_ItemKeys;
