@@ -296,8 +296,11 @@ void UpdateHatForClient(int client)
 		bool hatValid = CustomHats_HasValidEntRef(g_iHatRef[client][i]);
 		bool hideValid = CustomHats_HasValidEntRef(g_iHideHatRef[client][i]);
 		bool shouldHaveHide = (GetHideDefIndexForClass(i, classIndex) > 0);
-		if (hatValid && ((shouldHaveHide && hideValid) || (!shouldHaveHide && !hideValid)))
+		if (hatValid && g_iHatEquippedClass[client][i] == classIndex
+			&& CustomHats_VariantMatchesWearable(EntRefToEntIndex(g_iHatRef[client][i]), i, classIndex)
+			&& ((shouldHaveHide && hideValid) || (!shouldHaveHide && !hideValid)))
 		{
+			CustomHats_AttachParticle(client, EntRefToEntIndex(g_iHatRef[client][i]), i);
 			continue;
 		}
 

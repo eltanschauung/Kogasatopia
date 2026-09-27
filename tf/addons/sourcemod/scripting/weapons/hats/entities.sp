@@ -13,6 +13,10 @@ void EquipHat(int client, int hatIndex)
 	}
 
 	int classIndex = view_as<int>(playerClass);
+	char model[PLATFORM_MAX_PATH];
+	strcopy(model, sizeof(model), g_HatClassVariants[hatIndex][classIndex].model);
+	if (!model[0] || !FileExists(model, true))
+		return;
 	int hideDefIndex = GetHideDefIndexForClass(hatIndex, classIndex);
 	if (hideDefIndex > 0)
 	{
@@ -31,7 +35,7 @@ void EquipHat(int client, int hatIndex)
 	int paint = g_Hats[hatIndex].force
 		? ClampPaintIndex(g_Hats[hatIndex].defaultPaint)
 		: g_iHatPaintChoice[client][hatIndex];
-	int wearable = CreateHat(client, g_Hats[hatIndex].model, hatDefIndex, g_Hats[hatIndex].level, g_Hats[hatIndex].quality, paint, g_Hats[hatIndex].style, g_Hats[hatIndex].hasModelScale, g_Hats[hatIndex].modelScale);
+	int wearable = CreateHat(client, model, hatDefIndex, g_Hats[hatIndex].level, g_Hats[hatIndex].quality, paint, g_Hats[hatIndex].style, g_Hats[hatIndex].hasModelScale, g_Hats[hatIndex].modelScale);
 	if (wearable != -1)
 	{
 		if (g_Hats[hatIndex].bluSkin >= 0 && GetClientTeam(client) == view_as<int>(TFTeam_Blue))
@@ -39,7 +43,10 @@ void EquipHat(int client, int hatIndex)
 			SetEntProp(wearable, Prop_Send, "m_nSkin", g_Hats[hatIndex].bluSkin);
 		}
 		g_iHatRef[client][hatIndex] = EntIndexToEntRef(wearable);
-		CustomHats_AttachParticle(wearable, hatIndex);
+		g_iHatEquippedClass[client][hatIndex] = classIndex;
+		if (g_HatClassVariants[hatIndex][classIndex].body >= 0)
+			SetEntProp(wearable, Prop_Send, "m_nBody", g_HatClassVariants[hatIndex][classIndex].body);
+		CustomHats_AttachParticle(client, wearable, hatIndex);
 	}
 }
 
@@ -57,6 +64,7 @@ void RemoveHatIndex(int client, int hatIndex)
 		RemoveEntity(ent);
 	}
 	g_iHatRef[client][hatIndex] = INVALID_ENT_REFERENCE;
+	g_iHatEquippedClass[client][hatIndex] = 0;
 
 	int hideEnt = EntRefToEntIndex(g_iHideHatRef[client][hatIndex]);
 	if (hideEnt != INVALID_ENT_REFERENCE)

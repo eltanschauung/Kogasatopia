@@ -57,7 +57,7 @@
 public Plugin myinfo =
 {
     name = "Weapons",
-    author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden",
+    author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
     version = "7.1" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
@@ -373,6 +373,7 @@ public void OnEntityCreated(int entity, const char[] className)
 
 public void TF2_OnConditionRemoved(int client, TFCond condition)
 {
+    CustomHats_OnConditionChanged(client, condition);
     WeaponsModels_OnConditionRemoved(client, condition);
     WeaponsGameplay_OnConditionRemoved(client, condition);
 }

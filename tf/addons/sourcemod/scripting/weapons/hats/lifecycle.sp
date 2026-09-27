@@ -33,6 +33,7 @@ void CustomHats_OnPluginStart()
 			g_bHatEnabled[i][j] = false;
 			g_iHatRef[i][j] = INVALID_ENT_REFERENCE;
 			g_iHideHatRef[i][j] = INVALID_ENT_REFERENCE;
+			g_iHatEquippedClass[i][j] = 0;
 			g_iHatPaintChoice[i][j] = 0;
 		}
 		g_szHatIdChoice[i][0] = '\0';
@@ -132,6 +133,7 @@ void CustomHats_OnClientPutInServer(int client)
 	{
 		g_iHatRef[client][i] = INVALID_ENT_REFERENCE;
 		g_iHideHatRef[client][i] = INVALID_ENT_REFERENCE;
+		g_iHatEquippedClass[client][i] = 0;
 	}
 	g_bHatApplyPending[client] = false;
 }

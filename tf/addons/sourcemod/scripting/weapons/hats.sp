@@ -50,8 +50,6 @@ enum struct HatConfig
 	char particleEffect[128];
 	char particleFile[PLATFORM_MAX_PATH];
 	char particleAttachment[64];
-	bool particleReady;
-	bool particleInModel;
 	bool hasModelScale;
 	float modelScale;
 	int quality;
@@ -68,6 +66,7 @@ enum struct HatConfig
 }
 
 HatConfig g_Hats[MAX_HATS];
+int g_iHatEquippedClass[MAXPLAYERS + 1][MAX_HATS];
 int g_iHatCount = 0;
 int g_iDefaultHatIndex = -1;
 enum
@@ -83,6 +82,7 @@ enum
 	CLASSMASK_SNIPER = (1 << 7),
 	CLASSMASK_SPY = (1 << 8)
 };
+#include "hats/class_variants.sp"
 #include "hats/particles.sp"
 #include "hats/lifecycle.sp"
 #include "hats/client_state.sp"

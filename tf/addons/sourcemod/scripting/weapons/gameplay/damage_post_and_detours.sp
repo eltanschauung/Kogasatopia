@@ -220,6 +220,7 @@ public MRESReturn CanFireCriticalShot_Post(int weapon, DHookReturn hReturn, DHoo
 // Gas passer buff is a candidate for removal, it's uninspired and could be more creative
 public void TF2_OnConditionAdded(int client, TFCond condition)
 {
+	CustomHats_OnConditionChanged(client, condition);
 	if (!WeaponsGameplay_IsEnabled())
 	{
 		return;

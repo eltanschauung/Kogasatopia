@@ -18,7 +18,18 @@ void PrecacheConfiguredHats()
 		{
 			continue;
 		}
-		PrecacheModel(g_Hats[i].model, true);
+		for (int classIndex = 1; classIndex <= 9; classIndex++)
+		{
+			if (IsClassAllowedForHat(i, view_as<TFClassType>(classIndex)))
+			{
+				char model[PLATFORM_MAX_PATH];
+				strcopy(model, sizeof(model), g_HatClassVariants[i][classIndex].model);
+				if (model[0] && FileExists(model, true))
+					PrecacheModel(model, true);
+				else
+					LogError("[CustomHats] Missing model for %s class %d: %s", g_Hats[i].id, classIndex, model);
+			}
+		}
 	}
 }
 
@@ -135,6 +146,7 @@ void LoadConfig()
 	kv.GetString("classes", classes, sizeof(classes), "all");
 	hat.classMask = ParseClassMask(classes);
 
+				LoadClassOverrides(kv, "scout", TFClass_Scout, hat);
 				LoadClassOverrides(kv, "soldier", TFClass_Soldier, hat);
 				LoadClassOverrides(kv, "pyro", TFClass_Pyro, hat);
 				LoadClassOverrides(kv, "demoman", TFClass_DemoMan, hat);
@@ -144,7 +156,8 @@ void LoadConfig()
 				LoadClassOverrides(kv, "sniper", TFClass_Sniper, hat);
 				LoadClassOverrides(kv, "spy", TFClass_Spy, hat);
 
-				AddHatConfig(hat);
+				if (AddHatConfig(hat))
+					CustomHats_LoadClassVariants(kv, g_iHatCount - 1);
 			}
 			while (kv.GotoNextKey());
 			kv.GoBack();

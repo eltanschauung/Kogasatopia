@@ -77,10 +77,15 @@ void CustomHats_PrecacheParticles()
 	bool hasCustomPCF;
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		g_Hats[i].particleReady = false;
-		g_Hats[i].particleInModel = false;
-		if (IsHatEnabled(i) && g_Hats[i].particleEffect[0] && g_Hats[i].particleFile[0])
-			hasCustomPCF = true;
+		for (int classIndex = 1; classIndex <= 9; classIndex++)
+		{
+			g_HatClassVariants[i][classIndex].particleReady = false;
+			g_HatClassVariants[i][classIndex].particleInModel = false;
+			if (IsHatEnabled(i) && IsClassAllowedForHat(i, view_as<TFClassType>(classIndex))
+				&& g_HatClassVariants[i][classIndex].particleEffect[0]
+				&& g_HatClassVariants[i][classIndex].particleFile[0])
+				hasCustomPCF = true;
+		}
 	}
 
 	bool canLoad = !hasCustomPCF;
@@ -104,39 +109,47 @@ void CustomHats_PrecacheParticles()
 			bool changed = !FileExists(path);
 			for (int i = 0; i < g_iHatCount; i++)
 			{
-				if (!IsHatEnabled(i) || !g_Hats[i].particleEffect[0] || !g_Hats[i].particleFile[0])
+				if (!IsHatEnabled(i))
 					continue;
-				if (!CustomHats_ValidParticleFile(g_Hats[i].particleFile))
+				for (int classIndex = 1; classIndex <= 9; classIndex++)
 				{
-					LogError("[CustomHats] Invalid/missing PCF for %s: %s", g_Hats[i].id, g_Hats[i].particleFile);
-					continue;
-				}
-				bool found;
-				char value[PLATFORM_MAX_PATH];
-				for (int n = 0; n < files.Length; n++)
-				{
-					files.GetString(n, value, sizeof(value));
-					int skip = value[0] == '!' ? 1 : 0;
-					if (StrEqual(value[skip], g_Hats[i].particleFile, false))
+					HatClassVariant classAssets;
+					classAssets = g_HatClassVariants[i][classIndex];
+					if (!IsClassAllowedForHat(i, view_as<TFClassType>(classIndex))
+						|| !classAssets.particleEffect[0] || !classAssets.particleFile[0])
+						continue;
+					if (!CustomHats_ValidParticleFile(classAssets.particleFile))
 					{
-						found = true;
-						if (!skip)
-						{
-							Format(value, sizeof(value), "!%s", g_Hats[i].particleFile);
-							files.SetString(n, value);
-							changed = true;
-						}
-						break;
+						LogError("[CustomHats] Invalid/missing PCF for %s class %d: %s", g_Hats[i].id, classIndex, classAssets.particleFile);
+						continue;
 					}
+					bool found;
+					char value[PLATFORM_MAX_PATH];
+					for (int n = 0; n < files.Length; n++)
+					{
+						files.GetString(n, value, sizeof(value));
+						int skip = value[0] == '!' ? 1 : 0;
+						if (StrEqual(value[skip], classAssets.particleFile, false))
+						{
+							found = true;
+							if (!skip)
+							{
+								Format(value, sizeof(value), "!%s", classAssets.particleFile);
+								files.SetString(n, value);
+								changed = true;
+							}
+							break;
+						}
+					}
+					if (!found)
+					{
+						Format(value, sizeof(value), "!%s", classAssets.particleFile);
+						files.PushString(value);
+						changed = true;
+					}
+					AddFileToDownloadsTable(classAssets.particleFile);
+					PrecacheGeneric(classAssets.particleFile, true);
 				}
-				if (!found)
-				{
-					Format(value, sizeof(value), "!%s", g_Hats[i].particleFile);
-					files.PushString(value);
-					changed = true;
-				}
-				AddFileToDownloadsTable(g_Hats[i].particleFile);
-				PrecacheGeneric(g_Hats[i].particleFile, true);
 			}
 			if (files.Length > 64)
 				LogError("[CustomHats] %s exceeds TF2's 64 PCFs per map; not loading particle hats.", path);
@@ -179,33 +192,39 @@ void CustomHats_PrecacheParticles()
 	int table = FindStringTable("ParticleEffectNames");
 	for (int i = 0; i < g_iHatCount; i++)
 	{
-		if (!IsHatEnabled(i) || !g_Hats[i].particleEffect[0])
+		if (!IsHatEnabled(i) || table == INVALID_STRING_TABLE)
 			continue;
-		if (g_Hats[i].particleFile[0]
-			&& (!canLoad || !CustomHats_ValidParticleFile(g_Hats[i].particleFile)))
-			continue;
-		// PCF loading and effect-name registration are separate engine operations.
-		if (g_Hats[i].particleFile[0] && table != INVALID_STRING_TABLE)
+		for (int classIndex = 1; classIndex <= 9; classIndex++)
 		{
-			if (!CustomHats_PCFHasEffect(g_Hats[i].particleFile, g_Hats[i].particleEffect))
+			HatClassVariant classAssets;
+			classAssets = g_HatClassVariants[i][classIndex];
+			if (!IsClassAllowedForHat(i, view_as<TFClassType>(classIndex)) || !classAssets.particleEffect[0])
+				continue;
+			if (classAssets.particleFile[0])
 			{
-				LogError("[CustomHats] Effect absent or unsupported PCF encoding: %s (%s)", g_Hats[i].particleEffect, g_Hats[i].particleFile);
+				if (!canLoad || !CustomHats_ValidParticleFile(classAssets.particleFile))
+					continue;
+				if (!CustomHats_PCFHasEffect(classAssets.particleFile, classAssets.particleEffect))
+				{
+					LogError("[CustomHats] Effect absent or unsupported PCF encoding: %s (%s)", classAssets.particleEffect, classAssets.particleFile);
+					continue;
+				}
+				bool locked = LockStringTables(false);
+				if (FindStringIndex(table, classAssets.particleEffect) == INVALID_STRING_INDEX)
+					AddToStringTable(table, classAssets.particleEffect);
+				LockStringTables(locked);
+			}
+			classAssets.particleReady = FindStringIndex(table, classAssets.particleEffect) != INVALID_STRING_INDEX;
+			if (!classAssets.particleReady)
+			{
+				LogError("[CustomHats] Particle effect not precached: %s (%s)", classAssets.particleEffect, g_Hats[i].id);
 				continue;
 			}
-			bool locked = LockStringTables(false);
-			AddToStringTable(table, g_Hats[i].particleEffect);
-			LockStringTables(locked);
+			classAssets.particleInModel = CustomHats_ModelHasParticle(classAssets.model, classAssets.particleEffect);
+			g_HatClassVariants[i][classIndex] = classAssets;
+			LogMessage("[CustomHats] Loaded particle %s for %s class %d (%s).", classAssets.particleEffect,
+				g_Hats[i].id, classIndex, classAssets.particleInModel ? "model attachment" : "wearable emitter");
 		}
-		g_Hats[i].particleReady = table != INVALID_STRING_TABLE
-			&& FindStringIndex(table, g_Hats[i].particleEffect) != INVALID_STRING_INDEX;
-		if (!g_Hats[i].particleReady)
-		{
-			LogError("[CustomHats] Particle effect not precached: %s (%s)", g_Hats[i].particleEffect, g_Hats[i].id);
-			continue;
-		}
-		g_Hats[i].particleInModel = CustomHats_ModelHasParticle(g_Hats[i].model, g_Hats[i].particleEffect);
-		LogMessage("[CustomHats] Loaded particle %s for %s (%s).", g_Hats[i].particleEffect,
-			g_Hats[i].id, g_Hats[i].particleInModel ? "model attachment" : "wearable emitter");
 	}
 }
 
@@ -293,29 +312,96 @@ bool CustomHats_ModelHasParticle(const char[] model, const char[] effect)
 	return found;
 }
 
-void CustomHats_AttachParticle(int wearable, int hatIndex)
+static bool CustomHats_CanDisplayParticle(int client)
 {
-	if (!g_Hats[hatIndex].particleReady || g_Hats[hatIndex].particleInModel
-		|| wearable >= sizeof(g_iHatParticleRef))
+	return Client_IsInGame(client) && IsPlayerAlive(client)
+		&& !TF2_IsPlayerInCondition(client, TFCond_Cloaked)
+		&& !TF2_IsPlayerInCondition(client, TFCond_Disguised)
+		&& !TF2_IsPlayerInCondition(client, TFCond_Disguising)
+		&& !TF2_IsPlayerInCondition(client, TFCond_Stealthed)
+		&& !TF2_IsPlayerInCondition(client, TFCond_StealthedUserBuffFade);
+}
+
+void CustomHats_AttachParticle(int client, int wearable, int hatIndex)
+{
+	if (!CustomHats_CanDisplayParticle(client) || !IsHatIndexValid(hatIndex)
+		|| wearable <= MaxClients || wearable >= sizeof(g_iHatParticleRef) || !IsValidEntity(wearable))
 		return;
+	int classIndex = view_as<int>(TF2_GetPlayerClass(client));
+	if (classIndex < 1 || classIndex > 9)
+		return;
+	HatClassVariant classAssets;
+	classAssets = g_HatClassVariants[hatIndex][classIndex];
+	if (!classAssets.particleReady || classAssets.particleInModel
+		|| EntRefToEntIndex(g_iHatParticleRef[wearable]) != INVALID_ENT_REFERENCE)
+		return;
+	int attachment;
+	if (classAssets.particleAttachment[0])
+	{
+		attachment = LookupEntityAttachment(wearable, classAssets.particleAttachment);
+		if (attachment < 1)
+		{
+			LogError("[CustomHats] Missing attachment %s on %s.", classAssets.particleAttachment, classAssets.model);
+			return;
+		}
+	}
 	int particle = CreateEntityByName("info_particle_system");
-	if (particle == -1)
+	if (particle <= MaxClients)
 		return;
-	DispatchKeyValue(particle, "effect_name", g_Hats[hatIndex].particleEffect);
+	DispatchKeyValue(particle, "effect_name", classAssets.particleEffect);
+	DispatchKeyValue(particle, "start_active", "0");
 	DispatchSpawn(particle);
-	float origin[3];
-	GetEntPropVector(wearable, Prop_Send, "m_vecOrigin", origin);
-	TeleportEntity(particle, origin, NULL_VECTOR, NULL_VECTOR);
+	// Start at the wearer's position before parenting, even in distant arenas.
+	float origin[3], angles[3];
+	GetClientAbsOrigin(client, origin);
+	if (attachment > 0)
+		GetEntityAttachment(wearable, attachment, origin, angles);
+	TeleportEntity(particle, origin, angles, NULL_VECTOR);
 	SetVariantString("!activator");
 	AcceptEntityInput(particle, "SetParent", wearable, wearable);
-	if (g_Hats[hatIndex].particleAttachment[0])
+	if (attachment > 0)
 	{
-		SetVariantString(g_Hats[hatIndex].particleAttachment);
-		AcceptEntityInput(particle, "SetParentAttachment");
+		SetVariantString(classAssets.particleAttachment);
+		AcceptEntityInput(particle, "SetParentAttachment", wearable, wearable);
 	}
+	SetEntPropEnt(particle, Prop_Send, "m_hOwnerEntity", client);
+	int point = classAssets.ownerCameraControlPoint;
+	if (point > 0 && point <= GetEntPropArraySize(particle, Prop_Send, "m_hControlPointEnts"))
+		SetEntPropEnt(particle, Prop_Send, "m_hControlPointEnts", client, point - 1);
+	SDKHook(particle, SDKHook_SetTransmit, CustomHats_OnParticleTransmit);
 	ActivateEntity(particle);
 	AcceptEntityInput(particle, "Start");
 	g_iHatParticleRef[wearable] = EntIndexToEntRef(particle);
+}
+
+public Action CustomHats_OnParticleTransmit(int particle, int viewer)
+{
+	int owner = GetEntPropEnt(particle, Prop_Send, "m_hOwnerEntity");
+	if (!CustomHats_CanDisplayParticle(owner))
+		return Plugin_Handled;
+	return WeaponsHatVisibility_OnTransmit(particle, viewer);
+}
+
+void CustomHats_OnConditionChanged(int client, TFCond condition)
+{
+	if (condition != TFCond_Cloaked && condition != TFCond_Disguised
+		&& condition != TFCond_Disguising && condition != TFCond_Stealthed
+		&& condition != TFCond_StealthedUserBuffFade)
+		return;
+	if (!Client_IsInGame(client))
+		return;
+	bool visible = CustomHats_CanDisplayParticle(client);
+	int classIndex = view_as<int>(TF2_GetPlayerClass(client));
+	for (int i = 0; i < g_iHatCount; i++)
+	{
+		int wearable = EntRefToEntIndex(g_iHatRef[client][i]);
+		if (wearable <= MaxClients || !IsValidEntity(wearable))
+			continue;
+		if (visible && g_iHatEquippedClass[client][i] == classIndex)
+			CustomHats_AttachParticle(client, wearable, i);
+		else
+			CustomHats_RemoveWearableParticle(wearable);
+	}
 }
 
 void CustomHats_RemoveWearableParticle(int wearable)
