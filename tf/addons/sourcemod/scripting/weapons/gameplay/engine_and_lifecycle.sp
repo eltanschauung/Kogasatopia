@@ -429,7 +429,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 }
 
 public void PreCacheWeaponSounds() {
-	AddFileToDownloadsTable("sound/weapons/halo_ce/plasrifle_overheat_10b.mp3");
+	AddFileToDownloadsTable("sound/weapons/halo_ce/plasrifle_overheat_10b.wav");
 	PrecacheSound(SOUND_PLASMA_OVERHEAT, true);
 	PrecacheSound(SOUND_PLASMA_COOLED, true);
 	PrecacheSound(SOUND_ARROW_HEAL, true);
