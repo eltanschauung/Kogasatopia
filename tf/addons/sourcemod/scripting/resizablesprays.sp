@@ -28,6 +28,8 @@
 // Normal sprays are 64 Hammer units tall
 #define SPRAY_UNIT_DIMENSION_FLOAT 64.0
 #define CRC_BUFFER_SIZE 9
+#define SPRAY_COMMAND_LIMIT 3
+#define SPRAY_COMMAND_WINDOW 5.0
 
 #define LOG_ERROR 0
 #define LOG_WARNING 1
@@ -65,6 +67,9 @@ enum struct Player {
 	bool bTriedToSprayWhenDownloadingVtfs;
 	float fScale; //last scale used (in relative units)
 	float fLastSprayed;
+	float fSprayCommandTimes[SPRAY_COMMAND_LIMIT];
+	int iSprayCommandCount;
+	bool bSprayRateLimitNotified;
 	float fJoinTime;
 	float fRealSprayLastPosition[3];
 }
@@ -185,6 +190,8 @@ public void ResetSprayInfo(int client)
 	g_Players[client].bTriedToSprayWhenDownloadingVtfs = false;
 	g_Players[client].fScale = 1.0;
 	g_Players[client].fLastSprayed = 0.0;
+	g_Players[client].iSprayCommandCount = 0;
+	g_Players[client].bSprayRateLimitNotified = false;
 	g_Players[client].fJoinTime = GetGameTime();
 	g_Players[client].fRealSprayLastPosition[0] = -16380.0;
 	g_Players[client].fRealSprayLastPosition[1] = -16380.0;
@@ -373,6 +380,38 @@ public Action OnFileSend(int client, const char[] sFile)
 	return Plugin_Handled;
 }
 
+// Both spray commands share this per-client rolling window.
+bool AllowSprayCommand(int client)
+{
+	float now = GetEngineTime();
+	int count = 0;
+	for (int i = 0; i < g_Players[client].iSprayCommandCount; i++)
+	{
+		float commandTime = g_Players[client].fSprayCommandTimes[i];
+		if (now - commandTime < SPRAY_COMMAND_WINDOW)
+		{
+			g_Players[client].fSprayCommandTimes[count++] = commandTime;
+		}
+	}
+	g_Players[client].iSprayCommandCount = count;
+
+	if (count >= SPRAY_COMMAND_LIMIT)
+	{
+		if (!g_Players[client].bSprayRateLimitNotified)
+		{
+			ReplyToCommand(client, "[Kogasa] Spray commands are limited to %d uses per %.0f seconds.",
+				SPRAY_COMMAND_LIMIT, SPRAY_COMMAND_WINDOW);
+			g_Players[client].bSprayRateLimitNotified = true;
+		}
+		return false;
+	}
+
+	g_Players[client].fSprayCommandTimes[count] = now;
+	g_Players[client].iSprayCommandCount = count + 1;
+	g_Players[client].bSprayRateLimitNotified = false;
+	return true;
+}
+
 /*
 	Handles the !spray and !bspray commands
 	@param ID of client, will use their spray's unique filename
@@ -396,6 +435,8 @@ public Action Command_Spray(int client, int args)
 		return Plugin_Handled;
 
 	if (!cv_bEnabled.BoolValue)
+		return Plugin_Handled;
+	if (!AllowSprayCommand(client))
 		return Plugin_Handled;
 
 	if (GetGameTime() - g_Players[client].fLastSprayed < cv_fDecalFrequency.FloatValue && !IsAdmin(client))
