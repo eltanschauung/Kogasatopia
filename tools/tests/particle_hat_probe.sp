@@ -56,7 +56,7 @@ public Plugin myinfo =
     name = "Particle hat regression probe",
     author = "Kogasatopia",
     description = "Isolated class-variant, particle and cleanup checks",
-    version = "2.0"
+    version = "2.1"
 };
 
 static void Require(bool value, const char[] message)
@@ -108,7 +108,27 @@ public void OnPluginStart()
 
     CustomHats_InitParticles();
     Require(g_hHatParseParticleMap != null, "native map particle loader");
+    ArrayList revisionFiles = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+    revisionFiles.PushString("!particles/map_native.pcf");
+    revisionFiles.PushString("particles/ba_tsurugi_blood.pcf");
+    revisionFiles.PushString("!particles/procuration_v4.pcf");
+    Require(CustomHats_ReserveParticleRevisions(revisionFiles), "reserve revisions");
+    Require(revisionFiles.Length == 33, "32 slots plus native PCF, legacy entries retired");
+    Require(!CustomHats_ReserveParticleRevisions(revisionFiles), "idempotent revision reservation");
+    delete revisionFiles;
     CustomHats_PrecacheParticles();
+    int downloads = FindStringTable("downloadables");
+    Require(FindStringIndex(downloads, "particles/kogasa_particles_r01.pcf") != INVALID_STRING_INDEX,
+        "published revision downloaded");
+    for (int revision = 2; revision <= HAT_PARTICLE_REVISION_COUNT; revision++)
+    {
+        char revisionPath[PLATFORM_MAX_PATH];
+        Format(revisionPath, sizeof(revisionPath), "particles/kogasa_particles_r%02d.pcf", revision);
+        if (!FileExists(revisionPath, true))
+            Require(FindStringIndex(downloads, revisionPath) == INVALID_STRING_INDEX,
+                "missing revision not downloaded");
+    }
+    LogMessage("PASS: stable 32-slot manifests, native entries preserved, no missing-file downloads.");
     PrecacheModel(g_Hats[0].model, true);
     PrecacheModel(g_Hats[1].model, true);
 

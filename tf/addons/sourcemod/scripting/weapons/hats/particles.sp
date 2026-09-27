@@ -6,6 +6,65 @@ Handle g_hHatParseParticleMap;
 bool g_bHatParticleMapLoaded;
 int g_iHatParticleRef[2049];
 
+#define HAT_PARTICLE_REVISION_COUNT 32
+
+// Reserve immutable filenames, but never download/cache empty placeholders.
+bool CustomHats_ReserveParticleRevisions(ArrayList files)
+{
+	bool changed;
+	char value[PLATFORM_MAX_PATH], path[PLATFORM_MAX_PATH];
+	for (int n = files.Length - 1; n >= 0; n--)
+	{
+		files.GetString(n, value, sizeof(value));
+		int skip = value[0] == '!' ? 1 : 0;
+		if (StrEqual(value[skip], "particles/ba_tsurugi_blood.pcf", false)
+			|| StrEqual(value[skip], "particles/procuration_v4.pcf", false))
+		{
+			files.Erase(n);
+			changed = true;
+		}
+	}
+	for (int revision = 1; revision <= HAT_PARTICLE_REVISION_COUNT; revision++)
+	{
+		Format(path, sizeof(path), "particles/kogasa_particles_r%02d.pcf", revision);
+		bool found;
+		for (int n = files.Length - 1; n >= 0; n--)
+		{
+			files.GetString(n, value, sizeof(value));
+			int skip = value[0] == '!' ? 1 : 0;
+			if (!StrEqual(value[skip], path, false))
+				continue;
+			if (found)
+			{
+				files.Erase(n);
+				changed = true;
+			}
+			else
+			{
+				found = true;
+				if (!skip)
+				{
+					Format(value, sizeof(value), "!%s", path);
+					files.SetString(n, value);
+					changed = true;
+				}
+			}
+		}
+		if (!found)
+		{
+			Format(value, sizeof(value), "!%s", path);
+			files.PushString(value);
+			changed = true;
+		}
+		if (FileExists(path, true))
+		{
+			AddFileToDownloadsTable(path);
+			PrecacheGeneric(path, true);
+		}
+	}
+	return changed;
+}
+
 void CustomHats_InitParticles()
 {
 	CustomHats_ResetParticles();
@@ -97,6 +156,13 @@ void CustomHats_PrecacheParticles()
 		for (int n = 0; map[n]; n++)
 			if (map[n] == '/') start = n + 1;
 		strcopy(basename, sizeof(basename), map[start]);
+		// Workshop aliases are not the physical BSP's name.
+		int suffix = StrContains(basename, ".ugc", false);
+		if (suffix != -1)
+			basename[suffix] = '\0';
+		int length = strlen(basename);
+		if (length > 4 && StrEqual(basename[length - 4], ".bsp", false))
+			basename[length - 4] = '\0';
 		Format(path, sizeof(path), "maps/%s_particles.txt", basename);
 
 		// A packed manifest wins over loose files in Valve's parser, on clients too.
@@ -107,6 +173,8 @@ void CustomHats_PrecacheParticles()
 		else
 		{
 			bool changed = !FileExists(path);
+			if (CustomHats_ReserveParticleRevisions(files))
+				changed = true;
 			for (int i = 0; i < g_iHatCount; i++)
 			{
 				if (!IsHatEnabled(i))
