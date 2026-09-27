@@ -121,6 +121,14 @@ void ShowHatsInSlotMenu(int client, const char[] slot)
 			g_bHatEnabled[client][i] ? " [ON]" : "",
 			CanClientAccessHat(client, i) ? "" : " [!Shop]");
 		menu.AddItem(g_Hats[i].id, label);
+		if (g_Hats[i].paintable && g_bHatEnabled[client][i])
+		{
+			char paintId[72];
+			char paintLabel[128];
+			Format(paintId, sizeof(paintId), "paint:%s", g_Hats[i].id);
+			Format(paintLabel, sizeof(paintLabel), "Paint %s", g_Hats[i].name);
+			menu.AddItem(paintId, paintLabel);
+		}
 		added++;
 	}
 	if (added == 0)
@@ -137,12 +145,39 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 {
 	if (action == MenuAction_Select)
 	{
-		char itemId[64];
+		char itemId[72];
 		menu.GetItem(item, itemId, sizeof(itemId));
-		int hatIndex = FindHatIndexById(itemId);
+		bool paintSelection = StrContains(itemId, "paint:", false) == 0;
+		char hatId[64];
+		if (paintSelection)
+		{
+			strcopy(hatId, sizeof(hatId), itemId[6]);
+		}
+		else
+		{
+			strcopy(hatId, sizeof(hatId), itemId);
+		}
+		int hatIndex = FindHatIndexById(hatId);
 		if (hatIndex < 0)
 		{
 			ShowHatMenu(client);
+			return 0;
+		}
+		if (paintSelection)
+		{
+			if (!g_bHatEnabled[client][hatIndex] || !g_Hats[hatIndex].paintable)
+			{
+				ShowHatsInSlotMenu(client, g_Hats[hatIndex].slot);
+				return 0;
+			}
+			if (!CanClientUseHatForClass(client, hatIndex, TF2_GetPlayerClass(client)))
+			{
+				PrintHatLockedMessage(client, hatIndex);
+				ShowHatsInSlotMenu(client, g_Hats[hatIndex].slot);
+				return 0;
+			}
+			strcopy(g_szHatIdChoice[client], sizeof(g_szHatIdChoice[]), g_Hats[hatIndex].id);
+			ShowHatPaintMenu(client);
 			return 0;
 		}
 
@@ -152,7 +187,6 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 			QueueHatStateSave(client, true);
 			RemoveHat(client, hatIndex);
 			PrintToChat(client, "[Hats] Disabled %s.", g_Hats[hatIndex].name);
-			ShowHatsInSlotMenu(client, g_Hats[hatIndex].slot);
 			return 0;
 		}
 
@@ -165,14 +199,6 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 
 		strcopy(g_szHatIdChoice[client], sizeof(g_szHatIdChoice[]), itemId);
 		EquipSelectedHatFromMenu(client, hatIndex);
-		if (g_Hats[hatIndex].paintable)
-		{
-			ShowHatPaintMenu(client);
-		}
-		else
-		{
-			ShowHatsInSlotMenu(client, g_Hats[hatIndex].slot);
-		}
 	}
 	else if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && Client_IsInGame(client))
 	{
