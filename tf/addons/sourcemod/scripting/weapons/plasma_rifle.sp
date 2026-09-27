@@ -4,7 +4,7 @@
 #define PLASMA_COOL_RATE 30.0
 #define PLASMA_OVERHEAT_SECONDS 2.33
 #define PLASMA_NO_ATTACK_ATTRIBUTE 821
-#define SOUND_PLASMA_OVERHEAT "weapons/halo_ce/plasrifle_overheat_10b.wav"
+#define SOUND_PLASMA_OVERHEAT "weapons/halo_ce/plasrifle_overheat_10b.mp3"
 #define SOUND_PLASMA_COOLED "weapons/flaregun_tube_closefinish.wav"
 
 bool g_bPlasmaHooked[MAX_TRACKED_ENTITIES];
