@@ -1267,7 +1267,7 @@ stock ResolveWeightedVoteMute() {
     }
 
     CPrintToChatAll(
-        "{gold}[PermaMute]{default} Vote failed: %d/%d weighted votes were yes; %d%% was required.",
+        "{gold}[PermaMute]{default} Vote failed: %d/%d; %d%% was required.",
         yesVotes,
         totalVotes,
         VOTEMUTE_PERCENT);
