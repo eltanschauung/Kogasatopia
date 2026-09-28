@@ -6,6 +6,8 @@ ConVar g_GameplayRewardDelay = null;
 int g_LastDamageAttackerUserId[MAXPLAYERS + 1];
 int g_LastDamageWeaponRef[MAXPLAYERS + 1];
 float g_LastDamageAt[MAXPLAYERS + 1];
+int g_PendingHeadshotKills[MAXPLAYERS + 1];
+float g_LastHeadshotKillAt[MAXPLAYERS + 1];
 
 void GameplayRewards_OnPluginStart()
 {
@@ -21,6 +23,7 @@ void GameplayRewards_OnPluginStart()
 	for (int client = 1; client <= MaxClients; client++)
 	{
 		ResetLastDamage(client);
+		ResetHeadshotDoubleKill(client);
 		if (IsClientInGame(client))
 		{
 			SDKHook(client, SDKHook_OnTakeDamage, GameplayRewards_OnTakeDamage);
@@ -32,12 +35,22 @@ void GameplayRewards_OnPluginStart()
 void GameplayRewards_OnClientPutInServer(int client)
 {
 	ResetLastDamage(client);
+	ResetHeadshotDoubleKill(client);
 	SDKHook(client, SDKHook_OnTakeDamage, GameplayRewards_OnTakeDamage);
 }
 
 void GameplayRewards_OnClientDisconnect(int client)
 {
 	ResetLastDamage(client);
+	ResetHeadshotDoubleKill(client);
+}
+
+void GameplayRewards_OnMapStart()
+{
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		ResetHeadshotDoubleKill(client);
+	}
 }
 
 float GameplayRewardDelay()
@@ -104,6 +117,12 @@ void ResetLastDamage(int victim)
 	g_LastDamageAttackerUserId[victim] = 0;
 	g_LastDamageWeaponRef[victim] = INVALID_ENT_REFERENCE;
 	g_LastDamageAt[victim] = 0.0;
+}
+
+void ResetHeadshotDoubleKill(int client)
+{
+	g_PendingHeadshotKills[client] = 0;
+	g_LastHeadshotKillAt[client] = 0.0;
 }
 
 int ResolveDamageWeapon(int weapon, int inflictor)
@@ -214,6 +233,10 @@ public void Event_MemomanPlayerDeath(Event event, const char[] name, bool dontBr
 	}
 
 	int victim = GetClientOfUserId(event.GetInt("userid"));
+	if (victim > 0)
+	{
+		ResetHeadshotDoubleKill(victim);
+	}
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 	if (!Client_IsHumanInGame(victim) || !Client_IsHumanInGame(attacker) || victim == attacker)
 	{
@@ -287,6 +310,19 @@ public void OnBackstabMilestone(int client, int backstabsThisLife)
 
 public void OnHeadshotMilestone(int client, int headshotsThisLife)
 {
+	float now = GetGameTime();
+	ConVar multikillWindow = FindConVar("sm_multikill_window");
+	float window = multikillWindow == null ? 3.0 : multikillWindow.FloatValue;
+	if (g_PendingHeadshotKills[client] == 0 || now - g_LastHeadshotKillAt[client] > window)
+	{
+		g_PendingHeadshotKills[client] = 1;
+	}
+	else
+	{
+		g_PendingHeadshotKills[client]++;
+	}
+	g_LastHeadshotKillAt[client] = now;
+
 	if (headshotsThisLife > 0 && headshotsThisLife % 4 == 0)
 	{
 		AwardGameplayReward(client, "headshot_kills_life_4", 0);
@@ -383,6 +419,13 @@ public void OnJuggle(int attacker, int victim)
 
 public void OnMultikill(int client, int kills)
 {
+	if (kills == 2 && g_PendingHeadshotKills[client] == 2
+		&& TF2_GetPlayerClass(client) == TFClass_Sniper)
+	{
+		AwardGameplayReward(client, "headshot_double_kill", 0, 1.0);
+	}
+	ResetHeadshotDoubleKill(client);
+
 	if (kills >= 5)
 	{
 		AwardGameplayReward(client, "multikill_5_plus", kills, 1.0);

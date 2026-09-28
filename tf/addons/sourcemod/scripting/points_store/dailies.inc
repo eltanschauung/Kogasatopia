@@ -22,6 +22,7 @@ static const char g_DailyGemTypes[][] =
     "uber_deployed",
     "ubers_life_3",
     "headshot_kills_life_4",
+    "headshot_double_kill",
     "dropshot_kill",
     "headshot_kills_life_10",
     "ambassador_headshot_kill",

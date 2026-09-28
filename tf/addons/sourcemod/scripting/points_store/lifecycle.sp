@@ -134,6 +134,7 @@ public void OnPluginEnd()
 
 public void OnMapStart()
 {
+    GameplayRewards_OnMapStart();
     Lotteries_OnMapStart();
     Bounties_OnMapStart();
     Welfare_OnMapStart();
