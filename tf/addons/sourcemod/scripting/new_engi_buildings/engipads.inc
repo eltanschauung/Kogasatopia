@@ -30,8 +30,9 @@
 #define ATTRIBUTE_PDA_SLOT_LAST 4
 #define ATTRIBUTE_BUILD_SPEED "engineer teleporter build rate multiplier"
 #define ATTRIBUTE_BUILD_SPEED_FACTOR 3.0
-#define SNIPER_JUMP_VERTICAL_MULTIPLIER 0.4
+#define SNIPER_JUMP_VERTICAL_MULTIPLIER 0.7
 #define SNIPER_JUMP_SOUND "misc/banana_slip.wav"
+#define SNIPER_JUMP_SOUND_COOLDOWN 10.0
 
 //Debug "Mode"
 // #define DEBUG	//Uncomment for "debug" stuff. Just some 'PrintToChatAll's here and there.
@@ -101,6 +102,7 @@ static int g_iPadType[2048];
 static int g_iObjectParticle[2048];
 static int g_iPlayerDamageTaken[MAXPLAYERS + 1];
 static float g_flPlayerBoostEndTime[MAXPLAYERS + 1];
+static float g_flNextSniperJumpSound[MAXPLAYERS + 1];
 static PadCond g_fPadCondFlags[MAXPLAYERS + 1];
 static float g_flPadRechargeEnd[2048];
 
@@ -253,6 +255,8 @@ public Action Timer_PadsAnnounce(Handle hTimer)
 void EngiPads_OnMapStart()
 {
 	g_hPadTimerAnnounce = INVALID_HANDLE;
+	for (int client = 1; client <= MaxClients; client++)
+		g_flNextSniperJumpSound[client] = 0.0;
 	
 	/* Precache Sounds */
 	PrecacheSound(")items/powerup_pickup_haste.wav", true);	//For some reason, using PrecacheScriptSound doesn't work for this sound.
@@ -279,6 +283,7 @@ void EngiPads_OnClientPostAdminCheck(int iClient)
 	Pad_SetConds(iClient, PadCond_None);
 	g_iPlayerDamageTaken[iClient] = 0;
 	g_flPlayerBoostEndTime[iClient] = 0.0;
+	g_flNextSniperJumpSound[iClient] = 0.0;
 }
 
 void EngiPads_OnClientDisconnect(int iClient)
@@ -743,8 +748,11 @@ void LaunchPlayer(int iClient)
 	}
 	
 	SetEntPropVector(iClient, Prop_Data, "m_vecAbsVelocity", vVel);
-	if (sniper)
+	if (sniper && GetGameTime() >= g_flNextSniperJumpSound[iClient])
+	{
 		EmitSoundToAll(SNIPER_JUMP_SOUND, iClient, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
+		g_flNextSniperJumpSound[iClient] = GetGameTime() + SNIPER_JUMP_SOUND_COOLDOWN;
+	}
 	SetEntProp(iClient, Prop_Send, "m_bJumping", cvarPads[JumpBlockSnipers].IntValue);
 	
 	TF2_AddCondition(iClient, TFCond_GrapplingHookSafeFall, TFCondDuration_Infinite);
