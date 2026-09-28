@@ -11,7 +11,10 @@ public Action Command_Hats(int client, int args)
 		return Plugin_Handled;
 	}
 
-	ShowHatMenu(client);
+	if (!WeaponsCommands_TryShowHatsPage(client))
+	{
+		ShowHatMenu(client);
+	}
 	return Plugin_Handled;
 }
 

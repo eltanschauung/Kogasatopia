@@ -49,6 +49,36 @@ bool WeaponsCommands_TryShowClassPage(int client, bool customWeapons)
 	return true;
 }
 
+bool WeaponsCommands_TryShowHatsPage(int client)
+{
+	return g_WeaponsHtmlMotdPreference[client] == WeaponsHtmlMotd_Enabled
+		&& WeaponsWeb_TryOpenHatPanel(client);
+}
+
+void WeaponsCommands_ShowHatsPage(int client, const char[] sessionToken)
+{
+	char url[256];
+	if (sessionToken[0])
+	{
+		FormatEx(url, sizeof(url),
+			"https://kogasa.tf/weapons?view=hats-ingame&motd=3&session=%s#hats-ingame",
+			sessionToken);
+	}
+	else
+	{
+		strcopy(url, sizeof(url),
+			"https://kogasa.tf/weapons?view=hats-ingame&motd=3#hats-ingame");
+	}
+
+	KeyValues panel = new KeyValues("data");
+	panel.SetString("title", "Custom Hats");
+	panel.SetString("type", "2");
+	panel.SetString("msg", url);
+	panel.SetNum("customsvr", 1);
+	ShowVGUIPanel(client, "info", panel);
+	delete panel;
+}
+
 void WeaponsCommands_ShowClassPage(int client, bool customWeapons, const char[] classKey,
 	const char[] sessionToken)
 {

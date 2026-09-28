@@ -255,13 +255,35 @@ bool WeaponsWeb_TryOpenPanel(int client, int playerClass, const char[] classKey)
 	if (!g_WeaponsWebDbReady || !Weapons_LoadoutClientValid(client) || !IsClientInGame(client)
 		|| IsFakeClient(client) || !Weapons_LoadoutClassValid(playerClass)
 		|| !AreClientCookiesCached(client)) return false;
-	char steamId[KOGASA_STEAMID_MAX];
-	if (!Kogasa_GetClientSteamId64(client, steamId, sizeof(steamId), true)) return false;
-	char token[33], loadout[512], lockedPurchaseKeys[WEAPONS_WEB_LOCKED_PURCHASES_MAX];
-	WeaponsWeb_GenerateToken(token, sizeof(token));
+	char loadout[512], lockedPurchaseKeys[WEAPONS_WEB_LOCKED_PURCHASES_MAX];
 	WeaponsWeb_BuildLoadout(client, playerClass, loadout, sizeof(loadout));
 	WeaponsWeb_BuildLockedPurchaseKeys(client, playerClass, lockedPurchaseKeys,
 		sizeof(lockedPurchaseKeys));
+	return WeaponsWeb_CreateSession(client, playerClass, classKey, loadout, lockedPurchaseKeys);
+}
+
+bool WeaponsWeb_TryOpenHatPanel(int client)
+{
+	if (!g_WeaponsWebDbReady || !Client_IsInGame(client) || IsFakeClient(client)
+		|| !AreClientCookiesCached(client) || !g_bHatStateLoaded[client]) return false;
+	int playerClass = view_as<int>(TF2Classes_GetCurrentOrDesired(client));
+	if (!Weapons_LoadoutClassValid(playerClass)) return false;
+	char loadout[512], lockedPurchaseKeys[WEAPONS_WEB_LOCKED_PURCHASES_MAX];
+	WeaponsWeb_BuildHatLoadout(client, loadout, sizeof(loadout));
+	WeaponsWeb_BuildHatLockedPurchaseKeys(client, playerClass, lockedPurchaseKeys,
+		sizeof(lockedPurchaseKeys));
+	return WeaponsWeb_CreateSession(client, -playerClass, "hats", loadout,
+		lockedPurchaseKeys);
+}
+
+static bool WeaponsWeb_CreateSession(int client, int classIndex, const char[] classKey,
+	const char[] loadout, const char[] lockedPurchaseKeys)
+{
+	if (!g_WeaponsWebDbReady) return false;
+	char steamId[KOGASA_STEAMID_MAX];
+	if (!Kogasa_GetClientSteamId64(client, steamId, sizeof(steamId), true)) return false;
+	char token[33];
+	WeaponsWeb_GenerateToken(token, sizeof(token));
 	char escapedToken[65], escapedSteam[(KOGASA_STEAMID_MAX * 2) + 1];
 	char escapedStamp[65], escapedLoadout[1025];
 	char escapedLockedPurchaseKeys[(WEAPONS_WEB_LOCKED_PURCHASES_MAX * 2) + 1];
@@ -278,7 +300,7 @@ bool WeaponsWeb_TryOpenPanel(int client, int playerClass, const char[] classKey)
 		... "locked_purchase_keys, created_at, expires_at) "
 		... "VALUES ('%s', '%s', '%s', %d, '%s', '%s', %d, %d)",
 		WEAPONS_WEB_SESSIONS_TABLE, escapedToken, escapedSteam, escapedStamp,
-		playerClass, escapedLoadout, escapedLockedPurchaseKeys, now,
+		classIndex, escapedLoadout, escapedLockedPurchaseKeys, now,
 		now + WEAPONS_WEB_SESSION_LIFETIME);
 	DataPack pack = new DataPack();
 	pack.WriteCell(g_WeaponsWebConnectionGeneration);
@@ -306,10 +328,12 @@ public void WeaponsWeb_OnSessionCreated(Database db, DBResultSet results,
 	if (!WeaponsWeb_IsCurrentConnection(db, generation) || error[0])
 	{
 		if (error[0]) LogError("[Weapons] Failed to create web loadout session: %s", error);
-		WeaponsCommands_ShowClassPage(client, true, classKey, "");
+		if (StrEqual(classKey, "hats")) ShowHatMenu(client);
+		else WeaponsCommands_ShowClassPage(client, true, classKey, "");
 		return;
 	}
-	WeaponsCommands_ShowClassPage(client, true, classKey, token);
+	if (StrEqual(classKey, "hats")) WeaponsCommands_ShowHatsPage(client, token);
+	else WeaponsCommands_ShowClassPage(client, true, classKey, token);
 }
 
 static void WeaponsWeb_GenerateToken(char[] token, int maxlen)
@@ -329,6 +353,34 @@ static void WeaponsWeb_BuildLoadout(int client, int playerClass, char[] buffer, 
 		if (buffer[0]) StrCat(buffer, maxlen, "|");
 		StrCat(buffer, maxlen, uid);
 	}
+}
+
+static void WeaponsWeb_BuildHatLoadout(int client, char[] buffer, int maxlen)
+{
+	buffer[0] = '\0';
+	for (int i = 0; i < g_iHatCount; i++)
+	{
+		if (!IsHatEnabled(i) || g_Hats[i].force || !g_bHatEnabled[client][i]) continue;
+		if (buffer[0]) StrCat(buffer, maxlen, "|");
+		StrCat(buffer, maxlen, g_Hats[i].id);
+	}
+}
+
+static void WeaponsWeb_BuildHatLockedPurchaseKeys(int client, int playerClass,
+	char[] buffer, int maxlen)
+{
+	buffer[0] = '\0';
+	StringMap seen = new StringMap();
+	for (int i = 0; i < g_iHatCount; i++)
+	{
+		if (g_Hats[i].force || !CanClientViewHatForClass(i, view_as<TFClassType>(playerClass))
+			|| !g_Hats[i].pointsStorePurchase[0] || CanClientAccessHat(client, i)
+			|| seen.ContainsKey(g_Hats[i].pointsStorePurchase)) continue;
+		seen.SetValue(g_Hats[i].pointsStorePurchase, 1);
+		if (buffer[0]) StrCat(buffer, maxlen, "|");
+		StrCat(buffer, maxlen, g_Hats[i].pointsStorePurchase);
+	}
+	delete seen;
 }
 
 static void WeaponsWeb_BuildLockedPurchaseKeys(int client, int playerClass,
@@ -414,6 +466,12 @@ public void WeaponsWeb_OnActionsFetched(Database db, DBResultSet results,
 static void WeaponsWeb_ProcessAction(const char[] actionId, const char[] sessionToken,
 	const char[] steamId, int playerClass, const char[] uid, bool desiredEquipped)
 {
+	if (playerClass < 0)
+	{
+		WeaponsWeb_ProcessHatAction(actionId, sessionToken, steamId, -playerClass,
+			uid, desiredEquipped);
+		return;
+	}
 	int client = WeaponsWeb_FindClient(steamId);
 	char errorCode[64];
 	errorCode[0] = '\0';
@@ -475,6 +533,63 @@ static void WeaponsWeb_ProcessAction(const char[] actionId, const char[] session
 	{
 		WeaponsWeb_BuildLoadout(client, playerClass, loadout, sizeof(loadout));
 	}
+	WeaponsWeb_CompleteAction(actionId, sessionToken, loadout, success, errorCode);
+}
+
+static void WeaponsWeb_ProcessHatAction(const char[] actionId, const char[] sessionToken,
+	const char[] steamId, int playerClass, const char[] hatId, bool desiredEquipped)
+{
+	int client = WeaponsWeb_FindClient(steamId);
+	char errorCode[64];
+	errorCode[0] = '\0';
+	bool success;
+	int hatIndex = FindHatIndexById(hatId);
+	if (!Weapons_LoadoutClassValid(playerClass))
+	{
+		strcopy(errorCode, sizeof(errorCode), "invalid_class");
+	}
+	else if (client == 0)
+	{
+		strcopy(errorCode, sizeof(errorCode), "client_offline");
+	}
+	else if (!AreClientCookiesCached(client) || !g_bHatStateLoaded[client])
+	{
+		strcopy(errorCode, sizeof(errorCode), "cookies_unavailable");
+	}
+	else if (view_as<int>(TF2Classes_GetCurrentOrDesired(client)) != playerClass)
+	{
+		strcopy(errorCode, sizeof(errorCode), "class_changed");
+	}
+	else if (!IsHatIndexValid(hatIndex) || g_Hats[hatIndex].force
+		|| !CanClientViewHatForClass(hatIndex, view_as<TFClassType>(playerClass)))
+	{
+		strcopy(errorCode, sizeof(errorCode), "invalid_item");
+	}
+	else if (desiredEquipped && !CanClientAccessHat(client, hatIndex))
+	{
+		PrintHatLockedMessage(client, hatIndex);
+		strcopy(errorCode, sizeof(errorCode), "purchase_required");
+	}
+	else if (desiredEquipped)
+	{
+		if (!g_bHatEnabled[client][hatIndex]) EquipSelectedHatFromMenu(client, hatIndex);
+		success = true;
+	}
+	else
+	{
+		if (g_bHatEnabled[client][hatIndex])
+		{
+			SetClientHatEnabled(client, hatIndex, false);
+			QueueHatStateSave(client, true);
+			RemoveHat(client, hatIndex);
+			PrintToChat(client, "[Hats] Disabled %s.", g_Hats[hatIndex].name);
+		}
+		success = true;
+	}
+	if (success && client > 0) EmitSoundToClient(client, SOUND_MENU_BUTTON_EQUIP);
+	char loadout[512];
+	loadout[0] = '\0';
+	if (client > 0) WeaponsWeb_BuildHatLoadout(client, loadout, sizeof(loadout));
 	WeaponsWeb_CompleteAction(actionId, sessionToken, loadout, success, errorCode);
 }
 
