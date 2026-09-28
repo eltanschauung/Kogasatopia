@@ -57,6 +57,8 @@
 #define ROUND_TIMER_STATE_NORMAL 1
 #define ROUND_START_SIREN_CHANNEL (SNDCHAN_USER_BASE + 1)
 #define ROUND_START_SIREN_REPLACEMENT_DELAY 0.05
+#define ROUND_START_SIREN_FALLBACK_GRACE 0.15
+#define ROUND_START_SIREN_SETUP_POLL_INTERVAL 0.10
 #define ROUND_START_AUTO_COUNTDOWN_RESTORE_DELAY 0.50
 #define ROUND_START_SIREN_DUPLICATE_GUARD 5.0
 #define ROUND_RESULT_PAIR_WINDOW 5.0
@@ -165,6 +167,10 @@ int g_iTrackedSetupSirenTimerRef = INVALID_ENT_REFERENCE;
 int g_iTrackedSetupSirenState = -1;
 bool g_bTrackedSetupAutoCountdownOriginal = false;
 bool g_bTrackedSetupAutoCountdownSuppressed = false;
+bool g_bDgmSirenSetupActive = false;
+bool g_bSirenScheduledThisSetup = false;
+float g_fNextDgmSirenSetupPoll = 0.0;
+float g_fRoundStartSirenFallbackDue = 0.0;
 int g_iPendingSetupSirenTimerRef = INVALID_ENT_REFERENCE;
 float g_fLastRoundStartSirenTime = -9999.0;
 int g_iNextRoundStartSirenIndex = -1;

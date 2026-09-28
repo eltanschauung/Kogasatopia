@@ -4,6 +4,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errlen)
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("DGM_GetGameModeKey");
+    MarkNativeAsOptional("DGM_IsSetupActive");
     MarkNativeAsOptional("Filters_GetSteamIdColorTag");
     RegPluginLibrary("saysounds");
     CreateNative("SaySounds_ShouldPlay", Native_ShouldPlay);
@@ -258,6 +259,7 @@ public void OnMapStart()
     // Restore owned network overrides before dropping their entity references.
     CancelCountdownMonitorTimer();
     ResetRoundStartSirenTracking();
+    ResetRoundStartSirenSetupFallback();
     ResetRoundResultPairing();
     g_fLastRoundStartSirenTime = -9999.0;
     PrecacheConfiguredSounds();
@@ -269,5 +271,6 @@ public void OnMapEnd()
     CancelCountdownMonitorTimer();
     CancelRoundStartSirenTimers();
     ResetRoundStartSirenTracking();
+    ResetRoundStartSirenSetupFallback();
     ResetRoundResultPairing();
 }

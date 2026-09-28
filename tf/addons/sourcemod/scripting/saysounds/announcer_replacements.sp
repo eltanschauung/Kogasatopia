@@ -115,6 +115,7 @@ void ScheduleRoundStartSirenReplacement()
     }
 
     g_iPendingSetupSirenTimerRef = g_iTrackedSetupSirenTimerRef;
+    g_bSirenScheduledThisSetup = true;
     g_iPendingRoundStartSirenSerial = g_iRoundStartSirenTransitionSerial;
     g_iPendingRoundStartSirenIndex = g_iNextRoundStartSirenIndex;
     g_hRoundStartSirenTimer = CreateTimer(
