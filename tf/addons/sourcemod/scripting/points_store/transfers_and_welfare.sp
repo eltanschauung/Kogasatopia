@@ -2,7 +2,7 @@ bool g_WelfareVolunteerResetUsed = false;
 
 void Welfare_OnPluginStart()
 {
-    HookEvent("teamplay_round_start", Event_WelfareRoundStart, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_round_win", Event_WelfareRoundWin, EventHookMode_PostNoCopy);
 }
 
 void Welfare_OnMapStart()
@@ -10,12 +10,17 @@ void Welfare_OnMapStart()
     g_WelfareVolunteerResetUsed = false;
 }
 
-public void Event_WelfareRoundStart(Event event, const char[] name, bool dontBroadcast)
+public void Event_WelfareRoundWin(Event event, const char[] name, bool dontBroadcast)
+{
+    CreateTimer(5.0, Timer_WelfareRoundWin, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_WelfareRoundWin(Handle timer)
 {
     if (g_WelfareVolunteerResetUsed || !g_PerMapAwardsReady
         || GetFeatureStatus(FeatureType_Native, "TeamBalance_IsVolunteerEligible") != FeatureStatus_Available)
     {
-        return;
+        return Plugin_Stop;
     }
 
     if (GetPerMapAwardCountForSteamId(
@@ -23,7 +28,7 @@ public void Event_WelfareRoundStart(Event event, const char[] name, bool dontBro
         BP_WELFARE_VOLUNTEER_RESET_REWARD) > 0)
     {
         g_WelfareVolunteerResetUsed = true;
-        return;
+        return Plugin_Stop;
     }
 
     bool resetAny = false;
@@ -44,7 +49,7 @@ public void Event_WelfareRoundStart(Event event, const char[] name, bool dontBro
 
     if (!resetAny)
     {
-        return;
+        return Plugin_Stop;
     }
 
     g_WelfareVolunteerResetUsed = true;
@@ -55,6 +60,7 @@ public void Event_WelfareRoundStart(Event event, const char[] name, bool dontBro
     char colorTag[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(colorTag, sizeof(colorTag));
     CPrintToChatAll("%s[Gems]{default} {gold}!volunteer{default} bros can collect welfare again!", colorTag);
+    return Plugin_Stop;
 }
 
 public Action Command_SendBonusPoints(int client, int args)
