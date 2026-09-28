@@ -8,6 +8,7 @@
 #include <sdktools_sound>
 #include <sdktools_stringtables>
 #include <sdktools_functions>
+#include <sdktools_entoutput>
 #include <sdktools_gamerules>
 
 #undef REQUIRE_PLUGIN
@@ -57,8 +58,7 @@
 #define ROUND_TIMER_STATE_NORMAL 1
 #define ROUND_START_SIREN_CHANNEL (SNDCHAN_USER_BASE + 1)
 #define ROUND_START_SIREN_REPLACEMENT_DELAY 0.05
-#define ROUND_START_SIREN_FALLBACK_GRACE 0.15
-#define ROUND_START_SIREN_SETUP_POLL_INTERVAL 0.10
+#define ROUND_START_SIREN_DOOR_GRACE 0.10
 #define ROUND_START_AUTO_COUNTDOWN_RESTORE_DELAY 0.50
 #define ROUND_START_SIREN_DUPLICATE_GUARD 5.0
 #define ROUND_RESULT_PAIR_WINDOW 5.0
@@ -142,6 +142,7 @@ Handle g_hKillCookie = INVALID_HANDLE;
 Handle g_hDisabledGroupsCookie = INVALID_HANDLE;
 Handle g_hCountdownMonitorTimer = INVALID_HANDLE;
 Handle g_hRoundStartSirenTimer = INVALID_HANDLE;
+Handle g_hDoorSirenTimer = INVALID_HANDLE;
 Handle g_hRoundStartAutoCountdownRestoreTimer = INVALID_HANDLE;
 bool gNormalSoundHookAdded = false;
 bool gAmbientSoundHookAdded = false;
@@ -167,10 +168,11 @@ int g_iTrackedSetupSirenTimerRef = INVALID_ENT_REFERENCE;
 int g_iTrackedSetupSirenState = -1;
 bool g_bTrackedSetupAutoCountdownOriginal = false;
 bool g_bTrackedSetupAutoCountdownSuppressed = false;
-bool g_bDgmSirenSetupActive = false;
-bool g_bSirenScheduledThisSetup = false;
-float g_fNextDgmSirenSetupPoll = 0.0;
-float g_fRoundStartSirenFallbackDue = 0.0;
+bool g_bSirenRoundStarted = false;
+bool g_bHudSetupSirenTimerSeenThisMap = false;
+bool g_bHudSetupSirenTimerSeenThisRound = false;
+bool g_bSirenScheduledThisRound = false;
+bool g_bDoorSirenTriggeredThisRound = false;
 int g_iPendingSetupSirenTimerRef = INVALID_ENT_REFERENCE;
 float g_fLastRoundStartSirenTime = -9999.0;
 int g_iNextRoundStartSirenIndex = -1;
@@ -196,6 +198,7 @@ const int MAX_SOUND_OPTIONS = 16;
 #include "saysounds/lifecycle.sp"
 #include "saysounds/announcer_replacements.sp"
 #include "saysounds/countdown_replacements.sp"
+#include "saysounds/siren_door_fallback.sp"
 #include "saysounds/chat_commands.sp"
 #include "saysounds/config.sp"
 #include "saysounds/group_preferences.sp"

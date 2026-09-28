@@ -91,6 +91,10 @@ public void OnPluginStart()
     HookEvent("teamplay_broadcast_audio", Event_BroadcastAudio, EventHookMode_Pre);
     HookEvent("teamplay_point_startcapture", Event_PointStartCapture, EventHookMode_Post);
     HookEvent("teamplay_point_unlocked", Event_PointUnlocked, EventHookMode_Post);
+    HookEvent("teamplay_round_start", Event_SirenRoundStart, EventHookMode_PostNoCopy);
+    HookEntityOutput("func_door", "OnOpen", Event_RoundStartDoorOpened);
+    HookEntityOutput("func_door_rotating", "OnOpen", Event_RoundStartDoorOpened);
+    HookEntityOutput("prop_door_rotating", "OnOpen", Event_RoundStartDoorOpened);
     AddNormalSoundHook(AnnouncementReplacement_NormalSoundHook);
     gNormalSoundHookAdded = true;
     AddAmbientSoundHook(AnnouncementReplacement_AmbientSoundHook);
@@ -120,6 +124,7 @@ public void OnPluginEnd()
 {
     CancelCountdownMonitorTimer();
     CancelRoundStartSirenTimers();
+    ResetRoundStartSirenDoorFallback(false);
     RestoreTrackedSetupAutoCountdown();
     RestoreTrackedLiveAutoCountdown();
     if (gNormalSoundHookAdded)
@@ -255,11 +260,12 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
+    g_bHudSetupSirenTimerSeenThisMap = false;
     CancelRoundStartSirenTimers();
     // Restore owned network overrides before dropping their entity references.
     CancelCountdownMonitorTimer();
     ResetRoundStartSirenTracking();
-    ResetRoundStartSirenSetupFallback();
+    ResetRoundStartSirenDoorFallback(false);
     ResetRoundResultPairing();
     g_fLastRoundStartSirenTime = -9999.0;
     PrecacheConfiguredSounds();
@@ -268,9 +274,10 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+    g_bHudSetupSirenTimerSeenThisMap = false;
     CancelCountdownMonitorTimer();
     CancelRoundStartSirenTimers();
     ResetRoundStartSirenTracking();
-    ResetRoundStartSirenSetupFallback();
+    ResetRoundStartSirenDoorFallback(false);
     ResetRoundResultPairing();
 }

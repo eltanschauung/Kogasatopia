@@ -57,7 +57,6 @@ public Action Timer_MonitorCountdowns(Handle timer)
     g_CountdownRulesResolved = false;
 
     MonitorRoundStartSirenTransition();
-    if (timer == g_hCountdownMonitorTimer) MonitorRoundStartSirenSetupFallback();
     if (timer == g_hCountdownMonitorTimer) MonitorSetupCountdown();
     if (timer == g_hCountdownMonitorTimer) MonitorLiveRoundCountdown();
     if (timer == g_hCountdownMonitorTimer) MonitorControlPointUnlockCountdowns();
@@ -323,55 +322,11 @@ static void MonitorRoundStartSirenTransition()
     if (setupTimer != -1) TrackSetupSirenTimer(setupTimer);
 }
 
-void ResetRoundStartSirenSetupFallback()
-{
-    g_bDgmSirenSetupActive = false;
-    g_bSirenScheduledThisSetup = false;
-    g_fNextDgmSirenSetupPoll = 0.0;
-    g_fRoundStartSirenFallbackDue = 0.0;
-}
-
-static void MonitorRoundStartSirenSetupFallback()
-{
-    if (gReadyRoundStartSirenReplacements.Length == 0
-        || GetFeatureStatus(FeatureType_Native, "DGM_IsSetupActive") != FeatureStatus_Available)
-    {
-        ResetRoundStartSirenSetupFallback();
-        return;
-    }
-
-    float now = GetGameTime();
-    if (now >= g_fNextDgmSirenSetupPoll)
-    {
-        g_fNextDgmSirenSetupPoll = now + ROUND_START_SIREN_SETUP_POLL_INTERVAL;
-        bool setupActive = DGM_IsSetupActive();
-        if (setupActive)
-        {
-            if (!g_bDgmSirenSetupActive)
-                g_bSirenScheduledThisSetup = false;
-            g_bDgmSirenSetupActive = true;
-            g_fRoundStartSirenFallbackDue = 0.0;
-        }
-        else if (g_bDgmSirenSetupActive)
-        {
-            g_bDgmSirenSetupActive = false;
-            if (!g_bSirenScheduledThisSetup)
-                g_fRoundStartSirenFallbackDue = now + ROUND_START_SIREN_FALLBACK_GRACE;
-        }
-    }
-
-    if (g_fRoundStartSirenFallbackDue <= 0.0 || now < g_fRoundStartSirenFallbackDue)
-        return;
-    g_fRoundStartSirenFallbackDue = 0.0;
-    if (g_bSirenScheduledThisSetup || DGM_IsSetupActive()) return;
-
-    LogMessage("[SaySounds:Siren] DGM setup ended without a scheduled HUD-timer siren; scheduling fallback.");
-    ScheduleRoundStartSirenReplacement();
-}
-
 static void TrackSetupSirenTimer(int timerEntity)
 {
     if (!IsRoundTimerEntity(timerEntity)) return;
+    g_bHudSetupSirenTimerSeenThisMap = true;
+    g_bHudSetupSirenTimerSeenThisRound = true;
     int timerRef = EntIndexToEntRef(timerEntity);
     if (timerRef != g_iTrackedSetupSirenTimerRef)
     {
