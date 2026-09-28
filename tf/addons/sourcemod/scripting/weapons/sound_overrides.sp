@@ -284,6 +284,11 @@ static bool WeaponsSound_EmitCustomMeleeAttribute(
 	{
 		return false;
 	}
+	if (TF2_GetPlayerClass(client) == TFClass_Spy
+		&& TF2_IsPlayerInCondition(client, TFCond_Cloaked))
+	{
+		return false;
+	}
 
 	char soundEntry[PLATFORM_MAX_PATH];
 	TF2CustAttr_GetString(
