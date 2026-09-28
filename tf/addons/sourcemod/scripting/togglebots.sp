@@ -4,6 +4,10 @@
 #include <sourcemod>
 #include <files>
 
+#undef REQUIRE_PLUGIN
+#include <dgm_api>
+#define REQUIRE_PLUGIN
+
 ConVar g_cvManualBotQuota;
 ConVar g_cvGameBotQuota;
 
@@ -14,6 +18,12 @@ public Plugin myinfo = {
     version = "1.3",
     url = "https://kogasa.tf"
 };
+
+public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
+{
+    MarkNativeAsOptional("DGM_RealPlayerCount");
+    return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
@@ -65,6 +75,13 @@ public Action Command_BotToggle(int client, int args)
     }
     else
     {
+        if (GetFeatureStatus(FeatureType_Native, "DGM_RealPlayerCount") == FeatureStatus_Available
+            && DGM_RealPlayerCount() >= 8)
+        {
+            PrintToChat(client, "[Bots] Cannot enable bots with 8 or more real players.");
+            return Plugin_Handled;
+        }
+
         int smQuota = g_cvManualBotQuota.IntValue;
         if (smQuota != 8)
         {
