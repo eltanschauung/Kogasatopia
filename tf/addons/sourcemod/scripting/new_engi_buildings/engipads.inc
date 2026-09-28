@@ -30,6 +30,8 @@
 #define ATTRIBUTE_PDA_SLOT_LAST 4
 #define ATTRIBUTE_BUILD_SPEED "engineer teleporter build rate multiplier"
 #define ATTRIBUTE_BUILD_SPEED_FACTOR 3.0
+#define SNIPER_JUMP_VERTICAL_MULTIPLIER 0.4
+#define SNIPER_JUMP_SOUND "misc/banana_slip.wav"
 
 //Debug "Mode"
 // #define DEBUG	//Uncomment for "debug" stuff. Just some 'PrintToChatAll's here and there.
@@ -254,6 +256,7 @@ void EngiPads_OnMapStart()
 	
 	/* Precache Sounds */
 	PrecacheSound(")items/powerup_pickup_haste.wav", true);	//For some reason, using PrecacheScriptSound doesn't work for this sound.
+	PrecacheSound(SNIPER_JUMP_SOUND, true);
 	PrecacheScriptSound("Passtime.BallSmack");
 	//The other gamesounds I emit should already be precached by the game
 	
@@ -692,6 +695,9 @@ public void OnPreThink(int iClient)
 /* Jump Pad Effects */
 void LaunchPlayer(int iClient)
 {
+	if (!Client_IsInGame(iClient) || !IsPlayerAlive(iClient))
+		return;
+
 	float vVel[3], vVel2[3];
 	float flMaxSpeed = GetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed");
 	float flJumpSpeed = cvarPads[JumpSpeed].FloatValue;
@@ -717,6 +723,10 @@ void LaunchPlayer(int iClient)
 		vVel[2] = flJumpHeight * cvarPads[JumpCrouchHeightMult].FloatValue;
 	}
 	
+	bool sniper = TF2_GetPlayerClass(iClient) == TFClass_Sniper;
+	if (sniper)
+		vVel[2] *= SNIPER_JUMP_VERTICAL_MULTIPLIER;
+
 	#if defined DEBUG
 	PrintToChatAll("Speed: %.2f (%.0f%%)", flHorizontalSpeed / flRatio, flHorizontalSpeed / flJumpSpeed * 100);
 	PrintToChatAll("SpeedLaunch: %.2f", flHorizontalSpeed);
@@ -733,6 +743,8 @@ void LaunchPlayer(int iClient)
 	}
 	
 	SetEntPropVector(iClient, Prop_Data, "m_vecAbsVelocity", vVel);
+	if (sniper)
+		EmitSoundToAll(SNIPER_JUMP_SOUND, iClient, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 	SetEntProp(iClient, Prop_Send, "m_bJumping", cvarPads[JumpBlockSnipers].IntValue);
 	
 	TF2_AddCondition(iClient, TFCond_GrapplingHookSafeFall, TFCondDuration_Infinite);
