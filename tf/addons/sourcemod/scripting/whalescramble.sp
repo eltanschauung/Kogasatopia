@@ -171,6 +171,7 @@ ConVar g_hMpTeamsUnbalanceLimit;
 int g_iSavedAutoteamBalance;
 int g_iSavedUnbalanceLimit;
 Handle g_hAutoBalanceTimer = INVALID_HANDLE;
+Handle g_hTeamBalanceScrambleCompletedForward = null;
 float g_fImbalanceDetectedAt = 0.0;
 int g_iSwapRequestSenderUserId[MAXPLAYERS + 1];
 int g_iSwapRequestSenderTeam[MAXPLAYERS + 1];

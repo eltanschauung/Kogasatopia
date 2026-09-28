@@ -90,7 +90,6 @@ public void OnPluginStart()
     HookEvent("teamplay_broadcast_audio", Event_BroadcastAudio, EventHookMode_Pre);
     HookEvent("teamplay_point_startcapture", Event_PointStartCapture, EventHookMode_Post);
     HookEvent("teamplay_point_unlocked", Event_PointUnlocked, EventHookMode_Post);
-    HookEvent("teamplay_round_start", Event_SirenRoundStart, EventHookMode_PostNoCopy);
     HookEvent("teamplay_round_active", Event_SirenLivePhase, EventHookMode_PostNoCopy);
     HookEvent("teamplay_setup_finished", Event_SirenLivePhase, EventHookMode_PostNoCopy);
     AddNormalSoundHook(AnnouncementReplacement_NormalSoundHook);

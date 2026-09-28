@@ -75,6 +75,11 @@ static void ReplaceRoundStartSiren(int index, int transitionSerial)
     g_iEmittingRoundStartSirenIndex = -1;
     g_iEmittingRoundStartSirenClient = 0;
 
+    if (g_bPendingRoundStartSirenFallback && replacementRecipientCount + stockRecipientCount > 0)
+    {
+        g_bRoundActiveSirenArmed = false;
+    }
+
     char currentMap[PLATFORM_MAX_PATH];
     GetCurrentMap(currentMap, sizeof(currentMap));
     LogMessage(
@@ -115,7 +120,6 @@ void ScheduleRoundStartSirenReplacement()
     }
 
     g_iPendingSetupSirenTimerRef = g_iTrackedSetupSirenTimerRef;
-    g_bSirenScheduledThisRound = true;
     g_iPendingRoundStartSirenSerial = g_iRoundStartSirenTransitionSerial;
     g_iPendingRoundStartSirenIndex = g_iNextRoundStartSirenIndex;
     g_hRoundStartSirenTimer = CreateTimer(
@@ -183,10 +187,11 @@ public Action Timer_ReplaceRoundStartSiren(Handle timer, any data)
     g_iPendingSetupSirenTimerRef = INVALID_ENT_REFERENCE;
     g_iPendingRoundStartSirenSerial = 0;
     g_iPendingRoundStartSirenIndex = -1;
+    g_bPendingRoundStartSirenFallback = false;
     return Plugin_Stop;
 }
 
-static void CancelRoundStartSirenTimer()
+void CancelRoundStartSirenTimer()
 {
     if (g_hRoundStartSirenTimer != INVALID_HANDLE)
     {

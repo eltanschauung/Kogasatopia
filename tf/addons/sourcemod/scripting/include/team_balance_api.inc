@@ -5,6 +5,9 @@
 
 #include <sourcemod>
 
+/** Fired after a scramble actually moves players; aborted scrambles do not fire it. */
+forward void TeamBalance_OnScrambleCompleted();
+
 /** Returns whether the authoritative balance controller has a live operation. */
 native bool TeamBalance_IsBusy();
 

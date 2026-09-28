@@ -5,13 +5,18 @@ void ResetRoundStartSirenRoundFallback()
         delete g_hRoundActiveSirenTimer;
         g_hRoundActiveSirenTimer = INVALID_HANDLE;
     }
-    g_bSirenScheduledThisRound = false;
-    g_bRoundActiveSirenQueuedThisRound = false;
+    g_bRoundActiveSirenArmed = true;
+    g_bRoundActiveSirenQueued = false;
+    g_bPendingRoundStartSirenFallback = false;
 }
 
-public void Event_SirenRoundStart(Event event, const char[] name, bool dontBroadcast)
+public void TeamBalance_OnScrambleCompleted()
 {
-    ResetRoundStartSirenRoundFallback();
+    if (g_bPendingRoundStartSirenFallback)
+    {
+        CancelRoundStartSirenTimer();
+    }
+    g_bRoundActiveSirenArmed = true;
 }
 
 public void Event_SirenLivePhase(Event event, const char[] name, bool dontBroadcast)
@@ -19,15 +24,15 @@ public void Event_SirenLivePhase(Event event, const char[] name, bool dontBroadc
     if (StrEqual(name, "teamplay_round_active") && !g_bHudSetupSirenTimerSeenThisMap)
     {
         int rules = FindEntityByClassname(-1, "tf_gamerules");
-        LogMessage("[SaySounds:SirenTrace] round_active: rules=%d waiting=%d setup=%d scheduled=%d.",
+        LogMessage("[SaySounds:SirenTrace] round_active: rules=%d waiting=%d setup=%d armed=%d.",
             rules,
             rules == -1 ? -1 : GameRules_GetProp("m_bInWaitingForPlayers", 1),
             rules == -1 ? -1 : GameRules_GetProp("m_bInSetup", 1),
-            g_bSirenScheduledThisRound);
+            g_bRoundActiveSirenArmed);
     }
 
-    if (g_bHudSetupSirenTimerSeenThisMap || g_bSirenScheduledThisRound
-        || g_bRoundActiveSirenQueuedThisRound
+    if (g_bHudSetupSirenTimerSeenThisMap || !g_bRoundActiveSirenArmed
+        || g_bRoundActiveSirenQueued || g_hRoundStartSirenTimer != INVALID_HANDLE
         || gReadyRoundStartSirenReplacements.Length == 0
         || FindEntityByClassname(-1, "tf_gamerules") == -1
         || GameRules_GetProp("m_bInWaitingForPlayers", 1) != 0)
@@ -41,7 +46,7 @@ public void Event_SirenLivePhase(Event event, const char[] name, bool dontBroadc
         return;
     }
 
-    g_bRoundActiveSirenQueuedThisRound = true;
+    g_bRoundActiveSirenQueued = true;
     g_hRoundActiveSirenTimer = CreateTimer(ROUND_START_SIREN_ACTIVE_GRACE,
         Timer_RoundActiveSiren, _, TIMER_FLAG_NO_MAPCHANGE);
 }
@@ -50,7 +55,9 @@ public Action Timer_RoundActiveSiren(Handle timer)
 {
     if (timer != g_hRoundActiveSirenTimer) return Plugin_Stop;
     g_hRoundActiveSirenTimer = INVALID_HANDLE;
-    if (g_bHudSetupSirenTimerSeenThisMap || g_bSirenScheduledThisRound
+    g_bRoundActiveSirenQueued = false;
+    if (g_bHudSetupSirenTimerSeenThisMap || !g_bRoundActiveSirenArmed
+        || g_hRoundStartSirenTimer != INVALID_HANDLE
         || gReadyRoundStartSirenReplacements.Length == 0
         || FindEntityByClassname(-1, "tf_gamerules") == -1
         || GameRules_GetRoundState() != RoundState_RoundRunning
@@ -62,5 +69,6 @@ public Action Timer_RoundActiveSiren(Handle timer)
 
     LogMessage("[SaySounds:Siren] Live round on a map without a HUD setup siren timer; scheduling replacement.");
     ScheduleRoundStartSirenReplacement();
+    g_bPendingRoundStartSirenFallback = g_hRoundStartSirenTimer != INVALID_HANDLE;
     return Plugin_Stop;
 }
