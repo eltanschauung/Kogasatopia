@@ -313,7 +313,7 @@ static bool WeaponsSound_EmitCustomMeleeAttribute(
 		return false;
 	}
 
-	EmitSoundToAll(sample, client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
+	EmitSoundToAll(sample, client, SNDCHAN_WEAPON, SNDLEVEL_NORMAL);
 	return true;
 }
 
