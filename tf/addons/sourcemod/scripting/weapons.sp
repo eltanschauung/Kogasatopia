@@ -179,6 +179,7 @@ public void OnPluginStart()
     delete gameConf;
     HookUserMessage(GetUserMessageId("PlayerLoadoutUpdated"), OnPlayerLoadoutUpdated,
         .post = OnPlayerLoadoutUpdatedPost);
+    HookEvent("post_inventory_application", WeaponsStats_OnLoadoutApplication, EventHookMode_Post);
     CreateVersionConVar("sm_weapons_version", "Unified weapons plugin version.");
     sm_weapons_enable_loadout = CreateConVar("sm_weapons_enable_loadout", "1", "Allows players to receive custom items they have selected.");
     sm_weapons_statistics = CreateConVar("sm_weapons_statistics", "1", "Record custom weapons equip/unequip popularity statistics.", _, true, 0.0, true, 1.0);

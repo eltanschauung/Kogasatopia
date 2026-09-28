@@ -208,6 +208,20 @@ void WeaponsStats_RecordUnequip(int client, int playerClass, int slot, const cha
     }
 }
 
+public void WeaponsStats_OnLoadoutApplication(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client <= 0 || !IsClientInGame(client)) return;
+
+    char steamId[KOGASA_STEAMID_MAX] = "unknown";
+    Kogasa_GetClientSteamId64(client, steamId, sizeof(steamId), true);
+    char message[160];
+    FormatEx(message, sizeof(message), "tick=%d|client=%d|userid=%d|steamid64=%s|class_index=%d",
+        GetGameTickCount(), client, GetClientUserId(client), steamId,
+        view_as<int>(TF2_GetPlayerClass(client)));
+    PluginStats_Record("weapon_loadout_application", message);
+}
+
 void WeaponsStats_MirrorLoadedClients()
 {
     for (int client = 1; client <= MaxClients; client++)
