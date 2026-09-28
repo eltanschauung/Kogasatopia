@@ -326,7 +326,6 @@ static void TrackSetupSirenTimer(int timerEntity)
 {
     if (!IsRoundTimerEntity(timerEntity)) return;
     g_bHudSetupSirenTimerSeenThisMap = true;
-    g_bHudSetupSirenTimerSeenThisRound = true;
     int timerRef = EntIndexToEntRef(timerEntity);
     if (timerRef != g_iTrackedSetupSirenTimerRef)
     {

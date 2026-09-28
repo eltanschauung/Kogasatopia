@@ -4,7 +4,6 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errlen)
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("DGM_GetGameModeKey");
-    MarkNativeAsOptional("DGM_IsSetupActive");
     MarkNativeAsOptional("Filters_GetSteamIdColorTag");
     RegPluginLibrary("saysounds");
     CreateNative("SaySounds_ShouldPlay", Native_ShouldPlay);
@@ -92,9 +91,8 @@ public void OnPluginStart()
     HookEvent("teamplay_point_startcapture", Event_PointStartCapture, EventHookMode_Post);
     HookEvent("teamplay_point_unlocked", Event_PointUnlocked, EventHookMode_Post);
     HookEvent("teamplay_round_start", Event_SirenRoundStart, EventHookMode_PostNoCopy);
-    HookEntityOutput("func_door", "OnOpen", Event_RoundStartDoorOpened);
-    HookEntityOutput("func_door_rotating", "OnOpen", Event_RoundStartDoorOpened);
-    HookEntityOutput("prop_door_rotating", "OnOpen", Event_RoundStartDoorOpened);
+    HookEvent("teamplay_round_active", Event_SirenLivePhase, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_setup_finished", Event_SirenLivePhase, EventHookMode_PostNoCopy);
     AddNormalSoundHook(AnnouncementReplacement_NormalSoundHook);
     gNormalSoundHookAdded = true;
     AddAmbientSoundHook(AnnouncementReplacement_AmbientSoundHook);
@@ -124,7 +122,7 @@ public void OnPluginEnd()
 {
     CancelCountdownMonitorTimer();
     CancelRoundStartSirenTimers();
-    ResetRoundStartSirenDoorFallback(false);
+    ResetRoundStartSirenRoundFallback();
     RestoreTrackedSetupAutoCountdown();
     RestoreTrackedLiveAutoCountdown();
     if (gNormalSoundHookAdded)
@@ -265,7 +263,7 @@ public void OnMapStart()
     // Restore owned network overrides before dropping their entity references.
     CancelCountdownMonitorTimer();
     ResetRoundStartSirenTracking();
-    ResetRoundStartSirenDoorFallback(false);
+    ResetRoundStartSirenRoundFallback();
     ResetRoundResultPairing();
     g_fLastRoundStartSirenTime = -9999.0;
     PrecacheConfiguredSounds();
@@ -278,6 +276,6 @@ public void OnMapEnd()
     CancelCountdownMonitorTimer();
     CancelRoundStartSirenTimers();
     ResetRoundStartSirenTracking();
-    ResetRoundStartSirenDoorFallback(false);
+    ResetRoundStartSirenRoundFallback();
     ResetRoundResultPairing();
 }
