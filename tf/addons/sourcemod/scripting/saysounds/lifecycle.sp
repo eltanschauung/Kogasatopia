@@ -257,6 +257,7 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
+    g_bSirenFallbackPlayedThisMap = false;
     g_bHudSetupSirenTimerSeenThisMap = false;
     CancelRoundStartSirenTimers();
     // Restore owned network overrides before dropping their entity references.

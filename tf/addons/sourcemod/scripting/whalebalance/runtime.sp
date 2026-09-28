@@ -174,8 +174,6 @@ void TeamBalance_FinishScrambleInternal(bool movedPlayers, bool countForImmunity
     }
     TeamBalance_FinishOperation(true);
     LogBalance("Scramble completed; cooldown and settle window started.");
-    Call_StartForward(g_hTeamBalanceScrambleCompletedForward);
-    Call_Finish();
 }
 
 bool TeamBalance_IsScrambleCandidateInternal(int client, int expectedTeam, bool ignoreImmunity, bool allowBots)

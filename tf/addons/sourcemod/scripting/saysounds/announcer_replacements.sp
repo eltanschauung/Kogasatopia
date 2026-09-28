@@ -75,9 +75,9 @@ static void ReplaceRoundStartSiren(int index, int transitionSerial)
     g_iEmittingRoundStartSirenIndex = -1;
     g_iEmittingRoundStartSirenClient = 0;
 
-    if (g_bPendingRoundStartSirenFallback && replacementRecipientCount + stockRecipientCount > 0)
+    if (g_bPendingSirenFallback && replacementRecipientCount + stockRecipientCount > 0)
     {
-        g_bRoundActiveSirenArmed = false;
+        g_bSirenFallbackPlayedThisMap = true;
     }
 
     char currentMap[PLATFORM_MAX_PATH];
@@ -187,11 +187,11 @@ public Action Timer_ReplaceRoundStartSiren(Handle timer, any data)
     g_iPendingSetupSirenTimerRef = INVALID_ENT_REFERENCE;
     g_iPendingRoundStartSirenSerial = 0;
     g_iPendingRoundStartSirenIndex = -1;
-    g_bPendingRoundStartSirenFallback = false;
+    g_bPendingSirenFallback = false;
     return Plugin_Stop;
 }
 
-void CancelRoundStartSirenTimer()
+static void CancelRoundStartSirenTimer()
 {
     if (g_hRoundStartSirenTimer != INVALID_HANDLE)
     {
@@ -208,6 +208,7 @@ void CancelRoundStartSirenTimer()
     g_iPendingSetupSirenTimerRef = INVALID_ENT_REFERENCE;
     g_iPendingRoundStartSirenSerial = 0;
     g_iPendingRoundStartSirenIndex = -1;
+    g_bPendingSirenFallback = false;
 }
 
 static void ScheduleRoundStartAutoCountdownRestore()

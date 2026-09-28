@@ -1,6 +1,5 @@
 void WhaleBalance_OnPluginStart()
 {
-    g_hTeamBalanceScrambleCompletedForward = CreateGlobalForward("TeamBalance_OnScrambleCompleted", ET_Ignore);
     LoadTranslations("common.phrases");
     DuelDetection_Initialize();
     g_hLogEnabled = CreateConVar("sm_autobalance_log", "1", "Enable autobalance debug logging.", _, true, 0.0, true, 1.0);
@@ -74,8 +73,6 @@ void WhaleBalance_OnClientDisconnect(int client)
 
 void WhaleBalance_OnPluginEnd()
 {
-    delete g_hTeamBalanceScrambleCompletedForward;
-    g_hTeamBalanceScrambleCompletedForward = null;
     WhaleScramble_OnPluginEnd();
     ApplyServerBalanceCvars(false);
     DuelDetection_Shutdown();
