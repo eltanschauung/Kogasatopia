@@ -205,6 +205,7 @@ public void OnPluginStart()
     RegAdminCmd("sm_weps", DisplayItems, 0);
     RegAdminCmd("sm_equip", DisplayItems, 0);
     RegAdminCmd("sm_c", DisplayItemDescriptions, 0);
+    RegAdminCmd("sm_guns", DisplayItemDescriptions, 0);
     RegAdminCmd("sm_cp", DisplayItemDescriptions, 0);
     RegAdminCmd("sm_c2", DisplayItemDescriptions, 0);
     AddCommandListener(DisplayItemsCompat, "sm_cus");
