@@ -104,9 +104,13 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (!client)
         return Plugin_Continue;
 
-    // Preserve BaseComm's Plugin_Stop semantics: a gag blocks both ordinary
-    // chat and chat-triggered commands before any Filters delivery path runs.
-    if (FiltersBaseComm_IsClientGagged(client))
+    bool sourceModCommand = IsChatTrigger();
+    bool passthroughSayAlias = CheckConfiguredBareCommand(sArgs);
+
+    // Gagged chat is echoed to its sender and monitored by Filters, but
+    // chat-triggered commands must remain blocked.
+    if (FiltersBaseComm_IsClientGagged(client)
+        && (sourceModCommand || passthroughSayAlias || sArgs[0] == '/'))
         return Plugin_Stop;
 
     // Slash commands are silent chat triggers. Saysounds also recognizes
@@ -115,9 +119,6 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     // chat behavior for an unrecognized slash command.
     if (sArgs[0] == '/')
         return Plugin_Continue;
-
-    bool sourceModCommand = IsChatTrigger();
-    bool passthroughSayAlias = CheckConfiguredBareCommand(sArgs);
 
     char dead[64];
     BuildDeathPrefix(client, dead, sizeof(dead));
