@@ -225,6 +225,28 @@ public void OnClientPutInServer(int client)
     }
 }
 
+public void OnClientPostAdminCheck(int client)
+{
+    if (IsFakeClient(client) || !g_bSirenFallbackPlayedThisMap)
+    {
+        return;
+    }
+
+    int humanCount = 0;
+    for (int other = 1; other <= MaxClients; other++)
+    {
+        if (IsClientConnected(other) && !IsFakeClient(other))
+        {
+            humanCount++;
+        }
+    }
+
+    if (humanCount == 1)
+    {
+        g_bSirenFallbackPlayedThisMap = false;
+    }
+}
+
 public void OnClientCookiesCached(int client)
 {
     LoadVolumePreference(client);
