@@ -364,13 +364,13 @@ public Action Timer_Autobalance(Handle timer)
         GetFeatureStatus(FeatureType_Native, "Announcers_IsGroupEnabled") == FeatureStatus_Available
         && Announcers_IsGroupEnabled(pick, TEAM_MOVE_DRAGONBALL_GROUP);
     if (!useDragonBallSound
-        || !SaySounds_TryPlayCommand(0, TEAM_MOVE_DRAGONBALL_SAYSOUND, true))
+        || !SaySounds_TryPlayCommand(pick, TEAM_MOVE_DRAGONBALL_SAYSOUND, true))
     {
-        SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
+        SaySounds_TryPlayCommand(pick, TEAM_MOVE_SAYSOUND, true);
     }
 
-    CPrintToChatAllEx(
-        pick,
+    CPrintToChatEx(
+        pick, pick,
         "{tomato}[{purple}Gap{tomato}]{default} Sending {teamcolor}%N{default} from %s to %s",
         pick, fromTeamChat, toTeamChat
     );

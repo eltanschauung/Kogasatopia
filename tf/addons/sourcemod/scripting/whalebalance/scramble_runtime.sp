@@ -495,7 +495,6 @@ public Action Timer_CheckShortRoundAutoScramble(Handle timer)
 
     if (TryArmAutoScrambleForNextRound("short-round"))
     {
-        CPrintToChatAll("{blue}[WhaleScramble]{default} Round ended in under {lightgreen}%d{default} seconds, scrambling!", threshold);
         LogWhale("Short-round auto scramble armed: duration=%d threshold=%d.", duration, threshold);
     }
     return Plugin_Stop;
@@ -580,7 +579,6 @@ public Action Timer_CheckPayloadStompFirstCapture(Handle timer)
 
     if (StartAutoScramble(true))
     {
-        CPrintToChatAll("{blue}[WhaleScramble]{default} Payload stomp detected: first point captured in {lightgreen}%d{default} seconds, scrambling!", interval);
         LogWhale("Payload first-cap auto scramble triggered: interval=%d threshold=%d.", interval, threshold);
         LogWhaleStat("auto_scramble_decision", "trigger=payload_first_cap|result=triggered|interval=%d|threshold=%d", interval, threshold);
     }
@@ -612,7 +610,6 @@ static void CheckKothNoCapAutoScramble()
 
     if (TryArmAutoScrambleForNextRound("koth-no-cap"))
     {
-        CPrintToChatAll("{blue}[WhaleScramble]{default} KOTH steamroll detected, scrambling!");
         LogWhale("KOTH no-cap auto scramble armed: redCapped=%d bluCapped=%d.", g_bKothRedCapped ? 1 : 0, g_bKothBluCapped ? 1 : 0);
     }
 }
@@ -716,7 +713,6 @@ static void CheckWinStreakAutoScramble(int winningTeam)
 
     if (TryArmAutoScrambleForNextRound("win-streak"))
     {
-        CPrintToChatAll("{blue}[WhaleScramble]{default} Win streak reached {lightgreen}%d{default}, scrambling!", threshold);
         LogWhale("Win-streak auto scramble armed: team=%d streak=%d threshold=%d.", winningTeam, g_iWinStreak, threshold);
     }
 }

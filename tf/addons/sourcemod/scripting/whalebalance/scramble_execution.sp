@@ -104,7 +104,13 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
         WhaleScramble_AddKothTime();
         ResetSurrenderVotes("whalescramble_execute");
         CPrintToChatAll("{tomato}[{purple}Gap{tomato}]{default} {gold}Whalescrambling{default} %d players!", moved);
-        SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
+        for (int i = 0; i < pairCount; i++)
+        {
+            if (pairR[i] > 0 && IsClientInGame(pairR[i]) && !IsFakeClient(pairR[i]))
+                SaySounds_TryPlayCommand(pairR[i], TEAM_MOVE_SAYSOUND, true);
+            if (pairB[i] > 0 && IsClientInGame(pairB[i]) && !IsFakeClient(pairB[i]))
+                SaySounds_TryPlayCommand(pairB[i], TEAM_MOVE_SAYSOUND, true);
+        }
         LogWhale("Scramble executed: moved=%d pairs=%d suppressRespawn=%d.", moved, pairCount, suppressRespawn ? 1 : 0);
         LogWhaleStat("scramble_result", "mode=%s|result=executed|moved=%d|pairs=%d|medic_balance=%d|suppress_respawn=%d|setup=%d|ignore_immunity=%d", scrambleMode, moved, pairCount, medicBalanceMoved ? 1 : 0, suppressRespawn ? 1 : 0, setupScramble ? 1 : 0, ignoreImmunity ? 1 : 0);
         if (suppressRespawn)
@@ -154,7 +160,10 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
                 BuildFallbackName(b, useTeamColorB, nameB, sizeof(nameB));
             }
 
-            CPrintToChatAllEx(srcClient, "%s <-> %s", nameR, nameB);
+            if (r > 0 && IsClientInGame(r) && !IsFakeClient(r))
+                CPrintToChatEx(r, srcClient, "%s <-> %s", nameR, nameB);
+            if (b > 0 && IsClientInGame(b) && !IsFakeClient(b))
+                CPrintToChatEx(b, srcClient, "%s <-> %s", nameR, nameB);
             LogWhale("Pair %d: %N <-> %N.", i + 1, r, b);
         }
 
@@ -457,9 +466,7 @@ void NotifyFailure(int issuer, bool broadcastFailures, const char[] fmt, any ...
         return;
     }
     if (broadcastFailures)
-    {
-        CPrintToChatAll("{blue}[WhaleScramble]{default} %s", buffer);
-    }
+        LogWhale("Scramble failed: %s", buffer);
 }
 
 void InsertTopN(int client, int score, int clients[MAX_SWAP_BUFFER], int scores[MAX_SWAP_BUFFER], int maxCount)

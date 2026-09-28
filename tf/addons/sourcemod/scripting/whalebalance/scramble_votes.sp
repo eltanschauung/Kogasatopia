@@ -520,12 +520,7 @@ bool StartAutoScramble(bool suppressFeedback)
         return false;
     }
 
-    if (!suppressFeedback)
-    {
-        CPrintToChatAll("{blue}[WhaleScramble]{default} Auto scramble triggered.");
-    }
-
-    LogWhale("Auto scramble triggered.");
+    LogWhale("Auto scramble triggered (suppressFeedback=%d).", suppressFeedback ? 1 : 0);
     LogWhaleStat("auto_scramble_decision", "trigger=auto|result=triggered");
     return StartConfiguredWhaleScramble(0, !suppressFeedback, false, false);
 }
@@ -681,7 +676,6 @@ public int ScrambleVoteHandler(NativeVote vote, MenuAction action, int param1, i
                     {
                         TeamBalance_FinishScramble(true, false);
                         ServerCommand("mp_scrambleteams");
-                        SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
                         success = true;
                     }
                 }

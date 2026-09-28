@@ -133,7 +133,7 @@ void GenerateLotteryTicket(char[] buffer, int maxlen)
         return;
     }
 
-    int wordCount = GetRandomInt(6, 10);
+    int wordCount = GetRandomInt(6, 8);
     bool allowDuplicates = g_LotteryWords.Length < wordCount;
     StringMap usedWords = new StringMap();
 

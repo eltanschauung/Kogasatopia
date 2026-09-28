@@ -92,15 +92,20 @@ bool StartFavoredWhaleRankPairSwap(int issuer, int favoredTeam)
     }
 
     TeamBalance_FinishScramble(true, false);
-    SaySounds_TryPlayCommand(0, TEAM_MOVE_SAYSOUND, true);
+    SaySounds_TryPlayCommand(redClient, TEAM_MOVE_SAYSOUND, true);
+    SaySounds_TryPlayCommand(bluClient, TEAM_MOVE_SAYSOUND, true);
     if (opposingTeam == TEAM_RED)
     {
-        CPrintToChatAll(
+        CPrintToChat(redClient,
+            "{gold}[WhaleScramble]{default} The best player on {red}RED{default} has been swapped to team {blue}BLU{default}!");
+        CPrintToChat(bluClient,
             "{gold}[WhaleScramble]{default} The best player on {red}RED{default} has been swapped to team {blue}BLU{default}!");
     }
     else
     {
-        CPrintToChatAll(
+        CPrintToChat(redClient,
+            "{gold}[WhaleScramble]{default} The best player on {blue}BLU{default} has been swapped to team {red}RED{default}!");
+        CPrintToChat(bluClient,
             "{gold}[WhaleScramble]{default} The best player on {blue}BLU{default} has been swapped to team {red}RED{default}!");
     }
     LogWhaleStat(
