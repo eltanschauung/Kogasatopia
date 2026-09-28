@@ -52,7 +52,7 @@ def make_event(sample, processes, history, decision):
     return {
         "incident_id": str(uuid.uuid4()), "host_name": socket.gethostname(),
         "event_name": "resource_threshold" if decision.stop_mge else "resource_pressure",
-        "reasons": decision.reasons, "consecutive_samples": 2, "sample": sample,
+        "reasons": decision.reasons, "consecutive_samples": decision.required_samples, "sample": sample,
         "processes": processes, "history": list(history),
         "action": "mge_stop_pending" if decision.stop_mge else "diagnostic_only",
         "action_detail": "",
@@ -76,7 +76,8 @@ def monitor(state, config_path, interval):
         history = deque(maxlen=10)
         next_sample = time.monotonic() + interval
         next_prune = 0
-        logging.info("Watchdog started: interval=%ss breaches=2 CPU/RAM=95%% target=mge only", interval)
+        logging.info("Watchdog started: interval=%ss diagnostic_breaches=%d stop_breaches=%d CPU/RAM=95%% target=mge only",
+                     interval, policy.breaches, policy.stop_breaches)
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="mge-stop") as actions:
             while not stop.wait(max(0, next_sample - time.monotonic())):
                 if not db_thread.is_alive():

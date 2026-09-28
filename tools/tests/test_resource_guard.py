@@ -24,15 +24,25 @@ def sample(timestamp=1000, **changes):
 
 
 class PolicyTests(unittest.TestCase):
-    def test_two_high_samples(self):
+    def test_four_high_samples_to_stop(self):
         policy = Policy()
         self.assertIsNone(policy.evaluate(sample(cpu_pct=95)))
-        self.assertTrue(policy.evaluate(sample(1003, cpu_pct=95)).stop_mge)
+        decision = policy.evaluate(sample(1003, cpu_pct=95))
+        self.assertFalse(decision.stop_mge)
+        self.assertEqual(decision.required_samples, 2)
+        self.assertIsNone(policy.evaluate(sample(1006, cpu_pct=95)))
+        decision = policy.evaluate(sample(1009, cpu_pct=95))
+        self.assertTrue(decision.stop_mge)
+        self.assertEqual(decision.required_samples, 4)
 
     def test_alternating_cpu_and_memory(self):
         policy = Policy()
         self.assertIsNone(policy.evaluate(sample(cpu_pct=95)))
-        self.assertTrue(policy.evaluate(sample(1003, memory_pct=95)).stop_mge)
+        self.assertIsNone(policy.evaluate(sample(1003, memory_pct=95)))
+        self.assertIsNone(policy.evaluate(sample(1006, cpu_pct=95)))
+        decision = policy.evaluate(sample(1009, memory_pct=95))
+        self.assertTrue(decision.stop_mge)
+        self.assertIn("cpu_or_memory_pct", decision.reasons)
 
     def test_healthy_resets(self):
         policy = Policy()
@@ -50,8 +60,9 @@ class PolicyTests(unittest.TestCase):
 
     def test_cooldown_survives_restarts(self):
         policy = Policy(last_stop=990)
-        policy.evaluate(sample(cpu_pct=100))
-        self.assertFalse(policy.evaluate(sample(1003, cpu_pct=100)).stop_mge)
+        for timestamp in (1000, 1003, 1006, 1009):
+            decision = policy.evaluate(sample(timestamp, cpu_pct=100))
+            self.assertTrue(decision is None or not decision.stop_mge)
         self.assertTrue(policy.evaluate(sample(1290, cpu_pct=100)).stop_mge)
 
     def test_swap_disk_do_not_stop(self):
@@ -98,9 +109,11 @@ class StoreTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.store = Store(self.temp.name)
         policy = Policy()
-        policy.evaluate(sample(cpu_pct=100))
-        decision = policy.evaluate(sample(1003, cpu_pct=100))
-        self.event = make_event(sample(1003, cpu_pct=100), [], [], decision)
+        for timestamp in (1000, 1003, 1006):
+            policy.evaluate(sample(timestamp, cpu_pct=100))
+        decision = policy.evaluate(sample(1009, cpu_pct=100))
+        self.event = make_event(sample(1009, cpu_pct=100), [], [], decision)
+        self.assertEqual(self.event["consecutive_samples"], 4)
 
     def tearDown(self):
         self.store.close()
@@ -120,7 +133,7 @@ class StoreTests(unittest.TestCase):
         self.store.action(old["incident_id"], "mge_stopped")
         self.store.acknowledge(old["incident_id"], revision)
         self.assertEqual(self.store.pending()[0][0]["action"], "mge_stopped")
-        self.assertEqual(self.store.last_stop(), 1003)
+        self.assertEqual(self.store.last_stop(), 1009)
 
     def test_recovery_does_not_repeat_stop(self):
         self.store.incident(self.event, stop=True)

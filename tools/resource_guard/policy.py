@@ -5,13 +5,15 @@ from dataclasses import dataclass
 class Decision:
     reasons: tuple[str, ...]
     stop_mge: bool
+    required_samples: int = 2
 
 
 class Policy:
     """Diagnostic triggers never independently authorize a server stop."""
 
-    def __init__(self, breaches=2, cooldown=300, last_stop=0):
+    def __init__(self, breaches=2, stop_breaches=4, cooldown=300, last_stop=0):
         self.breaches = breaches
+        self.stop_breaches = stop_breaches
         self.cooldown = cooldown
         self.last_stop = last_stop
         self.last_incident = 0
@@ -29,7 +31,7 @@ class Policy:
         # one sample is high CPU and the next sample is high RAM.
         critical = sample["cpu_pct"] >= 95 or sample["memory_pct"] >= 95
         self.counts["critical"] = self.counts.get("critical", 0) + 1 if critical else 0
-        stop = (self.counts["critical"] >= self.breaches
+        stop = (self.counts["critical"] >= self.stop_breaches
                 and sample["occurred_at"] - self.last_stop >= self.cooldown)
         if stop and not any(key in ready for key in ("cpu_pct", "memory_pct")):
             ready += ("cpu_or_memory_pct",)
@@ -41,4 +43,4 @@ class Policy:
         self.last_incident = sample["occurred_at"]
         if stop:
             self.last_stop = sample["occurred_at"]
-        return Decision(ready, stop)
+        return Decision(ready, stop, self.stop_breaches if stop else self.breaches)
