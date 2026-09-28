@@ -52,6 +52,7 @@ void Lotteries_OnPluginEnd()
     delete g_LotteryWords;
     delete g_LotteryRarities;
     delete g_LotteryDrawTokens;
+    delete g_LotteryDrawParticipants;
 
     if (g_LotteryDrawTimer != null)
     {

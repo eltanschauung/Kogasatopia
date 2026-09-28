@@ -31,6 +31,7 @@ int g_LotteryPendingTicketWrites = 0;
 ArrayList g_LotteryWords = null;
 ArrayList g_LotteryRarities = null;
 ArrayList g_LotteryDrawTokens = null;
+ArrayList g_LotteryDrawParticipants = null;
 int g_LotteryTotalWeight = 0;
 
 bool g_LotteryReady = false;

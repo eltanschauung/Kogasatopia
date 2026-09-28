@@ -47,6 +47,7 @@ void ResetLotteryDrawState()
     {
         g_LotteryDrawTokens.Clear();
     }
+    delete g_LotteryDrawParticipants;
 }
 
 void CancelPendingLotteryCall()

@@ -374,7 +374,6 @@ public void SQL_OnLotteryWinnerSelected(Database db, DBResultSet results, const 
     strcopy(g_LotteryDrawHashColor, sizeof(g_LotteryDrawHashColor), g_CurrentLotteryHashColor);
     BuildLotteryDrawTokens(mainTicket);
 
-    delete steamIds;
     delete storedNames;
     delete tickets;
     delete ticketValues;
@@ -385,8 +384,12 @@ public void SQL_OnLotteryWinnerSelected(Database db, DBResultSet results, const 
     {
         g_LotteryDrawInProgress = false;
         ReplyToLotteryRequester(requesterUserId, "[Lotto] The selected ticket had no printable words.");
+        delete steamIds;
         return;
     }
+
+    delete g_LotteryDrawParticipants;
+    g_LotteryDrawParticipants = steamIds;
 
     char colorTag[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(colorTag, sizeof(colorTag));
@@ -453,7 +456,20 @@ public Action Timer_LotteryReveal(Handle timer, any data)
     {
         char token[LOTTO_TOKEN_MAX];
         g_LotteryDrawTokens.GetString(g_LotteryDrawIndex, token, sizeof(token));
-        CPrintToChatAll("%s", token);
+        for (int client = 1; client <= MaxClients; client++)
+        {
+            if (!IsClientAuthorizedHuman(client))
+            {
+                continue;
+            }
+
+            char steamId[32];
+            if (GetClientSteamId64(client, steamId, sizeof(steamId))
+                && g_LotteryDrawParticipants.FindString(steamId) != -1)
+            {
+                CPrintToChat(client, "%s", token);
+            }
+        }
         g_LotteryDrawIndex++;
         return Plugin_Continue;
     }
