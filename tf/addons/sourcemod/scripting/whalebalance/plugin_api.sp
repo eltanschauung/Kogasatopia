@@ -32,6 +32,8 @@ void WhaleBalance_RegisterPluginApi()
     MarkNativeAsOptional("PointsStore_ConsumePurchaseUse");
     MarkNativeAsOptional("SaySounds_PlayCommand");
     MarkNativeAsOptional("Filters_GetChatName");
+    MarkNativeAsOptional("Filters_GetSteamIdChatName");
+    MarkNativeAsOptional("Filters_GetLastRecordedSteamName");
     MarkNativeAsOptional("WhaleTracker_AreStatsLoaded");
     MarkNativeAsOptional("WhaleTracker_GetWhalePoints");
 }

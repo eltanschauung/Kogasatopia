@@ -16,6 +16,7 @@ void WhaleBalance_OnPluginStart()
     g_hDatabaseConfig = CreateConVar("sm_autobalance_database", "default", "Database config name from databases.cfg to use for persistent autobalance immunity.");
     RegAdminCmd("sm_immune", Command_Immune, ADMFLAG_GENERIC, "sm_immune <name> - Toggle persistent autobalance immunity for a player.");
     RegConsoleCmd("sm_volunteer", Command_Volunteer, "sm_volunteer [name] - Toggle autobalance volunteer status.");
+    RegConsoleCmd("sm_volunteers", Command_Volunteers, "List autobalance volunteers by signup time.");
     RegConsoleCmd("sm_swap", Command_RequestTeamSwap, "sm_swap [name] - Request a team swap with an enemy player.");
     RegConsoleCmd("sm_requestswap", Command_RequestTeamSwap, "sm_requestswap [name] - Request a team swap with an enemy player.");
     RegConsoleCmd("sm_sw", Command_RequestTeamSwap, "sm_sw [name] - Request a team swap with an enemy player.");

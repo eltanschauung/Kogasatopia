@@ -366,6 +366,98 @@ public Action Command_Volunteer(int client, int args)
     return Plugin_Handled;
 }
 
+public Action Command_Volunteers(int client, int args)
+{
+    if (g_hImmunityDb == null || !g_bVolunteerDbReady)
+    {
+        ReplyToCommand(client, "[WhaleBalance] Volunteer database is not ready.");
+        return Plugin_Handled;
+    }
+
+    g_hImmunityDb.Query(SQL_OnVolunteersListed,
+        "SELECT steamid64, volunteered_at FROM autobalance_volunteers "
+        ... "WHERE volunteer != 0 ORDER BY volunteered_at ASC, steamid64 ASC",
+        client > 0 ? GetClientUserId(client) : 0);
+    return Plugin_Handled;
+}
+
+public void SQL_OnVolunteersListed(Database db, DBResultSet results, const char[] error, any userId)
+{
+    int client = userId > 0 ? GetClientOfUserId(userId) : 0;
+    if ((userId > 0 && (client <= 0 || !IsClientInGame(client)))
+        || db == null || g_hImmunityDb == null || !db.IsSameConnection(g_hImmunityDb))
+    {
+        return;
+    }
+
+    if (error[0])
+    {
+        LogError("[whalebalance] Volunteer list failed: %s", error);
+        ReplyToCommand(client, "[WhaleBalance] Could not load volunteers.");
+        return;
+    }
+
+    if (client > 0)
+        CPrintToChat(client, "{gold}[WhaleBalance]{default} Volunteers (oldest first):");
+    else
+        ReplyToCommand(client, "[WhaleBalance] Volunteers (oldest first):");
+
+    int rank = 0;
+    while (results != null && results.FetchRow())
+    {
+        char steamId[32], displayName[160], timestamp[48];
+        results.FetchString(0, steamId, sizeof(steamId));
+        int volunteeredAt = results.FetchInt(1);
+        strcopy(displayName, sizeof(displayName), steamId);
+        for (int candidate = 1; candidate <= MaxClients; candidate++)
+        {
+            if (!IsClientInGame(candidate) || IsFakeClient(candidate)) continue;
+            char candidateSteamId[32];
+            if (Kogasa_GetClientSteamId64(candidate, candidateSteamId, sizeof(candidateSteamId), true)
+                && StrEqual(candidateSteamId, steamId))
+            {
+                GetClientName(candidate, displayName, sizeof(displayName));
+                break;
+            }
+        }
+        if (client > 0 && GetFeatureStatus(FeatureType_Native, "Filters_GetSteamIdChatName") == FeatureStatus_Available)
+        {
+            char renderedName[160];
+            if (Filters_GetSteamIdChatName(steamId, displayName, renderedName, sizeof(renderedName))
+                && renderedName[0])
+            {
+                strcopy(displayName, sizeof(displayName), renderedName);
+            }
+        }
+        else if (client == 0
+            && GetFeatureStatus(FeatureType_Native, "Filters_GetLastRecordedSteamName") == FeatureStatus_Available)
+        {
+            char storedName[128];
+            if (Filters_GetLastRecordedSteamName(steamId, storedName, sizeof(storedName))
+                && storedName[0])
+            {
+                strcopy(displayName, sizeof(displayName), storedName);
+            }
+        }
+        if (volunteeredAt > 0)
+            FormatTime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M", volunteeredAt);
+        else
+            strcopy(timestamp, sizeof(timestamp), "unknown");
+
+        rank++;
+        if (client > 0)
+            CPrintToChatEx(client, client, "{gold}%d. %s {gold}%s", rank, displayName, timestamp);
+        else
+            ReplyToCommand(client, "%d. %s %s", rank, displayName, timestamp);
+    }
+
+    if (rank == 0)
+    {
+        if (client > 0) CPrintToChat(client, "{gold}[WhaleBalance]{default} No volunteers yet.");
+        else ReplyToCommand(client, "[WhaleBalance] No volunteers yet.");
+    }
+}
+
 public void SQL_OnPersistentVolunteerToggled(Database db, DBResultSet results, const char[] error, any data)
 {
     DataPack pack = view_as<DataPack>(data);
