@@ -582,7 +582,7 @@ static void WeaponsWeb_ProcessHatAction(const char[] actionId, const char[] sess
 			SetClientHatEnabled(client, hatIndex, false);
 			QueueHatStateSave(client, true);
 			RemoveHat(client, hatIndex);
-			PrintToChat(client, "[Hats] Disabled %s.", g_Hats[hatIndex].name);
+			PrintHatUnequippedMessage(client, hatIndex);
 		}
 		success = true;
 	}

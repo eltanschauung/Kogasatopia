@@ -186,10 +186,7 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 			SetClientHatEnabled(client, hatIndex, false);
 			QueueHatStateSave(client, true);
 			RemoveHat(client, hatIndex);
-			char color[32];
-			GetHatChatColorForClientTeam(client, hatIndex, color, sizeof(color));
-			CPrintToChat(client, "{gold}[CustomHats] {%s}%s{default} unequipped.",
-				color, g_Hats[hatIndex].name);
+			PrintHatUnequippedMessage(client, hatIndex);
 			return 0;
 		}
 
@@ -283,6 +280,14 @@ public int MenuHandler_HatPaint(Menu menu, MenuAction action, int client, int it
 	}
 
 	return 0;
+}
+
+void PrintHatUnequippedMessage(int client, int hatIndex)
+{
+	char color[32];
+	GetHatChatColorForClientTeam(client, hatIndex, color, sizeof(color));
+	CPrintToChat(client, "{gold}[CustomHats] {%s}%s{default} unequipped.",
+		color, g_Hats[hatIndex].name);
 }
 
 void EquipSelectedHatFromMenu(int client, int hatIndex)
