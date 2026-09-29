@@ -106,12 +106,14 @@ static float g_flPadRechargeEnd[2048];
 
 static char g_szOffsetStartProp[64];
 static int g_iOffsetMatchingTeleporter = -1;
+static Handle g_hGetMaxHealthForCurrentLevel = INVALID_HANDLE;
 
 static Handle g_hPadCookie;
 static Handle g_hPadTimerAnnounce;
 
 /* Convars */
 ConVar cvarPads[VersionNumber + 1];
+ConVar g_hTeleporterMinLevel;
 
 
 //Initialise gamedata to be used for getting/setting Teleporter pairs.
@@ -134,9 +136,35 @@ void InitGamedata()
 	CloseHandle(hGameConf);
 }
 
+void InitNormalTeleporterHealthCall()
+{
+	GameData data = new GameData("buildings");
+	if (data == null)
+	{
+		SetFailState("[EngiPads] Unable to load gamedata file 'buildings.txt'.");
+		return;
+	}
+
+	StartPrepSDKCall(SDKCall_Entity);
+	if (!PrepSDKCall_SetFromConf(data, SDKConf_Virtual, "CBaseObject::GetMaxHealthForCurrentLevel"))
+	{
+		delete data;
+		SetFailState("[EngiPads] Missing CBaseObject::GetMaxHealthForCurrentLevel offset.");
+		return;
+	}
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+	g_hGetMaxHealthForCurrentLevel = EndPrepSDKCall();
+	delete data;
+	if (g_hGetMaxHealthForCurrentLevel == INVALID_HANDLE)
+	{
+		SetFailState("[EngiPads] Failed to prepare CBaseObject::GetMaxHealthForCurrentLevel SDKCall.");
+	}
+}
+
 void EngiPads_OnPluginStart()
 {
 	InitGamedata();
+	InitNormalTeleporterHealthCall();
 	
 	RegConsoleCmd("sm_pad", TogglePadsMenuCmd);
 	RegConsoleCmd("sm_pads", TogglePadsMenuCmd);
@@ -147,6 +175,10 @@ void EngiPads_OnPluginStart()
 	AddCommandListener(EurekaTeleport, "eureka_teleport");
 	
 	cvarPads[VersionNumber] = CreateConVar("pads_version", ENGIPADS_PLUGIN_VERSION, "EngiPads version number. Don't touch this!", FCVAR_NOTIFY|FCVAR_DONTRECORD|FCVAR_CHEAT);
+	g_hTeleporterMinLevel = CreateConVar(
+		"sm_teleporters_min_level", "0",
+		"Minimum upgrade level for completed normal teleporters. 0 and 1 disables.",
+		FCVAR_NOTIFY, true, 0.0, true, 3.0);
 	cvarPads[PadsEnabled] = CreateConVar("pads_enabled", "1", "Enables/Disables the plugin. (2 - BoostPads only, 3 - JumpPads only)", FCVAR_NOTIFY, true, 0.0, true, 3.0);
 	cvarPads[PadsAnnounce] = CreateConVar("pads_announce", "347.0", "Interval between chat announcements about the plugin. 0.0 to disable.", FCVAR_NOTIFY, true, 0.0);
 	
@@ -364,6 +396,58 @@ public void ObjectBuilt(Event event, const char[] name, bool dontBroadcast)
         TF2Attrib_SetByName(wrench, ATTRIBUTE_BUILD_SPEED, ATTRIBUTE_BUILD_SPEED_FACTOR);
     else
         TF2Attrib_RemoveByName(wrench, ATTRIBUTE_BUILD_SPEED);
+
+    if (g_iPadType[obj] == PadType_None && g_hTeleporterMinLevel.IntValue > 1)
+        SDKHook(obj, SDKHook_ThinkPost, NormalTeleporter_ThinkPost);
+}
+
+public void NormalTeleporter_ThinkPost(int teleporter)
+{
+	if (!IsValidEntity(teleporter))
+		return;
+
+	if (g_iPadType[teleporter] != PadType_None)
+	{
+		SDKUnhook(teleporter, SDKHook_ThinkPost, NormalTeleporter_ThinkPost);
+		return;
+	}
+
+	if (GetEntProp(teleporter, Prop_Send, "m_bBuilding"))
+		return;
+
+	SDKUnhook(teleporter, SDKHook_ThinkPost, NormalTeleporter_ThinkPost);
+	ApplyMinimumTeleporterLevel(teleporter);
+}
+
+void ApplyMinimumTeleporterLevel(int teleporter)
+{
+	if (!IsValidEntity(teleporter) || g_iPadType[teleporter] != PadType_None)
+		return;
+
+	int minimum = g_hTeleporterMinLevel.IntValue;
+	if (minimum <= 1)
+		return;
+
+	int current = GetEntProp(teleporter, Prop_Send, "m_iUpgradeLevel");
+	if (current >= minimum)
+		return;
+
+	SetEntProp(teleporter, Prop_Send, "m_iUpgradeLevel", minimum);
+	int maxHealth = SDKCall(g_hGetMaxHealthForCurrentLevel, teleporter);
+	if (maxHealth <= 0)
+	{
+		SetEntProp(teleporter, Prop_Send, "m_iUpgradeLevel", current);
+		LogError("[EngiPads] Invalid maximum health for teleporter %d at level %d.", teleporter, minimum);
+		return;
+	}
+	if (GetEntProp(teleporter, Prop_Send, "m_iHighestUpgradeLevel") < minimum)
+		SetEntProp(teleporter, Prop_Send, "m_iHighestUpgradeLevel", minimum);
+	SetEntProp(teleporter, Prop_Send, "m_iUpgradeMetal", 0);
+
+	// CBaseObject::InputSetHealth updates both the max and internal float
+	// health fields; SetEntityHealth alone would leave m_flHealth stale.
+	SetVariantInt(maxHealth);
+	AcceptEntityInput(teleporter, "SetHealth", teleporter);
 }
 
 public void ObjectDestroyed(Event event, const char[] name, bool dontBroadcast)

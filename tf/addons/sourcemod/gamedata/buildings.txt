@@ -4,6 +4,11 @@
 	{
 		"Offsets"
 		{
+			"CBaseObject::GetMaxHealthForCurrentLevel"
+			{
+				"linux"        "393"
+				"linux64"      "393"
+			}
 			"CBaseObject::StartBuilding"
 			{
 				"windows"       "344"
