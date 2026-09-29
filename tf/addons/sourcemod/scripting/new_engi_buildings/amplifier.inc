@@ -2109,6 +2109,7 @@ void DamageAmplifierExplosionPlayers(
 		{
 			healthDamage *= AMPLIFIER_EXPLOSION_SELF_DAMAGE_SCALE;
 		}
+		float forceBasis = selfBlast ? healthDamage : forceDamage;
 		float direction[3], velocity[3];
 		MakeVectorFromPoints(position, center, direction);
 		direction[2] += 10.0;
@@ -2120,7 +2121,7 @@ void DamageAmplifierExplosionPlayers(
 		{
 			hullVolume = 48.0 * 48.0 * 82.0;
 		}
-		float force = forceDamage * (48.0 * 48.0 * 82.0 / hullVolume)
+		float force = forceBasis * (48.0 * 48.0 * 82.0 / hullVolume)
 			* (selfBlast ? AMPLIFIER_EXPLOSION_FORCE_SELF
 				: AMPLIFIER_EXPLOSION_FORCE_OTHER);
 		if (!selfBlast && TF2_GetPlayerClass(victim) == TFClass_Heavy)
