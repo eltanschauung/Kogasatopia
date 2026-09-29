@@ -2,7 +2,7 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
-koth_dolls_playground_a5
+koth_dolls_playground_a6
 workshop/ctf_mandrillmaze_b2.ugc2908762556
 workshop/koth_spillway_rc3a.ugc1962574007
 workshop/pl_harpyhills_b8.ugc3758709084
@@ -136,7 +136,6 @@ ctf_gumption
 koth_heaven_b1
 koth_viaduct
 koth_cascade
-cp_steel_trad_pro
 pl_cactuscanyon
 koth_ashville_final
 pd_suijin_matsuri_rc4
