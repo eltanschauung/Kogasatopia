@@ -5,7 +5,7 @@
 
 /**
  * Last real activity from a human client's buttons, mouse, spectator camera
- * commands, or voice. Uses GetEngineTime(), not Unix or map time.
+ * commands, chat, or voice. Uses GetEngineTime(), not Unix or map time.
  * Returns 0.0 if no activity has been observed since connect/map/plugin start,
  * or if the client is not a human in game. Idle-time bookkeeping does not count.
  */

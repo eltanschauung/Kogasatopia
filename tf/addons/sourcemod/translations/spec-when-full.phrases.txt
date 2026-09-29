@@ -1,0 +1,47 @@
+"Phrases"
+{
+    "SPEC_WHEN_FULL_JOIN_SPEC"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You have been moved to Spectator because the server is full. Type !joinqueue to join the game when a slot opens up. Type !checkautojoin to see the auto join queue."
+    }
+    "SPEC_WHEN_FULL_JOIN_SPEC_AUTO"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You have been moved to Spectator because the server is full. You will join the game as soon as a slot opens up. Type !leavequeue to leave the auto join queue. Type !checkautojoin to see the auto join queue."
+    }
+    "SPEC_WHEN_FULL_AUTOJOIN_PLACE_QUEUE"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You will join the game as soon as a slot opens up."
+    }
+    "SPEC_WHEN_FULL_AUTOJOIN_REMOVE_QUEUE"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You have been removed from the auto join queue."
+    }
+    "SPEC_WHEN_FULL_NOT_FULL"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} The server is not full right now."
+    }
+    "SPEC_WHEN_FULL_NOT_SPEC"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You must be a spectator to use this command."
+    }
+    "SPEC_WHEN_FULL_SPEC_QUEUE_MENU_TITLE"
+    {
+        "en"    "Clients in auto join queue"
+    }
+    "SPEC_WHEN_FULL_AUTOJOIN_EMPTY"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} No one is in the auto join queue right now."
+    }
+    "SPEC_WHEN_FULL_IN_QUEUE"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You are already in the auto join queue."
+    }
+    "SPEC_WHEN_FULL_NOT_IN_QUEUE"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} You are not in the auto join queue."
+    }
+    "SPEC_WHEN_FULL_QUEUE_SUSPENDED"
+    {
+        "en"    "{gold}[SpecWhenFull]{cyan} The queue is inactive while the server is crowded. You can join a team directly."
+    }
+}
