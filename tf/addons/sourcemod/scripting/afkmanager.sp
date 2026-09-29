@@ -10,6 +10,7 @@
 #undef REQUIRE_PLUGIN
 #include <dgm_api>
 #include <plugin_statistics>
+#include <adminsdb_api>
 #define REQUIRE_PLUGIN
 
 #include "include/client_validation.inc"
@@ -23,7 +24,6 @@ public Plugin myinfo = {
 };
 
 #define AFK_ACTION_BUTTONS (IN_ATTACK | IN_JUMP | IN_DUCK | IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_ATTACK2 | IN_RELOAD | IN_SCORE | IN_USE)
-#define AFK_DOUBLE_LIVE_TIMEOUT_STEAMID64 "76561198163255365"
 #define AFK_MAINTENANCE_INTERVAL 1.0
 
 enum AFKAction {
@@ -37,7 +37,6 @@ enum struct AFKClientState {
     float lastIdleCheck;
     float idleSeconds;
     bool movedToSpec;
-    bool doubleLiveTimeout;
 }
 
 AFKClientState g_AFKClients[MAXPLAYERS + 1];
@@ -60,6 +59,7 @@ bool g_bAFKMapActive;
 
 public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int errMax) {
     MarkNativeAsOptional("DGM_ServerCapacitycheck");
+    MarkNativeAsOptional("AdminsDB_GetClientWhitelistLevel");
     SpecQueue_MarkNativesOptional();
     RegPluginLibrary("afkmanager");
     CreateNative("AFKManager_GetLastActivityTime", Native_GetLastActivityTime);
@@ -143,10 +143,6 @@ public void OnClientConnected(int client) {
 public void OnClientPutInServer(int client) {
     AFK_ResetIdle(client, GetEngineTime());
     SpecQueue_OnClientPutInServer(client);
-}
-
-public void OnClientPostAdminCheck(int client) {
-    AFK_CacheTimeoutException(client);
 }
 
 public void OnClientDisconnect(int client) {
@@ -283,24 +279,18 @@ void AFK_RecordActivity(int client) {
 void AFK_ResetClient(int client) {
     g_AFKClients[client].lastActivityTime = 0.0;
     g_AFKClients[client].movedToSpec = false;
-    g_AFKClients[client].doubleLiveTimeout = false;
     AFK_ResetIdle(client, GetEngineTime());
 }
 
 void AFK_ResetAllClients() {
     for (int client = 1; client <= MaxClients; client++) {
         AFK_ResetClient(client);
-        AFK_CacheTimeoutException(client);
     }
 }
 
-void AFK_CacheTimeoutException(int client) {
-    if (!Client_IsHumanInGame(client) || !IsClientAuthorized(client)) {
-        return;
-    }
-    char steamId64[32];
-    g_AFKClients[client].doubleLiveTimeout = GetClientAuthId(client, AuthId_SteamID64, steamId64, sizeof(steamId64), true)
-        && StrEqual(steamId64, AFK_DOUBLE_LIVE_TIMEOUT_STEAMID64);
+bool AFK_HasDoubleLiveTimeout(int client) {
+    return GetFeatureStatus(FeatureType_Native, "AdminsDB_GetClientWhitelistLevel") == FeatureStatus_Available
+        && AdminsDB_GetClientWhitelistLevel(client) == 2;
 }
 
 bool AFK_CanKickSpectators() {
@@ -365,7 +355,7 @@ void AFK_ManageClients(float now) {
         float timeout;
         if (playing) {
             timeout = g_cvAFKAliveTime.FloatValue;
-            if (action != AFKAction_Kick && g_AFKClients[client].doubleLiveTimeout) {
+            if (action != AFKAction_Kick && AFK_HasDoubleLiveTimeout(client)) {
                 timeout *= 2.0;
             }
         } else {

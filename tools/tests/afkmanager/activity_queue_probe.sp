@@ -50,6 +50,8 @@ int teams[MAXPLAYERS + 1];
 bool alive[MAXPLAYERS + 1];
 TFClassType classes[MAXPLAYERS + 1];
 bool gProbeCanKickSpectators;
+bool gProbeWhitelistAvailable;
+int gProbeWhitelistLevel;
 int population;
 int kicks;
 int moves;
@@ -97,6 +99,8 @@ void ResetScenario() {
     alive[1] = true;
     classes[1] = TFClass_Soldier;
     gProbeCanKickSpectators = true;
+    gProbeWhitelistAvailable = true;
+    gProbeWhitelistLevel = 0;
     population = 24;
     kicks = moves = 0;
     g_cvAFKAction.IntValue = 1;
@@ -145,6 +149,15 @@ int ProbeCount(bool inGameOnly) {
     return population;
 }
 int ProbeTeam(int client) { return teams[client]; }
+int ProbeWhitelistLevel(int client) {
+    #pragma unused client
+    return gProbeWhitelistLevel;
+}
+FeatureStatus ProbeFeatureStatus(FeatureType type, const char[] name) {
+    #pragma unused type
+    #pragma unused name
+    return gProbeWhitelistAvailable ? FeatureStatus_Available : FeatureStatus_Unavailable;
+}
 bool ProbeAlive(int client) { return alive[client]; }
 TFClassType ProbeClass(int client) { return classes[client]; }
 bool AFK_CanKickSpectators() { return gProbeCanKickSpectators; }
@@ -160,6 +173,8 @@ void AFK_MoveToSpectator(int client, float time) {
 }
 
 #define GetEngineTime ProbeTime
+#define GetFeatureStatus ProbeFeatureStatus
+#define AdminsDB_GetClientWhitelistLevel ProbeWhitelistLevel
 #define AFK_GetLastActivityTime ProbeActivity
 #define GetClientCount ProbeCount
 #define GetClientTeam ProbeTeam
@@ -268,10 +283,21 @@ public Action RunProbe(int client, int args) {
     classes[1] = TFClass_Unknown; AFK_ManageClients(261.0);
     Check(moves == 1, "idle class-selection menu still counts");
 
-    ResetScenario(); g_AFKClients[1].doubleLiveTimeout = true; AFK_ManageClients(220.0);
-    Check(moves == 0, "cached exception doubles live timeout");
+    ResetScenario(); gProbeWhitelistLevel = 2; AFK_ManageClients(220.0);
+    Check(moves == 0, "whitelist level 2 doubles live timeout");
     AFK_ManageClients(221.0);
-    Check(moves == 1, "cached exception expires at doubled timeout");
+    Check(moves == 1, "whitelist bonus expires at doubled timeout");
+    for (int level = -2; level <= 3; level++) {
+        if (level == 2) { continue; }
+        ResetScenario(); gProbeWhitelistLevel = level; AFK_ManageClients(161.0);
+        Check(moves == 1, "other whitelist levels use normal timeout");
+    }
+    ResetScenario(); gProbeWhitelistLevel = 2; gProbeWhitelistAvailable = false;
+    AFK_ManageClients(161.0);
+    Check(moves == 1, "missing whitelist API uses normal timeout");
+    ResetScenario(); gProbeWhitelistLevel = 2; AFK_ManageClients(170.0);
+    gProbeWhitelistLevel = 0; AFK_ManageClients(171.0);
+    Check(moves == 1, "whitelist changes apply without reconnecting");
 
     ResetScenario(); teams[1] = 1; g_AFKClients[1].movedToSpec = true;
     AFK_ManageClients(281.0);

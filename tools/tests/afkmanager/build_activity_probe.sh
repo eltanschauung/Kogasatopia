@@ -15,8 +15,8 @@ done > "$work/activity_queue_state.inc"
 for function in SpecQueue_ResetAutoQueueActivityBaselines SpecQueue_SuppressActivityAutoQueue SpecQueue_CheckActivity SpecQueue_BlocksAFKKick SpecQueue_IsPlayingTeam SpecQueue_ClearPendingJoin SpecQueue_ClearAllPendingJoins SpecQueue_Timer_ExpirePendingJoin; do
     sed -n "/^\(void\|bool\|public Action\) $function(/,/^}/p" "$module"
 done > "$work/activity_queue_under_test.inc"
-for function in AFK_ResetIdle AFK_RecordActivity AFK_ResetClient AFK_AdvanceIdle AFK_ManageClients; do
-    sed -n "/^void $function(/,/^}/p" "$afk"
+for function in AFK_ResetIdle AFK_RecordActivity AFK_ResetClient AFK_AdvanceIdle AFK_HasDoubleLiveTimeout AFK_ManageClients; do
+    sed -n "/^\(void\|bool\) $function(/,/^}/p" "$afk"
 done >> "$work/activity_queue_under_test.inc"
 cp "$root/tools/tests/afkmanager/activity_queue_probe.sp" "$work/probe.sp"
 "$scripting/spcomp" "$work/probe.sp" -i "$root/tf/addons/sourcemod/scripting/include" -i "$scripting/include" -o "$output"

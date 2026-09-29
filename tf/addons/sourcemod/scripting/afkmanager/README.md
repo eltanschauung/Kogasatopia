@@ -7,7 +7,7 @@ to prevent duplicate command and team-join ownership.
 
 ## Ownership
 
-The host owns client activity, idle accounting, SteamID exception caching,
+The host owns client activity, idle accounting, whitelist timeout eligibility,
 team/class hooks, the AFK forwards, and one one-second maintenance timer.
 Queue activity checks run every three seconds from that timer using the
 same activity state. There is no internal cross-plugin native dependency.
@@ -23,8 +23,10 @@ that real-input engine timestamp, or zero when unavailable.
 
 Queued clients and pending promotions retain AFK-kick protection. The existing
 `OnAFKKick` hook remains cancellable; `OnAFKSwitch` is now emitted after a
-successful AFK move to spectator. The existing SteamID timeout exception is
-cached on authentication instead of resolving it in every maintenance pass.
+successful AFK move to spectator. Whitelist level exactly 2 doubles the live
+timeout when the AFK action moves players to spectator. Eligibility uses the
+AdminsDB cached client-level API each pass, so changes apply without reconnecting.
+Without that API, the normal timeout applies. Spectator/kick timeouts are unchanged.
 
 ## Compatibility
 
