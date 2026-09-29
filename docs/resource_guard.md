@@ -14,7 +14,7 @@ creation time prevents PID reuse from corrupting deltas. Process CPU is expresse
 per core (a multithreaded process can exceed 100%); host CPU is normalized.
 Command lines and environments are never collected, avoiding leaked passwords.
 
-Two consecutive samples with **host CPU >=95% OR RAM >=95%** authorize stopping
+Six consecutive samples with **host CPU >=95% OR RAM >=95%** authorize stopping
 **only MGE**, through `sudo -n systemctl stop mge.service`. TF2 is never a stop
 target. The stop cooldown remains 300 seconds and survives daemon restarts.
 The daemon does not automatically restart MGE.
