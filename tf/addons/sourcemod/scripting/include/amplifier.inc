@@ -16,6 +16,9 @@ enum AmplifierObjectType
  */
 native bool Amplifier_WouldReplaceBuilding(int client, int objectType);
 
+/** Removes all sentries, dispensers, and teleporters owned by this Engineer. */
+native int Amplifier_DestroyOwnedBuildings(int client);
+
 public SharedPlugin __pl_amplifier =
 {
 	name = "Amplifier",

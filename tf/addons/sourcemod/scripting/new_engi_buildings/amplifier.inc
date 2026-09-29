@@ -266,6 +266,7 @@ void Amplifier_RegisterNatives()
 	CreateNative("HasAmplifier", Native_HasAmplifier);
 	CreateNative("ConvertToAmplifier", Native_ConvertToAmplifier);
 	CreateNative("Amplifier_WouldReplaceBuilding", Native_WouldReplaceBuilding);
+	CreateNative("Amplifier_DestroyOwnedBuildings", Native_DestroyOwnedBuildings);
 	fwdOnAmplify = CreateGlobalForward("OnAmplify", ET_Hook, Param_Cell, Param_Cell, Param_Cell);
 	RegPluginLibrary("Amplifier");
 }
@@ -676,6 +677,34 @@ bool GetDestroyCommandForBuilding(const char[] buildingClass, char[] destroyCmd,
 	return false;
 }
 
+static void RemoveOwnedBuildingEntity(int client, int ent, const char[] destroyCmd)
+{
+	if (AmplifierOn[ent] || IsAmplifierModel(ent))
+	{
+		StopAmplifierIdleSound(ent);
+	}
+
+	int entityRef = EntIndexToEntRef(ent);
+	char health[16];
+	IntToString(GetEntProp(ent, Prop_Send, "m_iMaxHealth") + 1, health, sizeof(health));
+	SetVariantString(health);
+	AcceptEntityInput(ent, "RemoveHealth");
+	FakeClientCommand(client, destroyCmd);
+
+	Event event = CreateEvent("object_removed", true);
+	if (event != null)
+	{
+		SetEventInt(event, "userid", GetClientUserId(client));
+		SetEventInt(event, "index", ent);
+		event.Fire();
+	}
+	// RemoveHealth/destroy may already have removed the entity.
+	if (EntRefToEntIndex(entityRef) == ent && IsValidEntity(ent))
+	{
+		AcceptEntityInput(ent, "kill");
+	}
+}
+
 void RemoveBuilding(int client, const char[] buildingClass)
 {
 	if (!Client_IsInGame(client))
@@ -709,27 +738,50 @@ void RemoveBuilding(int client, const char[] buildingClass)
 		{
 			continue;
 		}
-		if (AmplifierOn[ent] || IsAmplifierModel(ent))
-		{
-			StopAmplifierIdleSound(ent);
-		}
-
-		char health[16];
-		IntToString(GetEntProp(ent, Prop_Send, "m_iMaxHealth") + 1, health, sizeof(health));
-		SetVariantString(health);
-		AcceptEntityInput(ent, "RemoveHealth");
-		FakeClientCommand(client, destroyCmd);
-
-		Event event = CreateEvent("object_removed", true);
-		if (event != null)
-		{
-			SetEventInt(event, "userid", GetClientUserId(client));
-			SetEventInt(event, "index", ent);
-			event.Fire();
-		}
-
-		AcceptEntityInput(ent, "kill");
+		RemoveOwnedBuildingEntity(client, ent, destroyCmd);
 	}
+}
+
+public any Native_DestroyOwnedBuildings(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	if (!Client_IsInGame(client))
+	{
+		return 0;
+	}
+
+	int removed;
+	char classname[64], destroyCmd[32];
+	for (int ent = MaxClients + 1; ent < GetTrackedEntityLimit(); ent++)
+	{
+		if (!IsValidEntity(ent))
+		{
+			continue;
+		}
+		GetEdictClassname(ent, classname, sizeof(classname));
+		if (!IsSentryClass(classname) && !IsDispenserClass(classname)
+			&& !StrEqual(classname, "obj_teleporter"))
+		{
+			continue;
+		}
+		if (GetEntPropEnt(ent, Prop_Send, "m_hBuilder") != client)
+		{
+			continue;
+		}
+
+		if (StrEqual(classname, "obj_teleporter"))
+		{
+			Format(destroyCmd, sizeof(destroyCmd), "destroy 1 %d",
+				TF2_GetObjectMode(ent) == TFObjectMode_Exit ? 1 : 0);
+		}
+		else if (!GetDestroyCommandForBuilding(classname, destroyCmd, sizeof(destroyCmd)))
+		{
+			continue;
+		}
+		RemoveOwnedBuildingEntity(client, ent, destroyCmd);
+		removed++;
+	}
+	return removed;
 }
 
 public int AmpHelpPanelH(Handle menu, MenuAction action, int param1, int param2) { return 0; }

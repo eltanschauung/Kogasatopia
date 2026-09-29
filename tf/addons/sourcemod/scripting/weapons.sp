@@ -38,6 +38,9 @@
 #include <points_store_api>
 #define REQUIRE_PLUGIN
 #include <plugin_statistics>
+#undef REQUIRE_PLUGIN
+#include <amplifier>
+#define REQUIRE_PLUGIN
 #define WEAPONS_INCLUDE_SHAREDDEFS_ONLY
 #include <weapons>
 #include "include/database.inc"
@@ -117,6 +120,7 @@ int g_attrdef_AllowedInMedievalMode;
 #include "weapons/sound_overrides.sp"
 #include "weapons/model_overrides.sp"
 #include "weapons/gameplay.sp"
+#include "weapons/building_restrictions.sp"
 #include "weapons/commands.sp"
 #include "weapons/equip_commands.sp"
 #include "weapons/loadout_controller.sp"
@@ -180,6 +184,7 @@ public void OnPluginStart()
     HookUserMessage(GetUserMessageId("PlayerLoadoutUpdated"), OnPlayerLoadoutUpdated,
         .post = OnPlayerLoadoutUpdatedPost);
     HookEvent("post_inventory_application", WeaponsStats_OnLoadoutApplication, EventHookMode_Post);
+    HookEvent("post_inventory_application", WeaponsBuildings_OnInventoryApplied, EventHookMode_Post);
     CreateVersionConVar("sm_weapons_version", "Unified weapons plugin version.");
     sm_weapons_enable_loadout = CreateConVar("sm_weapons_enable_loadout", "1", "Allows players to receive custom items they have selected.");
     sm_weapons_statistics = CreateConVar("sm_weapons_statistics", "1", "Record custom weapons equip/unequip popularity statistics.", _, true, 0.0, true, 1.0);
@@ -279,6 +284,7 @@ void Weapons_NotifyItemRuntimeStateReady(int client, int entity)
     WeaponsSound_OnItemRuntimeStateReady(client, entity);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
     WeaponsGameplay_OnItemRuntimeStateReady(client, entity);
+    WeaponsBuildings_Reconcile(client);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)
         || g_hOnItemRuntimeStateReady == null) return;
     Call_StartForward(g_hOnItemRuntimeStateReady);
@@ -291,11 +297,28 @@ public void OnAllPluginsLoaded()
 {
     BuildLoadoutSlotMenu();
     g_attrdef_AllowedInMedievalMode = TF2Econ_TranslateAttributeNameToDefinitionIndex("allowed in medieval mode");
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client))
+        {
+            WeaponsBuildings_Reconcile(client);
+        }
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
     CustomHats_OnLibraryAdded(name);
+    if (StrEqual(name, "Amplifier"))
+    {
+        for (int client = 1; client <= MaxClients; client++)
+        {
+            if (IsClientInGame(client))
+            {
+                WeaponsBuildings_Reconcile(client);
+            }
+        }
+    }
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -305,6 +328,7 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnMapStart()
 {
+    WeaponsBuildings_ResetAll();
     WeaponsMovement_OnMapStart();
     WeaponsCustomAttributes_OnMapStart();
     WeaponsModels_OnMapStart();
@@ -330,6 +354,7 @@ public void OnMapEnd()
 
 public void OnClientPutInServer(int client)
 {
+    WeaponsBuildings_ResetClient(client);
     WeaponsMovement_OnClientPutInServer(client);
     WeaponsSound_ResetClient(client, true);
     WeaponsModels_OnClientPutInServer(client);
@@ -345,6 +370,7 @@ public void OnClientPostAdminCheck(int client)
 
 public void OnClientDisconnect(int client)
 {
+    WeaponsBuildings_ResetClient(client);
     WeaponsCommands_ResetClient(client);
     Weapons_ResetLoadoutRequests(client);
     CustomHats_OnClientDisconnect(client);
