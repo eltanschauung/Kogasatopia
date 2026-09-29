@@ -1,0 +1,11 @@
+import os.path
+for compiler in Extension.compilers:
+    builder.compiler = Extension.configure(compiler)
+    project = builder.project = Extension.HL2Project(builder, 'restore_score.ext')
+    project.sources += ['extension.cpp', os.path.join(Extension.sm_root, 'public', 'smsdk_ext.cpp')]
+    for sdk in Extension.sdks.values():
+        if sdk.specPasses(compiler.target):
+            binary = Extension.HL2Config(builder, 'restore_score.ext.' + sdk.ext, sdk)
+            if builder.options.network_tests:
+                binary.compiler.defines += ['RESTORESCORE_TEST']
+    Extension.extensions += builder.Add(project)

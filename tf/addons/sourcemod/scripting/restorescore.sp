@@ -1,288 +1,156 @@
 /*
-Release notes:
-
----- 1.0.0 (01/11/2013) ----
-- Restores a player's score when they reconnect
-- Stored scores are trashed on mapchange and when a new match starts
-
-
----- 1.1.1 (09/11/2013) ----
-- Fixed a bug where the scores would not be restored
-
-
----- 1.1.2 (28/01/2014) ----
-- Fixed a minor error when the server is closing
-- Fixed a bug that sometimes caused RestoreScore not to work for certain players (SteamID fix)
-
-
----- 1.1.3 (14/07/2025) ----
-- Updated code to be compatible with SourceMod 1.12
-
-
-Known issues:
-- Not compatible with TFTrue.
-*/
-
+ * Restore Score — based on F2's plugin and Kogasatopia's score adjustments.
+ * 1.2.0: send scoreboard adjustments through restore_score.ext; never write
+ * m_iTotalScore, which TF2 also uses as its Strange/MvM scoring baseline.
+ * The original upstream auto-updater is intentionally not registered by this
+ * fork: it could replace the fix with the incompatible original plugin.
+ */
 #pragma semicolon 1
 #pragma newdecls required
-
 #include <sourcemod>
 #include <tf2_stocks>
-#include <sdkhooks>
-#undef REQUIRE_PLUGIN
-#include <updater>
+#include <restore_score_display>
 
-
-#define PLUGIN_VERSION "1.1.3"
-#define UPDATE_URL		"https://sourcemod.krus.dk/restorescore/update.txt"
-
-
+#define PLUGIN_VERSION "1.2.0"
 public Plugin myinfo = {
-	name = "Restore Score",
-	author = "F2",
-	description = "Restores the score of a player when reconnecting",
-	version = PLUGIN_VERSION,
-	url = "https://github.com/F2/F2s-sourcemod-plugins"
+    name = "Restore Score", author = "F2; Kogasatopia; Codex",
+    description = "Restore and adjust scoreboard totals without changing Strange scoring",
+    version = PLUGIN_VERSION, url = "https://github.com/eltanschauung/Kogasatopia"
 };
 
-bool g_bHookActivated = false;
+int g_iAddScore[MAXPLAYERS + 1];
+int g_iScoreAdjustment[MAXPLAYERS + 1];
+int g_iQualifyingTeleports[MAXPLAYERS + 1];
+StringMap g_OldScores;
+bool g_Ready;
 
-int g_iScoreAdjustment[MAXPLAYERS+1]; // Backstab kill-point deductions for this connection.
-int g_iQualifyingTeleports[MAXPLAYERS+1];
-int g_iAddScore[MAXPLAYERS+1]; // The old scores that are currently being added to the clients.
-KeyValues g_kvOldScores = null; // Keys are steamids of players disconnected, and values are their old scores.
-
-
-
-// Previously provided by f2stocks.inc
 bool IsRealPlayer(int client) {
-	return client > 0
-		&& client <= MaxClients
-		&& IsClientConnected(client)
-		&& IsClientInGame(client)
-		&& !IsClientSourceTV(client);
+    return client > 0 && client <= MaxClients && IsClientInGame(client)
+        && !IsClientSourceTV(client) && !IsClientReplay(client);
 }
-
-// Previously provided by f2stocks.inc
-int TF2_GetPlayerScore(int client) {
-	if (!IsClientConnected(client))
-		return -1;
-
-	int offset = FindSendPropInfo("CTFPlayerResource", "m_iTotalScore");
-	if (offset < 1)
-		return -1;
-
-	int entity = GetPlayerResourceEntity();
-	if (entity == -1)
-		return -1;
-
-	return GetEntData(entity, offset + (client * 4));
+int DisplayedScore(int client) {
+    int resource = GetPlayerResourceEntity();
+    if (resource == -1) return -1;
+    return RSDisplay_Calculate(GetEntProp(resource, Prop_Send, "m_iTotalScore", _, client),
+        g_iAddScore[client], g_iScoreAdjustment[client]);
 }
-
-
-
-public void OnPluginStart() {
-	HookEvent("player_death", Event_player_death, EventHookMode_Post);
-	HookEvent("player_teleported", Event_player_teleported, EventHookMode_Post);
-	HookEvent("player_activate", Event_player_activate, EventHookMode_Post);
-	HookEvent("player_disconnect", Event_player_disconnect, EventHookMode_Pre);
-	HookEvent("teamplay_restart_round", Event_restart_round, EventHookMode_Post);
-	
-	g_kvOldScores = CreateKeyValues("OldScores");
-	
-	if (LibraryExists("updater"))
-		Updater_AddPlugin(UPDATE_URL);
+void Publish(int client) {
+    if (g_Ready) RSDisplay_Set(client, g_iAddScore[client], g_iScoreAdjustment[client]);
 }
-
-public void OnLibraryAdded(const char[] name) {
-	if (StrEqual(name, "updater"))
-		Updater_AddPlugin(UPDATE_URL);
+void ClearClient(int client) {
+    g_iAddScore[client] = 0;
+    g_iScoreAdjustment[client] = 0;
+    g_iQualifyingTeleports[client] = 0;
+    Publish(client);
 }
-
-public void OnPluginEnd() {
-	StopHook();
-	delete g_kvOldScores;
-}
-
-
-
-// Clear the old scores when the match is reset and on mapchange.
 void ResetOldScores() {
-	// Stop the hook (for performance reasons)
-	StopHook();
-	
-	// Clear the old scores
-	delete g_kvOldScores;
-	g_kvOldScores = CreateKeyValues("OldScores");
-	
-	for (int client = 1; client <= MaxClients; client++) {
-		g_iAddScore[client] = 0;
-		g_iScoreAdjustment[client] = 0;
-		g_iQualifyingTeleports[client] = 0;
-	}
+    g_OldScores.Clear();
+    for (int client = 1; client <= MaxClients; client++) ClearClient(client);
 }
-
-public void Event_restart_round(Event event, const char[] name, bool dontBroadcast) {
-	ResetOldScores();
+bool RestoreSavedScore(int client, const char[] steamid) {
+    int saved;
+    if (!g_OldScores.GetValue(steamid, saved)) return false;
+    g_OldScores.Remove(steamid);
+    g_iAddScore[client] = saved;
+    Publish(client);
+    return true;
 }
-
+void RememberScore(int client, const char[] steamid) {
+    int score = DisplayedScore(client);
+    if (score > 0) g_OldScores.SetValue(steamid, score);
+    else g_OldScores.Remove(steamid);
+}
+void TryRestore(int client) {
+    if (!IsRealPlayer(client) || IsFakeClient(client)) return;
+    char steamid[64];
+    if (GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid), true))
+        RestoreSavedScore(client, steamid);
+}
+public void OnPluginStart() {
+    if (GetEngineVersion() != Engine_TF2 || RSDisplay_ApiVersion() != 1)
+        SetFailState("Requires TF2 and the matching Restore Score Display extension.");
+    g_OldScores = new StringMap();
+    g_Ready = true;
+    RSDisplay_Reset();
+    HookEvent("player_death", Event_player_death, EventHookMode_Post);
+    HookEvent("player_teleported", Event_player_teleported, EventHookMode_Post);
+    HookEvent("player_activate", Event_player_activate, EventHookMode_Post);
+    HookEvent("teamplay_restart_round", Event_restart_round, EventHookMode_Post);
+    RegAdminCmd("sm_restorescore_status", Command_Status, ADMFLAG_ROOT, "Inspect raw and displayed scores.");
+#if defined RESTORESCORE_TEST
+    TestStart();
+#endif
+}
+public void OnPluginEnd() {
+    if (g_Ready) RSDisplay_Reset();
+    g_Ready = false;
+    delete g_OldScores;
+}
 public void OnMapStart() {
-	ResetOldScores();
+    if (g_Ready) ResetOldScores();
+#if defined RESTORESCORE_TEST
+    TestMapStart();
+#endif
 }
-
-
-
-
-public void OnClientPutInServer(int client) {
-	g_iAddScore[client] = 0;
-	g_iScoreAdjustment[client] = 0;
-	g_iQualifyingTeleports[client] = 0;
+public void Event_restart_round(Event event, const char[] name, bool dontBroadcast) { ResetOldScores(); }
+public void OnClientConnected(int client) { ClearClient(client); }
+public void OnClientPutInServer(int client) { TryRestore(client); }
+public void OnClientAuthorized(int client, const char[] auth) { TryRestore(client); }
+public void OnClientPostAdminCheck(int client) { TryRestore(client); }
+public void Event_player_activate(Event event, const char[] name, bool dontBroadcast) {
+    TryRestore(GetClientOfUserId(event.GetInt("userid")));
 }
+// SourceMod runs this forward before decrementing its player count and before
+// the game's ClientDisconnect. Capture the display offset while it still exists.
+public void OnClientDisconnect(int client) { SaveDisconnect(client); }
 
 public void Event_player_death(Event event, const char[] name, bool dontBroadcast) {
-	if (event.GetInt("customkill") != TF_CUSTOM_BACKSTAB
-		|| (event.GetInt("death_flags") & TF_DEATHFLAG_DEADRINGER))
-		return;
-
-	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	int victim = GetClientOfUserId(event.GetInt("userid"));
-	if (!IsRealPlayer(attacker) || attacker == victim
-		|| TF2_GetPlayerClass(attacker) != TFClass_Spy)
-		return;
-
-	// Leave TF2's real score intact; remove only the ordinary kill point
-	// from the displayed total after the player manager recalculates it.
-	g_iScoreAdjustment[attacker]--;
-	StartHook();
+    if (event.GetInt("customkill") != TF_CUSTOM_BACKSTAB
+        || (event.GetInt("death_flags") & TF_DEATHFLAG_DEADRINGER)) return;
+    int attacker = GetClientOfUserId(event.GetInt("attacker"));
+    int victim = GetClientOfUserId(event.GetInt("userid"));
+    if (!IsRealPlayer(attacker) || attacker == victim || TF2_GetPlayerClass(attacker) != TFClass_Spy) return;
+    // Preserve Kogasa's one-point backstab deduction on the scoreboard.
+    if (g_iScoreAdjustment[attacker] > -2147483647) g_iScoreAdjustment[attacker]--;
+    Publish(attacker);
 }
-
 public void Event_player_teleported(Event event, const char[] name, bool dontBroadcast) {
-	int teleportedUserId = event.GetInt("userid");
-	int builderUserId = event.GetInt("builderid");
-	if (builderUserId == teleportedUserId)
-		return;
-
-	int teleported = GetClientOfUserId(teleportedUserId);
-	int builder = GetClientOfUserId(builderUserId);
-	if (!IsRealPlayer(teleported) || !IsRealPlayer(builder)
-		|| TF2_GetPlayerClass(builder) != TFClass_Engineer
-		|| GetClientTeam(teleported) != GetClientTeam(builder))
-		return;
-
-	g_iQualifyingTeleports[builder]++;
-	if ((g_iQualifyingTeleports[builder] % 2) == 0) {
-		// TF2 awards one TFSTAT_TELEPORTS point per two teammate uses.
-		g_iScoreAdjustment[builder]--;
-		StartHook();
-	}
+    int user = GetClientOfUserId(event.GetInt("userid"));
+    int builder = GetClientOfUserId(event.GetInt("builderid"));
+    if (user == builder || !IsRealPlayer(user) || !IsRealPlayer(builder)
+        || TF2_GetPlayerClass(builder) != TFClass_Engineer || GetClientTeam(user) != GetClientTeam(builder)) return;
+    // Only parity is needed; avoid a session-long integer counter overflow.
+    g_iQualifyingTeleports[builder] ^= 1;
+    if (!g_iQualifyingTeleports[builder]) {
+        if (g_iScoreAdjustment[builder] > -2147483647) g_iScoreAdjustment[builder]--;
+        Publish(builder);
+    }
 }
-
-// When a player connects, check if it is a returning player, and adjust his score accordingly.
-public void Event_player_activate(Event event, const char[] name, bool dontBroadcast) {
-	int userid = event.GetInt("userid");
-	int client = GetClientOfUserId(userid);
-	if (!IsRealPlayer(client))
-		return;
-	
-	char steamid[64];
-	if (!GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid), false))
-		return;
-	KvRewind(g_kvOldScores);
-	if (KvJumpToKey(g_kvOldScores, steamid) == false)
-		return;
-	int oldscore = KvGetNum(g_kvOldScores, "score");
-	KvGoBack(g_kvOldScores);
-	KvDeleteKey(g_kvOldScores, steamid);
-	
-	g_iAddScore[client] = oldscore;
-	//SetEntProp(client, Prop_Data, "m_iFrags", KvGetNum(g_kvOldScores, "kills"));
-	//SetEntProp(client, Prop_Data, "m_iDeaths", KvGetNum(g_kvOldScores, "deaths"));
-	//SetEntProp(client, Prop_Data, "m_iAssists", KvGetNum(g_kvOldScores, "assists"));
-	
-	StartHook();
+void SaveDisconnect(int client) {
+    if (client < 1 || client > MaxClients) return;
+    bool others;
+    for (int other = 1; other <= MaxClients; other++)
+        if (other != client && IsRealPlayer(other)) { others = true; break; }
+    if (!others) { ResetOldScores(); return; }
+    if (IsRealPlayer(client) && !IsFakeClient(client)) {
+        char steamid[64];
+        // Capture the displayed total before clearing this connection's offset.
+        if (GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid), true))
+            RememberScore(client, steamid);
+    }
+    ClearClient(client);
 }
-
-// When a player disconnects, remember the score.
-public void Event_player_disconnect(Event event, const char[] name, bool dontBroadcast) {
-	int userid = event.GetInt("userid");
-	int client = GetClientOfUserId(userid);
-	
-	g_iAddScore[client] = 0;
-	g_iScoreAdjustment[client] = 0;
-	g_iQualifyingTeleports[client] = 0;
-	
-	// Clear the old scores if the server is empty
-	if (GetClientCount() == 1) {
-		ResetOldScores();
-		return;
-	}
-	
-	if (!IsRealPlayer(client))
-		return;
-	
-	// Save the score if it is above 0
-	int score = TF2_GetPlayerScore(client);
-	if (score <= 0)
-		return;
-	char steamid[64];
-	if (!GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid), false))
-		return;
-	
-	KvRewind(g_kvOldScores);
-	if (KvJumpToKey(g_kvOldScores, steamid, true) == false)
-		return;
-	
-	KvSetNum(g_kvOldScores, "score", score);
-	//KvSetNum(g_kvOldScores, "kills", GetEntProp(client, Prop_Data, "m_iFrags"));
-	//KvSetNum(g_kvOldScores, "deaths", GetEntProp(client, Prop_Data, "m_iDeaths"));
-	//KvSetNum(g_kvOldScores, "assists", GetEntProp(client, Prop_Data, "m_iAssists"));
-	KvGoBack(g_kvOldScores);
+public Action Command_Status(int client, int args) {
+    int resource = GetPlayerResourceEntity();
+    ReplyToCommand(client, "[Restore Score] %s; network-only display; saved players=%d; resource=%d", PLUGIN_VERSION, g_OldScores.Size, resource);
+    for (int target = 1; target <= MaxClients; target++) {
+        if (!IsRealPlayer(target) || resource == -1) continue;
+        ReplyToCommand(client, "[Restore Score] %N: raw=%d, restored=%d, adjustment=%d, serialized=%d", target,
+            GetEntProp(resource, Prop_Send, "m_iTotalScore", _, target), g_iAddScore[target], g_iScoreAdjustment[target],
+            RSDisplay_ReadSerialized(resource, target));
+    }
+    return Plugin_Handled;
 }
-
-
-
-// --- This is where the magic happens! ---
-void StartHook() {
-	if (g_bHookActivated)
-		return;
-	g_bHookActivated = true;
-	int iIndex = FindEntityByClassname(-1, "tf_player_manager");
-	if (iIndex == -1)
-		SetFailState("Unable to find tf_player_manager entity");
-	
-	SDKHook(iIndex, SDKHook_ThinkPost, Hook_OnThinkPost);
-}
-
-void StopHook() {
-	if (!g_bHookActivated)
-		return;
-	g_bHookActivated = false;
-	int iIndex = FindEntityByClassname(-1, "tf_player_manager");
-	if (iIndex == -1)
-		SetFailState("Unable to find tf_player_manager entity");
-	
-	SDKUnhook(iIndex, SDKHook_ThinkPost, Hook_OnThinkPost);
-}
-
-public void Hook_OnThinkPost(int iEnt) {
-	static int iTotalScoreOffset = -1;
-	if (iTotalScoreOffset == -1)
-		iTotalScoreOffset = FindSendPropInfo("CTFPlayerResource", "m_iTotalScore");
-	
-	// Get all players' current scores
-	int iTotalScore[MAXPLAYERS+1];
-	GetEntDataArray(iEnt, iTotalScoreOffset, iTotalScore, MaxClients+1);
-	
-	// Apply reconnect credit and backstab deductions to the fresh engine totals.
-	for (int i = 1; i <= MaxClients; i++) {
-		if (IsClientInGame(i)) {
-			iTotalScore[i] += g_iAddScore[i] + g_iScoreAdjustment[i];
-			if (iTotalScore[i] < 0)
-				iTotalScore[i] = 0;
-		}
-	}
-	
-	// Set all players' new scores
-	SetEntDataArray(iEnt, iTotalScoreOffset, iTotalScore, MaxClients+1);
-}
-// ----------------------------------------
+#if defined RESTORESCORE_TEST
+ #include "selftest.sp"
+#endif
