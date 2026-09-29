@@ -26,6 +26,7 @@ public Plugin myinfo =
 #define DOUBLE_SPEC_TIMEOUT_STEAMID64 "76561198163255365"
 
 int g_iLastPressTime[MAXPLAYERS+1];
+float g_flLastActivityTime[MAXPLAYERS+1];
 bool g_bMovedToSpec[MAXPLAYERS+1];
 int g_iCurrentTime = 0;
 
@@ -42,7 +43,17 @@ GlobalForward g_fwOnAfkKick;
 public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max) {
     MarkNativeAsOptional("DGM_ServerCapacitycheck");
     RegPluginLibrary("afkmanager");
+    CreateNative("AFKManager_GetLastActivityTime", Native_GetLastActivityTime);
     return APLRes_Success;
+}
+
+public any Native_GetLastActivityTime(Handle plugin, int numParams) {
+    int client = GetNativeCell(1);
+    if (!Client_IsHumanInGame(client)) {
+        return view_as<int>(0.0);
+    }
+
+    return view_as<int>(g_flLastActivityTime[client]);
 }
 
 public void OnPluginStart()
@@ -90,18 +101,18 @@ public Action OnPlayerRunCmd(
 ) {
 	if (Client_IsHumanInGame(client)
 		&& ((buttons & ACTION_BUTTONS) != 0 || mouse[0] != 0 || mouse[1] != 0)) {
-		MarkClientActive(client);
+		MarkClientInputActive(client);
 	}
 	return Plugin_Continue;
 }
 
 public void OnClientSpeaking(int client) {
-	MarkClientActive(client);
+	MarkClientInputActive(client);
 }
 
 Action OnSpecChanged(int client, const char[] command, int argc) {
 	// spectators moving cameras is not covered by button checks (annoyingly!)
-	MarkClientActive(client);
+	MarkClientInputActive(client);
 	return Plugin_Continue;
 }
 
@@ -133,12 +144,23 @@ void MarkClientActive(int client) {
 	g_iLastPressTime[client] = g_iCurrentTime;
 }
 
+void MarkClientInputActive(int client) {
+    if (!Client_IsHumanInGame(client)) {
+        return;
+    }
+
+    // Idle-time bookkeeping is not evidence of actual client input.
+    g_flLastActivityTime[client] = GetEngineTime();
+    MarkClientActive(client);
+}
+
 void ResetClientState(int client) {
 	if (client <= 0 || client > MaxClients) {
 		return;
 	}
 
 	g_iLastPressTime[client] = g_iCurrentTime;
+	g_flLastActivityTime[client] = 0.0;
 	g_bMovedToSpec[client] = false;
 }
 
