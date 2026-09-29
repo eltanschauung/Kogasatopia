@@ -186,7 +186,10 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 			SetClientHatEnabled(client, hatIndex, false);
 			QueueHatStateSave(client, true);
 			RemoveHat(client, hatIndex);
-			PrintToChat(client, "[Hats] Disabled %s.", g_Hats[hatIndex].name);
+			char color[32];
+			GetHatChatColorForClientTeam(client, hatIndex, color, sizeof(color));
+			CPrintToChat(client, "{gold}[CustomHats] {%s}%s{default} unequipped.",
+				color, g_Hats[hatIndex].name);
 			return 0;
 		}
 
