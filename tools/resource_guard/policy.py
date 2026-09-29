@@ -11,7 +11,7 @@ class Decision:
 class Policy:
     """Diagnostic triggers never independently authorize a server stop."""
 
-    def __init__(self, breaches=2, stop_breaches=6, cooldown=300, last_stop=0):
+    def __init__(self, breaches=2, stop_breaches=10, cooldown=300, last_stop=0):
         self.breaches = breaches
         self.stop_breaches = stop_breaches
         self.cooldown = cooldown
