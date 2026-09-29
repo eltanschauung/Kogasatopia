@@ -172,7 +172,7 @@ void SpecQueue_OnClientPutInServer(int client) {
     }
 }
 
-void SpecQueue_OnClientDisconnect_Post(int client) {
+void SpecQueue_OnClientDisconnect_Post() {
     SpecQueue_UpdateQueueSuspension();
 }
 

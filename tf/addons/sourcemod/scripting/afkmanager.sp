@@ -75,9 +75,8 @@ public void OnPluginStart() {
     if (FindPluginByFile("spec-when-full.smx") != null) {
         ServerCommand("sm plugins unload spec-when-full");
         ServerExecute();
-        if (FindPluginByFile("spec-when-full.smx") != null) {
-            SetFailState("Unload the retired spec-when-full plugin before loading AFK Manager");
-        }
+        // SourceMod defers plugin removal until this startup callback returns.
+        RequestFrame(AFK_VerifyLegacyPluginRetired);
     }
 
     g_cvAFKEnabled = CreateConVar("sm_afkmanager_enabled", "1", "Enable AFK management; spectator queue controls are independent.", _, true, 0.0, true, 1.0);
@@ -111,6 +110,12 @@ public void OnPluginStart() {
     AFK_ResetAllClients();
     SpecQueue_Init();
     AutoExecConfig(true, "afkmanager", "sourcemod");
+}
+
+public void AFK_VerifyLegacyPluginRetired(any data) {
+    if (FindPluginByFile("spec-when-full.smx") != null) {
+        SetFailState("Unload the retired spec-when-full plugin before loading AFK Manager");
+    }
 }
 
 public void OnMapStart() {
@@ -150,7 +155,7 @@ public void OnClientDisconnect(int client) {
 }
 
 public void OnClientDisconnect_Post(int client) {
-    SpecQueue_OnClientDisconnect_Post(client);
+    SpecQueue_OnClientDisconnect_Post();
 }
 
 public void OnServerEnterHibernation() {
@@ -290,7 +295,7 @@ void AFK_ResetAllClients() {
 }
 
 void AFK_CacheTimeoutException(int client) {
-    if (!Client_IsHumanInGame(client)) {
+    if (!Client_IsHumanInGame(client) || !IsClientAuthorized(client)) {
         return;
     }
     char steamId64[32];

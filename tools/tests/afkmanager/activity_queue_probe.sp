@@ -36,6 +36,10 @@ bool pending[MAXPLAYERS + 1];
 float activity[MAXPLAYERS + 1];
 float g_flSpecQueueActivityBaseline[MAXPLAYERS + 1];
 float g_flSpecQueueImmuneUntil[MAXPLAYERS + 1];
+Handle g_hSpecQueuePendingTimers[MAXPLAYERS + 1];
+int g_iSpecQueuePendingUserIds[MAXPLAYERS + 1];
+int g_iSpecQueuePendingTeams[MAXPLAYERS + 1];
+bool g_bSpecQueuePendingFromQueue[MAXPLAYERS + 1];
 AFKClientState g_AFKClients[MAXPLAYERS + 1];
 Toggle g_cvAFKAction;
 Toggle g_cvAFKMinPlayerCount;
@@ -125,6 +129,17 @@ bool SpecQueue_AddClientToWaitQueue(int client, const char[] reason) {
     return true;
 }
 void SpecQueue_SchedulePlayerChangeChecks() { scheduled++; }
+int ProbeUserId(int userId) { return userId == 1001 ? 1 : 0; }
+void SpecQueue_LogPopulationSnapshot(const char[] eventName, int client = 0,
+    int oldTeam = -1, int newTeam = -1, int userId = 0, const char[] reason = "") {
+    #pragma unused eventName
+    #pragma unused client
+    #pragma unused oldTeam
+    #pragma unused newTeam
+    #pragma unused userId
+    #pragma unused reason
+}
+public Action ProbeTimer(Handle timer) { return Plugin_Stop; }
 int ProbeCount(bool inGameOnly) {
     #pragma unused inGameOnly
     return population;
@@ -148,6 +163,7 @@ void AFK_MoveToSpectator(int client, float time) {
 #define AFK_GetLastActivityTime ProbeActivity
 #define GetClientCount ProbeCount
 #define GetClientTeam ProbeTeam
+#define GetClientOfUserId ProbeUserId
 #define IsPlayerAlive ProbeAlive
 #define TF2_GetPlayerClass ProbeClass
 #define CPrintToChat ProbeChat
@@ -281,6 +297,33 @@ public Action RunProbe(int client, int args) {
     Check(SpecQueue_BlocksAFKKick(1), "pending promotion is protected from AFK kick");
     operational = false;
     Check(!SpecQueue_BlocksAFKKick(1), "disabled queue does not grant AFK immunity");
+
+    ResetScenario();
+    Handle stale = CreateTimer(30.0, ProbeTimer, _, TIMER_FLAG_NO_MAPCHANGE);
+    g_hSpecQueuePendingTimers[1] = stale;
+    g_iSpecQueuePendingUserIds[1] = 1001;
+    SpecQueue_ClearPendingJoin(1);
+    Check(g_hSpecQueuePendingTimers[1] == null && g_iSpecQueuePendingUserIds[1] == 0,
+        "clearing a reservation cancels its timer and state");
+    Handle current = CreateTimer(30.0, ProbeTimer, _, TIMER_FLAG_NO_MAPCHANGE);
+    g_hSpecQueuePendingTimers[1] = current;
+    g_iSpecQueuePendingUserIds[1] = 1001;
+    g_bSpecQueuePendingFromQueue[1] = true;
+    SpecQueue_Timer_ExpirePendingJoin(stale, 1001);
+    Check(g_hSpecQueuePendingTimers[1] == current && g_iSpecQueuePendingUserIds[1] == 1001,
+        "old timeout cannot clear a newer reservation");
+    SpecQueue_Timer_ExpirePendingJoin(current, 999);
+    Check(g_iSpecQueuePendingUserIds[1] == 1001, "wrong-user timeout cannot clear reservation");
+    SpecQueue_Timer_ExpirePendingJoin(current, 1001);
+    Check(g_hSpecQueuePendingTimers[1] == null && g_iSpecQueuePendingUserIds[1] == 0 && inQueue[1],
+        "matching failed promotion clears itself and requeues");
+    delete current;
+
+    g_hSpecQueuePendingTimers[1] = CreateTimer(30.0, ProbeTimer, _, TIMER_FLAG_NO_MAPCHANGE);
+    g_iSpecQueuePendingUserIds[1] = 1001;
+    SpecQueue_ClearAllPendingJoins();
+    Check(g_hSpecQueuePendingTimers[1] == null && g_iSpecQueuePendingUserIds[1] == 0,
+        "map/shutdown cleanup cancels all reservations");
 
     PrintToServer("[ActivityProbe] %d assertions, %d failures", assertions, failures);
     return Plugin_Handled;

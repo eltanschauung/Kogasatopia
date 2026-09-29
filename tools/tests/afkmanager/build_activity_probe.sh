@@ -12,8 +12,8 @@ trap 'rm -rf -- "$work"' EXIT
 for type in AFKClientState AFKAction; do
     sed -n "/^enum\( struct\)\? $type {/,/^}/p" "$afk"
 done > "$work/activity_queue_state.inc"
-for function in SpecQueue_ResetAutoQueueActivityBaselines SpecQueue_SuppressActivityAutoQueue SpecQueue_CheckActivity SpecQueue_BlocksAFKKick SpecQueue_IsPlayingTeam; do
-    sed -n "/^\(void\|bool\) $function(/,/^}/p" "$module"
+for function in SpecQueue_ResetAutoQueueActivityBaselines SpecQueue_SuppressActivityAutoQueue SpecQueue_CheckActivity SpecQueue_BlocksAFKKick SpecQueue_IsPlayingTeam SpecQueue_ClearPendingJoin SpecQueue_ClearAllPendingJoins SpecQueue_Timer_ExpirePendingJoin; do
+    sed -n "/^\(void\|bool\|public Action\) $function(/,/^}/p" "$module"
 done > "$work/activity_queue_under_test.inc"
 for function in AFK_ResetIdle AFK_RecordActivity AFK_ResetClient AFK_AdvanceIdle AFK_ManageClients; do
     sed -n "/^void $function(/,/^}/p" "$afk"
