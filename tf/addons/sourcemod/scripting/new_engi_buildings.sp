@@ -38,7 +38,7 @@ public void OnPluginStart()
 	HookEvent("player_builtobject", NewEngiBuildings_ObjectBuilt, EventHookMode_Post);
 	HookEvent("player_carryobject", NewEngiBuildings_ObjectCarried, EventHookMode_Post);
 	HookEvent("object_destroyed", NewEngiBuildings_ObjectDestroyed, EventHookMode_Post);
-	HookEvent("object_detonated", NewEngiBuildings_ObjectDetonated, EventHookMode_Post);
+	HookEvent("object_detonated", NewEngiBuildings_ObjectDetonated, EventHookMode_Pre);
 }
 
 public void OnPluginEnd()

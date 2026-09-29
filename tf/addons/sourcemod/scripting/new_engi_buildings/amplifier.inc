@@ -48,6 +48,18 @@
 #define AMPLIFIER_RAYZAR_GIB_COUNT 6
 #define AMPLIFIER_EXPLOSION_DAMAGE 120
 #define AMPLIFIER_EXPLOSION_RADIUS 146.0
+#define AMPLIFIER_EXPLOSION_SELF_RADIUS 146.0
+#define AMPLIFIER_EXPLOSION_SELF_DAMAGE_SCALE 0.75
+#define AMPLIFIER_EXPLOSION_FORCE_SELF 9.0
+#define AMPLIFIER_EXPLOSION_FORCE_OTHER 6.0
+#define AMPLIFIER_ENV_EXPLOSION_VISUAL_FLAGS "829" // Existing 828 flags plus SF_ENVEXPLOSION_NODAMAGE.
+
+enum AmplifierExplosionMode
+{
+	AmplifierExplosion_EnemyDestroyed,
+	AmplifierExplosion_PDA,
+	AmplifierExplosion_Carried
+};
 
 static const char g_AmplifierModelExtensions[][] =
 {
@@ -141,6 +153,7 @@ TFCond AmplifierCondition[ME];
 int BuildingRef[ME];
 int g_ActiveAmplifiers[ME];
 bool g_bAmplifierExplosionActive = false;
+int g_AmplifierHandledDestructionRef[ME];
 
 // ConVars
 ConVar cvarDistance;
@@ -459,6 +472,11 @@ static void Amplifier_PrecacheResources()
 
 void Amplifier_OnMapStart()
 {
+	g_bAmplifierExplosionActive = false;
+	for (int ent = 0; ent < ME; ent++)
+	{
+		g_AmplifierHandledDestructionRef[ent] = INVALID_ENT_REFERENCE;
+	}
     Amplifier_PrecacheResources();
 	PrecacheScriptSound(AMPLIFIER_IDLE_SOUND);
 	g_AmplifierIdleSoundResolved = GetGameSoundParams(
@@ -476,6 +494,11 @@ void Amplifier_OnMapStart()
 
 void Amplifier_OnMapEnd()
 {
+	g_bAmplifierExplosionActive = false;
+	for (int ent = 0; ent < ME; ent++)
+	{
+		g_AmplifierHandledDestructionRef[ent] = INVALID_ENT_REFERENCE;
+	}
 	for (int ent = 1; ent < GetTrackedEntityLimit(); ent++)
 	{
 		ResetAmplifierBuildingState(ent);
@@ -1051,13 +1074,7 @@ void StopAmplifierIdleSound(int ent)
 
 public Action Event_AmplifierObjectDestroyedPre(Event event, const char[] name, bool dontBroadcast)
 {
-	int ent = event.GetInt("index");
-	if (IsTrackedEntityIndex(ent)
-		&& (AmplifierOn[ent] || AmplifierIdleSoundPlaying[ent]))
-	{
-		StopAmplifierIdleSound(ent);
-	}
-
+	HandleAmplifierDestruction(event, false);
 	return Plugin_Continue;
 }
 
@@ -1506,6 +1523,11 @@ void HandleAmplifierDestruction(Event event, bool wasPdaDetonation)
 	{
 		return;
 	}
+	int entRef = EntIndexToEntRef(ent);
+	if (g_AmplifierHandledDestructionRef[ent] == entRef)
+	{
+		return;
+	}
 
 	if (!AmplifierOn[ent] && !AmplifierCarried[ent] && !IsAmplifierModel(ent))
 	{
@@ -1515,26 +1537,32 @@ void HandleAmplifierDestruction(Event event, bool wasPdaDetonation)
 	bool wasCarried = IsAmplifierBeingCarried(ent);
 	bool wasBuilding = GetObjectBoolProp(ent, "m_bBuilding");
 	float position[3];
-	GetEntPropVector(ent, Prop_Send, "m_vecOrigin", position);
+	GetEntPropVector(ent, Prop_Data, "m_vecAbsOrigin", position);
+	int builder = GetEntPropEnt(ent, Prop_Send, "m_hBuilder");
+	if (!Client_IsInGame(builder))
+	{
+		builder = GetClientOfUserId(event.GetInt("userid"));
+	}
+	int buildingTeam = GetEntProp(ent, Prop_Send, "m_iTeamNum");
+	AmplifierExplosionMode mode = wasCarried ? AmplifierExplosion_Carried
+		: (wasPdaDetonation ? AmplifierExplosion_PDA : AmplifierExplosion_EnemyDestroyed);
+	int attacker = mode == AmplifierExplosion_PDA ? builder
+		: GetClientOfUserId(event.GetInt("attacker"));
+	g_AmplifierHandledDestructionRef[ent] = entRef;
 
 	int explosionDamage = GetConVarInt(cvarEnableExplosion);
 	if (explosionDamage > 0
 		&& (wasCarried || !wasBuilding)
 		&& !g_bAmplifierExplosionActive)
 	{
-		// Carried destruction always takes precedence and is environmental so
-		// both teams are vulnerable. A PDA detonation is builder-owned so TF2
-		// protects teammates while still damaging the Engineer and enemies.
-		int explosionOwner = 0;
-		if (wasPdaDetonation && !wasCarried)
-		{
-			explosionOwner = GetClientOfUserId(event.GetInt("userid"));
-		}
-
 		CreateAmplifierExplosion(
+			ent,
 			position,
-			explosionOwner,
-			explosionDamage,
+			attacker,
+			builder,
+			buildingTeam,
+			mode,
+			float(explosionDamage),
 			AMPLIFIER_EXPLOSION_RADIUS);
 	}
 
@@ -1998,38 +2026,190 @@ void DealElectricDamage(int client, int builder, const float amplifierPos[3], fl
 }
 
 
+public bool TraceFilter_AmplifierExplosion(int entity, int contentsMask, any source)
+{
+	return entity != source && (entity < 1 || entity > MaxClients);
+}
+
+bool AmplifierExplosionHasLineOfSight(
+	const float position[3], const float target[3], int source, int victim)
+{
+	Handle trace = TR_TraceRayFilterEx(
+		position, target, MASK_SOLID, RayType_EndPoint,
+		TraceFilter_AmplifierExplosion, source);
+	bool clear = TR_GetFraction(trace) >= 0.99 || TR_GetEntityIndex(trace) == victim;
+	delete trace;
+	return clear;
+}
+
+int AmplifierExplosionAttacker(int attacker, int victim, int victimTeam,
+	AmplifierExplosionMode mode)
+{
+	if (!Client_IsInGame(attacker))
+	{
+		return 0;
+	}
+	// TF2 rejects ordinary friendly fire, so use world attribution only for
+	// targets on the destroyer's team. Preserve credit against enemies.
+	if (mode != AmplifierExplosion_PDA
+		&& (victim == attacker || victimTeam == GetClientTeam(attacker)))
+	{
+		return 0;
+	}
+	return attacker;
+}
+
+void DamageAmplifierExplosionPlayers(
+	int source, int inflictor, const float position[3], int attacker,
+	int builder, int builderTeam, AmplifierExplosionMode mode,
+	float baseDamage, float radius)
+{
+	for (int victim = 1; victim <= MaxClients; victim++)
+	{
+		if (!IsClientInGame(victim) || !IsPlayerAlive(victim))
+		{
+			continue;
+		}
+		int victimTeam = GetClientTeam(victim);
+		if (victimTeam != 2 && victimTeam != 3)
+		{
+			continue;
+		}
+		if (mode == AmplifierExplosion_PDA && victim != builder
+			&& victimTeam == builderTeam)
+		{
+			continue;
+		}
+
+		float feet[3], mins[3], maxs[3], center[3];
+		GetClientAbsOrigin(victim, feet);
+		GetClientMins(victim, mins);
+		GetClientMaxs(victim, maxs);
+		center[0] = feet[0] + (mins[0] + maxs[0]) * 0.5;
+		center[1] = feet[1] + (mins[1] + maxs[1]) * 0.5;
+		center[2] = feet[2] + (mins[2] + maxs[2]) * 0.5;
+		float distance = GetVectorDistance(position, feet);
+		float centerDistance = GetVectorDistance(position, center);
+		if (centerDistance < distance)
+		{
+			distance = centerDistance;
+		}
+		float victimRadius = mode == AmplifierExplosion_PDA && victim == builder
+			? AMPLIFIER_EXPLOSION_SELF_RADIUS : radius;
+		if (distance >= victimRadius
+			|| !AmplifierExplosionHasLineOfSight(position, center, source, victim))
+		{
+			continue;
+		}
+
+		float forceDamage = baseDamage * (1.0 - distance / victimRadius);
+		float healthDamage = forceDamage;
+		bool selfBlast = mode == AmplifierExplosion_PDA && victim == builder;
+		if (selfBlast)
+		{
+			healthDamage *= AMPLIFIER_EXPLOSION_SELF_DAMAGE_SCALE;
+		}
+		float direction[3], velocity[3];
+		MakeVectorFromPoints(position, center, direction);
+		direction[2] += 10.0;
+		NormalizeVector(direction, direction);
+		GetEntPropVector(victim, Prop_Data, "m_vecVelocity", velocity);
+		float hullVolume = (maxs[0] - mins[0]) * (maxs[1] - mins[1])
+			* (maxs[2] - mins[2]);
+		if (hullVolume <= 1.0)
+		{
+			hullVolume = 48.0 * 48.0 * 82.0;
+		}
+		float force = forceDamage * (48.0 * 48.0 * 82.0 / hullVolume)
+			* (selfBlast ? AMPLIFIER_EXPLOSION_FORCE_SELF
+				: AMPLIFIER_EXPLOSION_FORCE_OTHER);
+		if (!selfBlast && TF2_GetPlayerClass(victim) == TFClass_Heavy)
+		{
+			force *= 0.5;
+		}
+		if (force > 1000.0)
+		{
+			force = 1000.0;
+		}
+		ScaleVector(direction, force);
+		AddVectors(velocity, direction, velocity);
+		TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, velocity);
+		SDKHooks_TakeDamage(victim, inflictor,
+			AmplifierExplosionAttacker(attacker, victim, victimTeam, mode),
+			healthDamage, DMG_BLAST | DMG_PREVENT_PHYSICS_FORCE,
+			-1, NULL_VECTOR, position);
+	}
+}
+
+void DamageAmplifierExplosionBuildings(
+	int source, int inflictor, const float position[3], int attacker,
+	int builderTeam, AmplifierExplosionMode mode, float baseDamage, float radius)
+{
+	char classname[32];
+	for (int victim = MaxClients + 1; victim < GetMaxEntities(); victim++)
+	{
+		if (victim == source || !IsValidEntity(victim))
+		{
+			continue;
+		}
+		GetEntityClassname(victim, classname, sizeof(classname));
+		if (!StrEqual(classname, "obj_sentrygun")
+			&& !StrEqual(classname, "obj_dispenser")
+			&& !StrEqual(classname, "obj_teleporter"))
+		{
+			continue;
+		}
+		int victimTeam = GetEntProp(victim, Prop_Send, "m_iTeamNum");
+		if (mode == AmplifierExplosion_PDA && victimTeam == builderTeam)
+		{
+			continue;
+		}
+		float center[3];
+		GetEntPropVector(victim, Prop_Data, "m_vecAbsOrigin", center);
+		float distance = GetVectorDistance(position, center);
+		if (distance >= radius
+			|| !AmplifierExplosionHasLineOfSight(position, center, source, victim))
+		{
+			continue;
+		}
+		SDKHooks_TakeDamage(victim, inflictor,
+			AmplifierExplosionAttacker(attacker, victim, victimTeam, mode),
+			baseDamage * (1.0 - distance / radius),
+			DMG_BLAST | DMG_PREVENT_PHYSICS_FORCE, -1, NULL_VECTOR, position);
+	}
+}
+
 void CreateAmplifierExplosion(
-	const float position[3],
-	int owner,
-	int damage,
-	float radiusUnits)
+	int source, const float position[3], int attacker, int builder,
+	int buildingTeam, AmplifierExplosionMode mode, float damage, float radiusUnits)
 {
 	int explosion = CreateEntityByName("env_explosion");
-	if (explosion == -1)
-	{
-		return;
-	}
-
 	int radius = RoundFloat(radiusUnits);
 	char sDamage[16], sRadius[16];
-	IntToString(damage, sDamage, sizeof(sDamage));
+	IntToString(RoundFloat(damage), sDamage, sizeof(sDamage));
 	IntToString(radius, sRadius, sizeof(sRadius));
 
-	DispatchKeyValue(explosion, "iMagnitude", sDamage);
-	DispatchKeyValue(explosion, "iRadiusOverride", sRadius);
-	DispatchKeyValue(explosion, "spawnflags", "828");
-	TeleportEntity(explosion, position, NULL_VECTOR, NULL_VECTOR);
-
-	bool hasPlayerOwner = Client_IsInGame(owner);
-	if (hasPlayerOwner)
+	if (explosion != -1)
 	{
-		SetEntPropEnt(explosion, Prop_Send, "m_hOwnerEntity", owner);
+		DispatchKeyValue(explosion, "iMagnitude", sDamage);
+		DispatchKeyValue(explosion, "iRadiusOverride", sRadius);
+		DispatchKeyValue(explosion, "spawnflags", AMPLIFIER_ENV_EXPLOSION_VISUAL_FLAGS);
+		TeleportEntity(explosion, position, NULL_VECTOR, NULL_VECTOR);
+		DispatchSpawn(explosion);
 	}
 
-	DispatchSpawn(explosion);
+	// Set the guard before damaging buildings: their death events may be nested.
 	g_bAmplifierExplosionActive = true;
-	AcceptEntityInput(explosion, "Explode");
 	CreateTimer(0.2, Timer_ClearAmplifierExplosionActive, _, TIMER_NO_MAPCHANGE);
+	int inflictor = explosion != -1 ? explosion : source;
+	DamageAmplifierExplosionPlayers(source, inflictor, position, attacker,
+		builder, buildingTeam, mode, damage, radiusUnits);
+	DamageAmplifierExplosionBuildings(source, inflictor, position, attacker,
+		buildingTeam, mode, damage, radiusUnits);
+	if (explosion != -1)
+	{
+		AcceptEntityInput(explosion, "Explode");
+	}
 
 	// Create visual explosion effect
 	TE_SetupExplosion(position, 0, 10.0, 1, 0, radius, 5000);
@@ -2038,7 +2218,7 @@ void CreateAmplifierExplosion(
 	int particle = CreateEntityByName("info_particle_system");
 	if (particle != -1)
 	{
-		int team = hasPlayerOwner ? GetClientTeam(owner) : 0;
+		int team = buildingTeam;
 		TeleportEntity(particle, position, NULL_VECTOR, NULL_VECTOR);
 		char storedParticle[64];
 		strcopy(storedParticle, sizeof(storedParticle), "powerup_supernova_explode_red_spikes");
@@ -2055,7 +2235,10 @@ void CreateAmplifierExplosion(
 	}
 
 	// Clean up explosion entity
-	CreateTimer(0.1, Timer_RemoveEntity, EntIndexToEntRef(explosion), TIMER_NO_MAPCHANGE);
+	if (explosion != -1)
+	{
+		CreateTimer(0.1, Timer_RemoveEntity, EntIndexToEntRef(explosion), TIMER_NO_MAPCHANGE);
+	}
 }
 
 public Action Timer_ClearAmplifierExplosionActive(Handle timer)
