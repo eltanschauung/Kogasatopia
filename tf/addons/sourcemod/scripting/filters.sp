@@ -207,7 +207,7 @@ public Plugin myinfo =
     name = "filters",
     author = "Hombre, Dr. McKay, AlliedModders LLC",
     description = "Chat management, filtering, web relay, and BaseComm controls",
-    version = "1.0.0",
+    version = "1.1.0",
     url = "https://kogasa.tf"
 };
 
@@ -218,6 +218,7 @@ public Plugin myinfo =
 #include "filters/common_state.sp"
 #include "filters/tidychat.sp"
 #include "filters/runtime.sp"
+#include "filters/name_history.sp"
 #include "filters/database.sp"
 #include "filters/archived_personas.sp"
 #include "filters/webchat.sp"

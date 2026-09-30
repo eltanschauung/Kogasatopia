@@ -80,7 +80,7 @@ bool Prename_Apply(int client)
     {
         if (!StrEqual(currentName, rename, false))
         {
-            SetClientName(client, rename);
+            Filters_SetPersonaOverride(client, rename);
         }
         return true;
     }
@@ -125,7 +125,7 @@ public Action Command_Prename(int client, int args)
 
         Prename_SaveRule(steamId, selfName);
         Prename_SetIdRuleCache(steamId, selfName);
-        SetClientName(client, selfName);
+        Filters_SetPersonaOverride(client, selfName);
         ReplyToCommand(client, "[Kogasa] Your prename was set to '%s'.", selfName);
         return Plugin_Handled;
     }
@@ -175,7 +175,7 @@ public Action Command_Prename(int client, int args)
 
     Prename_SaveRule(steamId, newname);
     Prename_SetIdRuleCache(steamId, newname);
-    SetClientName(target, newname);
+    Filters_SetPersonaOverride(target, newname);
     ReplyToCommand(client, "[Kogasa] Prename rule saved: %s -> %s (%s)", targetName, newname, steamId);
     return Plugin_Handled;
 }

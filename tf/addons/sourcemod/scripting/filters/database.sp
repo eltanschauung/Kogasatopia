@@ -47,6 +47,7 @@ public void T_Filters_SQLConnect(Database db, const char[] error, any data)
 
     g_hFiltersDb = db;
     g_bDbReady = true;
+    g_SteamNameHistoryReady = false;
     g_bOutboxStampReady = false;
     Db_CancelTimer(g_hFiltersDbReconnectTimer);
     if (!g_hFiltersDb.SetCharset("utf8mb4"))
@@ -112,6 +113,10 @@ public void T_Filters_SQLConnect(Database db, const char[] error, any data)
         ... "updated_at INT NOT NULL DEFAULT 0,"
         ... "INDEX(last_name_lower),"
         ... "INDEX(updated_at)) DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS filters_steam_name_history ("
+        ... "steamid64 VARCHAR(32) NOT NULL, name VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,"
+        ... "name_lower VARCHAR(128) NOT NULL, first_seen INT NOT NULL, last_seen INT NOT NULL,"
+        ... "PRIMARY KEY(steamid64, name), INDEX(name_lower), INDEX(last_seen)) DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS filters_namecolors (steamid VARCHAR(32) PRIMARY KEY, color VARCHAR(32) NOT NULL DEFAULT '', pattern VARCHAR(96) NOT NULL DEFAULT '', updated_at INT NOT NULL DEFAULT 0)",
         "ALTER TABLE filters_namecolors ADD COLUMN IF NOT EXISTS pattern VARCHAR(96) NOT NULL DEFAULT '' AFTER color",
         "ALTER TABLE filters_namecolors MODIFY COLUMN pattern VARCHAR(96) NOT NULL DEFAULT ''",
@@ -170,6 +175,7 @@ public void Filters_SchemaQueryCallback(Database db, DBResultSet results, const 
     {
         g_bOutboxStampReady = true;
         Filters_LogDebug("Schema ready; host stamp support enabled");
+        Filters_SeedNameHistory();
         for (int i = 1; i <= MaxClients; i++)
         {
             if (IsClientInGame(i) && !IsFakeClient(i))

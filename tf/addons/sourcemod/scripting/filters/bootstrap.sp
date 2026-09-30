@@ -30,6 +30,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 
 public void OnPluginStart()
 {
+    Filters_NameHistoryInit();
     LoadTranslations("common.phrases");
     FiltersBaseComm_Initialize();
     Filters_EnsureCollections();
@@ -119,6 +120,8 @@ static void Filters_RegisterCommands()
     RegConsoleCmd("sm_colours", Command_Colors, "Show available chat colours");
     AddCommandListener(Listener_Colors, "colors");
     RegConsoleCmd("sm_gradientmenu", Command_GradientMenu, "Adjust where the second gradient color becomes full.");
+    RegConsoleCmd("sm_gradient", Command_Gradient, "Set a two- or three-color name gradient.");
+    RegConsoleCmd("sm_hue", Command_Gradient, "Set a two- or three-color name gradient.");
     RegConsoleCmd("sm_gm", Command_GradientMenu, "Adjust where the second gradient color becomes full.");
     RegConsoleCmd("sm_prename", Command_Prename, "sm_prename <name_substring|steamid> <newname> (admins) or sm_prename <newname> (self)");
     RegConsoleCmd("sm_reset", Command_PrenameReset, "sm_reset <name|steamid> (admins) or sm_reset (self)");

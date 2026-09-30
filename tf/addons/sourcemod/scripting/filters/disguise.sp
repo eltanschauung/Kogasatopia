@@ -76,17 +76,17 @@ public Action Command_Disguise(int client, int args)
         return Plugin_Handled;
     }
 
-    char predicate[320];
+    char predicate[768];
     if (isSteamId)
     {
         FormatEx(predicate, sizeof(predicate), "sn.steamid64 = '%s'", escaped);
     }
     else
     {
-        FormatEx(predicate, sizeof(predicate), "sn.last_name_lower = '%s'", escaped);
+        FormatEx(predicate, sizeof(predicate), "(sn.last_name_lower = '%s' OR EXISTS (SELECT 1 FROM filters_steam_name_history nh WHERE nh.steamid64 = BINARY sn.steamid64 AND nh.name_lower = '%s'))", escaped, escaped);
     }
 
-    char query[768];
+    char query[1536];
     FormatEx(query, sizeof(query),
         "SELECT sn.steamid64, sn.last_name, COALESCE(nc.color, ''), COALESCE(nc.pattern, '') "
         ... "FROM filters_steam_names sn "
@@ -108,7 +108,7 @@ public Action Command_Disguise(int client, int args)
     if (!found && !isSteamId)
     {
         delete results;
-        FormatEx(predicate, sizeof(predicate), "LOCATE('%s', sn.last_name_lower) > 0", escaped);
+        FormatEx(predicate, sizeof(predicate), "(LOCATE('%s', sn.last_name_lower) > 0 OR EXISTS (SELECT 1 FROM filters_steam_name_history nh WHERE nh.steamid64 = BINARY sn.steamid64 AND LOCATE('%s', nh.name_lower) > 0))", escaped, escaped);
         FormatEx(query, sizeof(query),
             "SELECT sn.steamid64, sn.last_name, COALESCE(nc.color, ''), COALESCE(nc.pattern, '') "
             ... "FROM filters_steam_names sn "

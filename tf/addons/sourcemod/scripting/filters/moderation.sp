@@ -320,7 +320,7 @@ static void Filters_GetServerName(char[] buffer, int maxlen)
     strcopy(buffer, maxlen, g_sServerName);
 }
 
-void Filters_RecordSteamName(int client)
+void Filters_RecordSteamName(int client, const char[] observedName = "")
 {
     if (!Filters_DbAvailable() || !Filters_IsRealClientInGame(client))
     {
@@ -334,9 +334,10 @@ void Filters_RecordSteamName(int client)
     }
 
     char name[MAX_NAME_LENGTH];
-    GetClientName(client, name, sizeof(name));
+    if (observedName[0]) strcopy(name, sizeof(name), observedName);
+    else GetClientName(client, name, sizeof(name));
     TrimString(name);
-    if (name[0] == '\0')
+    if (name[0] == '\0' || Filters_IsPersonaOverride(client, name))
     {
         return;
     }
@@ -365,6 +366,14 @@ void Filters_RecordSteamName(int client)
         escapedLower,
         GetTime());
     g_hFiltersDb.Query(Filters_SimpleSqlCallback, query);
+    if (g_SteamNameHistoryReady)
+    {
+        FormatEx(query, sizeof(query),
+            "INSERT INTO filters_steam_name_history (steamid64, name, name_lower, first_seen, last_seen) "
+            ... "VALUES ('%s', '%s', '%s', %d, %d) ON DUPLICATE KEY UPDATE last_seen = VALUES(last_seen)",
+            escapedSteam, escapedName, escapedLower, GetTime(), GetTime());
+        g_hFiltersDb.Query(Filters_SimpleSqlCallback, query);
+    }
 }
 
 bool Filters_QueryLastRecordedSteamName(const char[] steamId64, char[] buffer, int maxlen)

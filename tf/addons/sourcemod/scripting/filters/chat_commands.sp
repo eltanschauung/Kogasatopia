@@ -99,10 +99,55 @@ Action Filters_FinalizeChat(bool sourceModCommand, bool passthroughSayAlias)
     return Plugin_Stop;
 }
 
+static float g_ChatAcceptedAt[MAXPLAYERS + 1][2];
+static int g_ChatRateSerial[MAXPLAYERS + 1];
+
+bool Filters_AcceptChatMessage(int client)
+{
+    int serial = GetClientSerial(client);
+    if (g_ChatRateSerial[client] != serial)
+    {
+        g_ChatRateSerial[client] = serial;
+        g_ChatAcceptedAt[client][0] = -1.0;
+        g_ChatAcceptedAt[client][1] = -1.0;
+    }
+    float now = GetEngineTime();
+    if (now - g_ChatAcceptedAt[client][0] < 1.0)
+        return false;
+    g_ChatAcceptedAt[client][0] = g_ChatAcceptedAt[client][1];
+    g_ChatAcceptedAt[client][1] = now;
+    return true;
+}
+
+bool Filters_IsGradientChatCommand(const char[] message)
+{
+    char token[32];
+    BreakString(message, token, sizeof(token));
+    return StrEqual(token, "!gradient", false) || StrEqual(token, "/gradient", false)
+        || StrEqual(token, "!hue", false) || StrEqual(token, "/hue", false);
+}
+
+public Action Command_Gradient(int client, int args)
+{
+    if (client <= 0 || !IsClientInGame(client))
+        return Plugin_Handled;
+    if (FiltersBaseComm_IsClientGagged(client))
+        return Plugin_Handled;
+    char arguments[256];
+    GetCmdArgString(arguments, sizeof(arguments));
+    HandleGradientNameCommand(client, arguments, 0);
+    return Plugin_Handled;
+}
+
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
 {
     if (!client)
         return Plugin_Continue;
+
+    // Sliding one-second window shared by say/say_team and chat commands.
+    // Check before dispatch or side effects so excess messages stop entirely.
+    if (!Filters_AcceptChatMessage(client))
+        return Plugin_Stop;
 
     bool sourceModCommand = IsChatTrigger();
     bool passthroughSayAlias = CheckConfiguredBareCommand(sArgs);
@@ -112,6 +157,11 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (FiltersBaseComm_IsClientGagged(client)
         && (sourceModCommand || passthroughSayAlias || sArgs[0] == '/'))
         return Plugin_Stop;
+
+    // Let SourceMod dispatch the registered command exactly once, for either
+    // chat prefix. Plugin_Stop here would also suppress /gradient execution.
+    if (sourceModCommand && Filters_IsGradientChatCommand(sArgs))
+        return Plugin_Handled;
 
     // Slash commands are silent chat triggers. Saysounds also recognizes
     // /soundname through a say listener, so do not render or relay them here.
@@ -308,7 +358,7 @@ bool HandleNameColorCommand(int client, const char[] sArgs)
 
     if (gradientCommand)
     {
-        return HandleGradientNameCommand(client, buffer, nextIndex);
+        return false; // Handled by the registered sm_gradient/sm_hue commands.
     }
 
     if (americaCommand)
