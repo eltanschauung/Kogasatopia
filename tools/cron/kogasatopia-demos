@@ -1,0 +1,3 @@
+# Run hourly, but the persistent marker permits cleanup only after 72 hours.
+# Install script root-owned mode 0755 in /usr/local/sbin; state directory mode 0700.
+10 * * * * root /usr/bin/ionice -c 3 /usr/bin/nice -n 19 /usr/local/sbin/kogasatopia-cleanup-demos >> /var/log/kogasatopia-demo-cleanup.log 2>&1
