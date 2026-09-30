@@ -87,9 +87,12 @@ public void OnMapStart()
     Filters_StartTimers();
     g_TidyChatSuppressTeamAlertsUntil = 0.0;
     for (int client = 1; client <= MaxClients; client++) g_TidyChatSuppressNextTeamAlert[client] = false;
-    char mapName[128];
-    GetCurrentMap(mapName, sizeof(mapName));
-    Filters_InsertSystemMessage(false, false, "{gold}[Server]{default}: Map changed to {cornflowerblue}%s", mapName);
+    if (GetClientCount(false) >= 3)
+    {
+        char mapName[128];
+        GetCurrentMap(mapName, sizeof(mapName));
+        Filters_InsertSystemMessage(false, false, "{gold}[Server]{default}: Map changed to {cornflowerblue}%s", mapName);
+    }
 }
 
 Database g_hFiltersDb = null;
