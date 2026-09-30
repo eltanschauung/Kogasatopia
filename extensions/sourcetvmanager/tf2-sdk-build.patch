@@ -1,0 +1,53 @@
+diff --git a/AMBuildScript b/AMBuildScript
+index 5d7ca71..c076929 100644
+--- a/AMBuildScript
++++ b/AMBuildScript
+@@ -204,6 +204,7 @@ class ExtensionConfig(object):
+       '-Werror',
+       '-Wno-unused',
+       '-Wno-switch',
++      '-Wno-unknown-pragmas',
+       '-Wno-array-bounds',
+       '-Wno-expansion-to-defined',
+       '-msse',
+@@ -304,7 +305,8 @@ class ExtensionConfig(object):
+     cxx.cflags += ['/Oy-']
+ 
+   def configure_linux(self, cxx):
+-    cxx.defines += ['_LINUX', 'POSIX']
++    cxx.defines += ['_LINUX', 'LINUX', 'POSIX']
++    cxx.cxxflags += ['-Wno-error=dangling-else']
+     cxx.linkflags += ['-Wl,--exclude-libs,ALL', '-lm']
+     if cxx.family == 'gcc':
+       cxx.linkflags += ['-static-libgcc']
+@@ -364,7 +366,7 @@ class ExtensionConfig(object):
+ 
+     compiler.defines += ['SOURCE_ENGINE=' + sdk.code]
+ 
+-    if sdk.name in ['sdk2013', 'bms'] and compiler.like('gcc'):
++    if sdk.name in ['sdk2013', 'bms', 'tf2'] and compiler.like('gcc'):
+       # The 2013 SDK already has these in public/tier0/basetypes.h
+       compiler.defines.remove('stricmp=strcasecmp')
+       compiler.defines.remove('_stricmp=strcasecmp')
+@@ -398,7 +400,9 @@ class ExtensionConfig(object):
+       compiler.cxxincludes += [os.path.join(sdk.path, *path)]
+ 
+     if compiler.target.platform == 'linux':
+-      if sdk.name == 'episode1':
++      if sdk.name == 'tf2':
++        lib_folder = os.path.join(sdk.path, 'lib', 'public', 'linux64' if compiler.target.arch == 'x86_64' else 'linux')
++      elif sdk.name == 'episode1':
+         lib_folder = os.path.join(sdk.path, 'linux_sdk')
+       elif sdk.name in ['sdk2013', 'bms']:
+         lib_folder = os.path.join(sdk.path, 'lib', 'public', 'linux32')
+@@ -450,7 +454,9 @@ class ExtensionConfig(object):
+       output = context.AddSymlink(source_path, output_path)
+ 
+       compiler.weaklinkdeps += [output]
+-      compiler.linkflags[0:0] = [library]
++      # Resolve references from tier1/mathlib before --as-needed considers the
++      # Valve DSOs. Otherwise tier0 is discarded and Error/Warning stay unbound.
++      compiler.postlink += [library]
+ 
+     return binary
+ 

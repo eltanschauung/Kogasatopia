@@ -1,0 +1,10 @@
+SourceTV Manager 1.2: upstream source and license are identified in source.json.
+Clone that revision with its submodules, then apply tf2-sdk-build.patch.
+Configure with AMBuild using --sdks=tf2 --targets=x86 --enable-optimize and
+--hl2sdk-root, --sm-path, and --mms-path pointing to the TF2 SDK, SourceMod,
+and Metamod source trees. Run ambuild in the build directory.
+Install the package extension, gamedata and include into addons/sourcemod.
+The patch adapts upstream build paths, defines and link order to the current TF2 SDK;
+it does not change extension runtime behavior. WhaleTracker stores the first
+recording filename observed at a round start in whaletracker_logs.demo_filename.
+No recording leaves that nullable column unset. Recording settings are unchanged.

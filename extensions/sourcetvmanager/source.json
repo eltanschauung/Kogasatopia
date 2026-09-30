@@ -1,0 +1,8 @@
+{
+  "project": "SourceTV Manager",
+  "url": "https://github.com/peace-maker/sourcetvmanager",
+  "revision": "7ef5753b8164e843e9cf4ee80830faf434b61075",
+  "version": "1.2",
+  "target": "Linux x86 TF2",
+  "binary_sha256": "8266a4bf148a9f4cf8a5ef9d4074981a204cdd67927615e0976f67501522c671"
+}
