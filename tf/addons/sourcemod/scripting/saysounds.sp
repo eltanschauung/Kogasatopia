@@ -72,7 +72,7 @@ public Plugin myinfo =
     name = "saysounds",
     author = "Hombre",
     description = "Chat-triggered say sounds with opt-out and volume features",
-    version = "2.0.1",
+    version = "2.1.0",
     url = "https://kogasa.tf"
 };
 
@@ -169,7 +169,7 @@ int g_iTrackedSetupSirenState = -1;
 bool g_bTrackedSetupAutoCountdownOriginal = false;
 bool g_bTrackedSetupAutoCountdownSuppressed = false;
 bool g_bHudSetupSirenTimerSeenThisMap = false;
-bool g_bSirenFallbackPlayedThisMap = false;
+bool g_bSirenFallbackPlayedThisRound = false;
 bool g_bRoundActiveSirenQueued = false;
 bool g_bPendingSirenFallback = false;
 int g_iPendingSetupSirenTimerRef = INVALID_ENT_REFERENCE;

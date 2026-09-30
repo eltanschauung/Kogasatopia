@@ -5,6 +5,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errlen)
     MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("DGM_GetGameModeKey");
     MarkNativeAsOptional("Filters_GetSteamIdColorTag");
+    MarkNativeAsOptional("Filters_GetChatName");
     RegPluginLibrary("saysounds");
     CreateNative("SaySounds_ShouldPlay", Native_ShouldPlay);
     CreateNative("SaySounds_PlaySoundToOptedIn", Native_PlaySoundToOptedIn);
@@ -91,6 +92,7 @@ public void OnPluginStart()
     HookEvent("teamplay_point_startcapture", Event_PointStartCapture, EventHookMode_Post);
     HookEvent("teamplay_point_unlocked", Event_PointUnlocked, EventHookMode_Post);
     HookEvent("teamplay_round_active", Event_SirenLivePhase, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_round_start", Event_SirenNewRound, EventHookMode_PostNoCopy);
     HookEvent("teamplay_setup_finished", Event_SirenLivePhase, EventHookMode_PostNoCopy);
     AddNormalSoundHook(AnnouncementReplacement_NormalSoundHook);
     gNormalSoundHookAdded = true;
@@ -227,7 +229,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientPostAdminCheck(int client)
 {
-    if (IsFakeClient(client) || !g_bSirenFallbackPlayedThisMap)
+    if (IsFakeClient(client) || !g_bSirenFallbackPlayedThisRound)
     {
         return;
     }
@@ -243,7 +245,7 @@ public void OnClientPostAdminCheck(int client)
 
     if (humanCount == 1)
     {
-        g_bSirenFallbackPlayedThisMap = false;
+        g_bSirenFallbackPlayedThisRound = false;
     }
 }
 
@@ -279,7 +281,7 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
-    g_bSirenFallbackPlayedThisMap = false;
+    g_bSirenFallbackPlayedThisRound = false;
     g_bHudSetupSirenTimerSeenThisMap = false;
     CancelRoundStartSirenTimers();
     // Restore owned network overrides before dropping their entity references.

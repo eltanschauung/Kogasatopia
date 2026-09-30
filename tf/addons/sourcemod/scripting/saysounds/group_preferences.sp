@@ -73,137 +73,80 @@ public int MenuHandler_GroupOptions(Menu menu, MenuAction action, int client, in
 
 public Action Command_ListOptedInClients(int client, int args)
 {
-    char allSoundsNames[256];
-    char allSoundsNamesOverflow[256];
-    char mostlyEnabledNames[1024];
-    char allSoundsPlainNames[256];
-    char allSoundsPlainNamesOverflow[256];
-    char mostlyEnabledPlainNames[1024];
-    int allSoundsCount = 0;
-    int mostlyEnabledCount = 0;
-    int totalGroups = 0;
-
-    if (gGroupNames != null)
+    if (!gConfigLoaded || gGroupNames == null)
     {
-        char groupName[MAX_GROUP_NAME];
-        for (int i = 0; i < gGroupNames.Length; i++)
-        {
-            gGroupNames.GetString(i, groupName, sizeof(groupName));
-            if (!StrEqual(groupName, DEFAULT_GROUP))
-            {
-                totalGroups++;
-            }
-        }
+        ReplyToCommand(client, "[SaySounds] Sound groups are not ready yet.");
+        return Plugin_Handled;
     }
-
+    int total;
+    char group[MAX_GROUP_NAME];
+    for (int i = 0; i < gGroupNames.Length; i++)
+    {
+        gGroupNames.GetString(i, group, sizeof(group));
+        if (!StrEqual(group, DEFAULT_GROUP)) total++;
+    }
+    int players[MAXPLAYERS], enabled[MAXPLAYERS], count;
+    char names[MAXPLAYERS][MAX_NAME_LENGTH];
     for (int target = 1; target <= MaxClients; target++)
     {
-        if (!IsClientInGame(target) || IsFakeClient(target) || !SaySounds_ShouldPlay(target))
+        if (!IsClientInGame(target) || IsFakeClient(target)
+            || (client > 0 && Oblivion_ShouldHide(client, target))) continue;
+        int groups;
+        bool audible = SaySounds_ShouldPlay(target);
+        if (audible) for (int i = 0; i < gGroupNames.Length; i++)
         {
-            continue;
+            gGroupNames.GetString(i, group, sizeof(group));
+            if (!StrEqual(group, DEFAULT_GROUP) && !IsClientGroupDisabled(target, group)) groups++;
         }
-
-        int enabledGroups = 0;
-        if (gGroupNames != null)
+        // -1 sorts completely muted clients below users with zero configured groups.
+        if (!audible) groups = -1;
+        char name[MAX_NAME_LENGTH];GetClientName(target, name, sizeof(name));
+        int position = count;
+        while (position > 0 && (enabled[position - 1] < groups
+            || (enabled[position - 1] == groups && strcmp(names[position - 1], name, false) > 0)))
         {
-            char groupName[MAX_GROUP_NAME];
-            for (int i = 0; i < gGroupNames.Length; i++)
+            players[position] = players[position - 1];enabled[position] = enabled[position - 1];
+            strcopy(names[position], sizeof(names[]), names[position - 1]);position--;
+        }
+        players[position] = target;enabled[position] = groups;
+        strcopy(names[position], sizeof(names[]), name);count++;
+    }
+    for (int i = 0; i < count; i++)
+    {
+        int target = players[i];char status[512];
+        if (enabled[i] < 0 || (total > 0 && enabled[i] == 0))
+            strcopy(status, sizeof(status), "{red}All groups disabled");
+        else if (enabled[i] == total)
+            strcopy(status, sizeof(status), "{lightgreen}All groups");
+        else
+        {
+            bool listDisabled = enabled[i] * 2 >= total;
+            strcopy(status, sizeof(status), listDisabled ? "{yellowgreen}Disabled groups " : "{salmon}Enabled groups ");
+            int listed;
+            for (int groupIndex = 0; groupIndex < gGroupNames.Length; groupIndex++)
             {
-                gGroupNames.GetString(i, groupName, sizeof(groupName));
-                if (!StrEqual(groupName, DEFAULT_GROUP) && !IsClientGroupDisabled(target, groupName))
-                {
-                    enabledGroups++;
-                }
+                gGroupNames.GetString(groupIndex, group, sizeof(group));
+                if (StrEqual(group, DEFAULT_GROUP) || IsClientGroupDisabled(target, group) != listDisabled) continue;
+                if (listed++) StrCat(status, sizeof(status), ", ");
+                StrCat(status, sizeof(status), group);
             }
         }
-
-        if (enabledGroups == totalGroups)
+        if (client > 0 && IsClientInGame(client))
         {
-            if (allSoundsCount < 6)
-            {
-                AppendOptListClientName(allSoundsNames, sizeof(allSoundsNames), target, allSoundsCount, true);
-                AppendOptListClientName(allSoundsPlainNames, sizeof(allSoundsPlainNames), target, allSoundsCount, false);
-            }
-            else
-            {
-                AppendOptListClientName(allSoundsNamesOverflow, sizeof(allSoundsNamesOverflow), target, allSoundsCount - 6, true);
-                AppendOptListClientName(allSoundsPlainNamesOverflow, sizeof(allSoundsPlainNamesOverflow), target, allSoundsCount - 6, false);
-            }
-            allSoundsCount++;
+            char displayName[256];
+            if (GetFeatureStatus(FeatureType_Native, "Filters_GetChatName") != FeatureStatus_Available
+                || !Filters_GetChatName(target, displayName, sizeof(displayName)))
+                FormatEx(displayName, sizeof(displayName), "{teamcolor}%N", target);
+            CPrintToChatEx(client, target, "{gold}%d. %s{default}: %s", i + 1, displayName, status);
         }
-        else if (enabledGroups * 2 >= totalGroups)
+        else
         {
-            AppendOptListClientName(mostlyEnabledNames, sizeof(mostlyEnabledNames), target, mostlyEnabledCount, true);
-            AppendOptListClientName(mostlyEnabledPlainNames, sizeof(mostlyEnabledPlainNames), target, mostlyEnabledCount, false);
-            mostlyEnabledCount++;
+            CRemoveTags(status, sizeof(status));
+            ReplyToCommand(client, "%d. %s: %s", i + 1, names[i], status);
         }
     }
-
-    if (allSoundsCount == 0)
-    {
-        strcopy(allSoundsNames, sizeof(allSoundsNames), "none");
-        strcopy(allSoundsPlainNames, sizeof(allSoundsPlainNames), "none");
-    }
-    if (mostlyEnabledCount == 0)
-    {
-        strcopy(mostlyEnabledNames, sizeof(mostlyEnabledNames), "none");
-        strcopy(mostlyEnabledPlainNames, sizeof(mostlyEnabledPlainNames), "none");
-    }
-
-    if (client > 0 && IsClientInGame(client))
-    {
-        CPrintToChatEx(client, client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNames);
-        if (allSoundsCount > 6)
-        {
-            CPrintToChatEx(client, client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsNamesOverflow);
-        }
-        CPrintToChatEx(client, client, "[Saysounds] Clients with >=50%% of sound groups enabled: %s", mostlyEnabledNames);
-    }
-    else
-    {
-        ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsPlainNames);
-        if (allSoundsCount > 6)
-        {
-            ReplyToCommand(client, "[Saysounds] Clients will all sounds enabled: %s", allSoundsPlainNamesOverflow);
-        }
-        ReplyToCommand(client, "[Saysounds] Clients with >=50%% of sound groups enabled: %s", mostlyEnabledPlainNames);
-    }
-
+    if (!count) ReplyToCommand(client, "[SaySounds] No players to list.");
     return Plugin_Handled;
-}
-
-static void AppendOptListClientName(char[] output, int maxlen, int client, int existingCount, bool colorized)
-{
-    if (existingCount > 0)
-    {
-        StrCat(output, maxlen, ", ");
-    }
-
-    char displayName[256];
-    if (!colorized)
-    {
-        GetClientName(client, displayName, sizeof(displayName));
-    }
-    else
-    {
-        char colorToken[32];
-        char steamId64[32];
-        if (GetFeatureStatus(FeatureType_Native, "Filters_GetSteamIdColorTag") != FeatureStatus_Available
-            || !GetClientAuthId(client, AuthId_SteamID64, steamId64, sizeof(steamId64))
-            || !Filters_GetSteamIdColorTag(steamId64, colorToken, sizeof(colorToken))
-            || !colorToken[0])
-        {
-            strcopy(colorToken, sizeof(colorToken), "teamcolor");
-        }
-
-        FormatEx(displayName, sizeof(displayName), "{%s}%N{default}", colorToken, client);
-    }
-
-    if (colorized)
-    {
-        ChatColors_ResolveTeamTag(client, displayName, sizeof(displayName));
-    }
-    StrCat(output, maxlen, displayName);
 }
 
 public Action Command_ToggleSoundOpt(int client, int args)

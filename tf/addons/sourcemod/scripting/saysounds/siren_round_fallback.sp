@@ -8,19 +8,30 @@ void ResetRoundStartSirenRoundFallback()
     g_bRoundActiveSirenQueued = false;
 }
 
+public void Event_SirenNewRound(Event event, const char[] name, bool dontBroadcast)
+{
+    // Once per actual round, rather than once per map. The live-phase checks
+    // below still avoid waiting-for-players/setup and duplicate sirens.
+    ResetRoundStartSirenRoundFallback();
+    CancelRoundStartSirenTimer();
+    g_bPendingSirenFallback = false;
+    g_bSirenFallbackPlayedThisRound = false;
+    Event_SirenLivePhase(event, name, dontBroadcast);
+}
+
 public void Event_SirenLivePhase(Event event, const char[] name, bool dontBroadcast)
 {
     if (StrEqual(name, "teamplay_round_active") && !g_bHudSetupSirenTimerSeenThisMap)
     {
         int rules = FindEntityByClassname(-1, "tf_gamerules");
-        LogMessage("[SaySounds:SirenTrace] round_active: rules=%d waiting=%d setup=%d played_this_map=%d.",
+        LogMessage("[SaySounds:SirenTrace] round_active: rules=%d waiting=%d setup=%d played_this_round=%d.",
             rules,
             rules == -1 ? -1 : GameRules_GetProp("m_bInWaitingForPlayers", 1),
             rules == -1 ? -1 : GameRules_GetProp("m_bInSetup", 1),
-            g_bSirenFallbackPlayedThisMap);
+            g_bSirenFallbackPlayedThisRound);
     }
 
-    if (g_bHudSetupSirenTimerSeenThisMap || g_bSirenFallbackPlayedThisMap
+    if (g_bHudSetupSirenTimerSeenThisMap || g_bSirenFallbackPlayedThisRound
         || g_bRoundActiveSirenQueued || g_hRoundStartSirenTimer != INVALID_HANDLE
         || gReadyRoundStartSirenReplacements.Length == 0
         || FindEntityByClassname(-1, "tf_gamerules") == -1
@@ -45,7 +56,7 @@ public Action Timer_RoundActiveSiren(Handle timer)
     if (timer != g_hRoundActiveSirenTimer) return Plugin_Stop;
     g_hRoundActiveSirenTimer = INVALID_HANDLE;
     g_bRoundActiveSirenQueued = false;
-    if (g_bHudSetupSirenTimerSeenThisMap || g_bSirenFallbackPlayedThisMap
+    if (g_bHudSetupSirenTimerSeenThisMap || g_bSirenFallbackPlayedThisRound
         || g_hRoundStartSirenTimer != INVALID_HANDLE
         || gReadyRoundStartSirenReplacements.Length == 0
         || FindEntityByClassname(-1, "tf_gamerules") == -1

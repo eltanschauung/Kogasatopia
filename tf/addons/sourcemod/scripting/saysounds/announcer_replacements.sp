@@ -77,7 +77,7 @@ static void ReplaceRoundStartSiren(int index, int transitionSerial)
 
     if (g_bPendingSirenFallback && replacementRecipientCount + stockRecipientCount > 0)
     {
-        g_bSirenFallbackPlayedThisMap = true;
+        g_bSirenFallbackPlayedThisRound = true;
     }
 
     char currentMap[PLATFORM_MAX_PATH];
@@ -191,7 +191,7 @@ public Action Timer_ReplaceRoundStartSiren(Handle timer, any data)
     return Plugin_Stop;
 }
 
-static void CancelRoundStartSirenTimer()
+void CancelRoundStartSirenTimer()
 {
     if (g_hRoundStartSirenTimer != INVALID_HANDLE)
     {
