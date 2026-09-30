@@ -1,5 +1,5 @@
 // Spectate When Full by Eric Zhang (https://ericaftereric.top/).
-// Owned by afkmanager.sp; do not compile/load as a standalone plugin.
+// Owned by whalescramble.sp through AFK Manager; not a standalone plugin.
 
 #define SQ_BASE_STR_LEN 128
 #define SQ_JOIN_RESERVATION_TIMEOUT 3.0
@@ -136,13 +136,6 @@ void SpecQueue_Init() {
     AddCommandListener(SpecQueue_OnClientJoinTeam, "jointeam");
 
     AutoExecConfig(true, "plugin.spec-when-full", "sourcemod");
-}
-
-void SpecQueue_MarkNativesOptional() {
-    MarkNativeAsOptional("DGM_GetGameModeKey");
-    MarkNativeAsOptional("DGM_NormalizeMapName");
-    MarkNativeAsOptional("DGM_CurrentNormalizedMap");
-    MarkNativeAsOptional("DGM_RealPlayerCount");
 }
 
 void SpecQueue_OnMapStart() {
@@ -424,7 +417,7 @@ public Action SpecQueue_OnClientJoinTeam(int client, const char[] command, int a
 #endif
         SpecQueue_ClearPendingJoin(client);
         SpecQueue_RemoveClientFromWaitQueue(client, "voluntary_spectator");
-        ChangeClientTeam(client, TFTeam_Spectator);
+        TeamBalance_MoveToSpectator(client, "voluntary_spectator");
         CPrintToChat(client, "%t", "SPEC_WHEN_FULL_JOIN_SPEC");
         SpecQueue_SchedulePlayerChangeChecks();
         return Plugin_Handled;
@@ -444,9 +437,18 @@ public Action SpecQueue_OnClientJoinTeam(int client, const char[] command, int a
     LogMessage("Effective players: %d", SpecQueue_GetPlayersInGame() + SpecQueue_GetPendingJoinCount());
     LogMessage("SpecQueue_IsServerFull: %s", SpecQueue_IsServerFull() ? "true" : "false");
 #endif
+    if (!TeamBalance_CanAdmitClients()) {
+        if (putInAutoJoin) {
+            TeamBalance_MoveToSpectator(client, "admission_deferred");
+            SpecQueue_AddClientToWaitQueue(client, "team_operation_pending");
+        }
+        CPrintToChat(client, "{gold}[Queue]{default} Team changes are settling; please wait.");
+        SpecQueue_SchedulePlayerChangeChecks();
+        return Plugin_Handled;
+    }
     if (!SpecQueue_ReservePendingJoin(client, false, requestedTeam)) {
         SpecQueue_LogPopulationSnapshot("join_blocked", client, currentTeam, requestedTeam, GetClientUserId(client), "capacity_or_team_unavailable");
-        ChangeClientTeam(client, TFTeam_Spectator);
+        TeamBalance_MoveToSpectator(client, "full_join_attempt");
         if (putInAutoJoin && !g_SpecQueue.InQueue(client)) {
             SpecQueue_AddClientToWaitQueue(client, "full_join_attempt");
         }
@@ -501,7 +503,7 @@ public Action SpecQueue_Cmd_Spectate(int client, int args) {
         return Plugin_Handled;
     }
 
-    ChangeClientTeam(client, TFTeam_Spectator);
+    TeamBalance_MoveToSpectator(client, "spectate_command");
     CPrintToChat(client, "%t", "SPEC_WHEN_FULL_JOIN_SPEC");
 
     if (SpecQueue_IsPlayingTeam(oldTeam)) {
@@ -630,6 +632,12 @@ void SpecQueue_RunPlayerChangeChecks() {
     if (!SpecQueue_IsPluginOperational()) {
         return;
     }
+    if (!TeamBalance_CanAdmitClients()) {
+        if (!g_SpecQueue.IsEmpty()) {
+            SpecQueue_SchedulePlayerChangeChecks();
+        }
+        return;
+    }
 #if defined DEBUG
     LogMessage("SpecQueue_RunPlayerChangeChecks()");
 #endif
@@ -650,9 +658,22 @@ void SpecQueue_RunPlayerChangeChecks() {
             SpecQueue_AddClientToWaitQueue(client, "promotion_no_slot");
             break;
         }
+        if (!TeamBalance_TryBegin(TeamBalance_QueueJoin, TEAM_BALANCE_OPERATION_LEASE, true)) {
+            SpecQueue_ClearPendingJoin(client);
+            SpecQueue_AddClientToWaitQueue(client, "team_operation_pending");
+            SpecQueue_SchedulePlayerChangeChecks();
+            break;
+        }
+        int userId = GetClientUserId(client);
+        int operation = g_iBalanceOperationGeneration;
         SpecQueue_LogPopulationSnapshot("promotion_requested", client, -1, -1, GetClientUserId(client), "queue_head");
         FakeClientCommand(client, "jointeam %s",
             g_iSpecQueuePendingTeams[client] == view_as<int>(TFTeam_Red) ? SQ_JOIN_TEAM_RED : SQ_JOIN_TEAM_BLU);
+        client = GetClientOfUserId(userId);
+        if (operation == g_iBalanceOperationGeneration) {
+            TeamBalance_FinishOperation(Client_IsHumanInGame(client)
+                && SpecQueue_IsPlayingTeam(GetClientTeam(client)));
+        }
         SpecQueue_SchedulePlayerChangeChecks();
         break;
     }
@@ -733,10 +754,7 @@ bool SpecQueue_IsPlayingTeam(int team) {
 }
 
 int SpecQueue_GetPlayersInGame() {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_RealPlayerCount") == FeatureStatus_Available) {
-        return DGM_RealPlayerCount();
-    }
-    return SpecQueue_CountPlayingHumansLocally();
+    return DGM_RealPlayerCount();
 }
 
 bool SpecQueue_IsServerFull() {
@@ -836,7 +854,8 @@ bool SpecQueue_HasPendingJoin(int client) {
 }
 
 bool SpecQueue_ReservePendingJoin(int client, bool fromQueue, int requestedTeam) {
-    if (client <= 0 || !IsClientInGame(client) || IsFakeClient(client) || SpecQueue_IsPlayingTeam(GetClientTeam(client))) {
+    if (!TeamBalance_CanAdmitClients()
+        || client <= 0 || !IsClientInGame(client) || IsFakeClient(client) || SpecQueue_IsPlayingTeam(GetClientTeam(client))) {
         return false;
     }
 
@@ -991,7 +1010,7 @@ public void SpecQueue_Frame_EnforcePlayingCapacity(any userId) {
     int oldTeam = GetClientTeam(client);
     SpecQueue_LogPopulationSnapshot("overflow_corrected", client, oldTeam, view_as<int>(TFTeam_Spectator), userId, "post_team_change");
     SpecQueue_ClearPendingJoin(client);
-    ChangeClientTeam(client, TFTeam_Spectator);
+    TeamBalance_MoveToSpectator(client, "capacity_overflow");
 
     bool putInAutoJoin = g_cvSpecQueueAutoJoin.BoolValue;
     if (putInAutoJoin) {

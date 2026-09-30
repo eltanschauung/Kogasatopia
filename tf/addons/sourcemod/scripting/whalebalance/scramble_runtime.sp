@@ -726,6 +726,7 @@ public void WhaleBalance_Event_GameOver(Event event, const char[] name, bool don
 
 public void WhaleBalance_Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
+    AFK_OnPlayerTeamEvent(event);
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (client <= 0 || client > MaxClients)
     {

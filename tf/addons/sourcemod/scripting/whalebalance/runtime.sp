@@ -2,7 +2,6 @@
 // synchronous engine hooks replacing a request while its callback is executing.
 Handle g_hBalanceRespawnTimer[MAXPLAYERS + 1];
 int g_iBalanceRespawnGeneration[MAXPLAYERS + 1];
-int g_iBalanceOperationGeneration;
 
 #define TEAM_BALANCE_PROTECTED_KILLSTREAK 10
 
@@ -139,6 +138,11 @@ bool TeamBalance_TryBegin(TeamBalanceState state, float leaseSeconds, bool bypas
 
     TeamBalance_RefreshState();
     if (g_eTeamBalanceState != TeamBalance_Idle) return false;
+    // Admissions already own their destination slots until join confirmation.
+    if ((state == TeamBalance_Autobalance || state == TeamBalance_ManualSwap
+            || state == TeamBalance_ScrambleVote || state == TeamBalance_ScramblePending)
+        && SpecQueue_IsPluginOperational() && SpecQueue_GetPendingJoinCount() > 0)
+        return false;
     if (!bypassScrambleCooldown
         && (state == TeamBalance_ScrambleVote || state == TeamBalance_ScramblePending)
         && TeamBalance_IsScrambleCooldownActiveInternal()) return false;

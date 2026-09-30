@@ -74,6 +74,7 @@ void WhaleBalance_OnClientDisconnect(int client)
 
 void WhaleBalance_OnPluginEnd()
 {
+    TeamBalance_ResetRuntime();
     WhaleScramble_OnPluginEnd();
     ApplyServerBalanceCvars(false);
     DuelDetection_Shutdown();

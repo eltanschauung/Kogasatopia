@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <clientprefs>
 #include <sdktools>
+#include <sdktools_voice>
 #include <sdkhooks>
 #include <sdktools_gamerules>
 #include <dhooks>
@@ -25,6 +26,7 @@
 #include <points_store_api>
 #include <saysounds>
 #include <whaletracker_api>
+#include <adminsdb_api>
 #define REQUIRE_PLUGIN
 
 #include "include/database.inc"
@@ -42,7 +44,7 @@ native int FilterAlerts_MarkAutobalance(int client);
 native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 native bool Announcers_IsGroupEnabled(int client, const char[] groupName);
 
-#define PLUGIN_VERSION "5.1"
+#define PLUGIN_VERSION "5.2"
 
 // DGM state and policy.
 #define DGM_MAX_CONTROL_POINTS 8
@@ -146,7 +148,10 @@ enum TeamBalanceState
     TeamBalance_ScrambleVote,
     TeamBalance_ScramblePending,
     TeamBalance_ScrambleMoving,
-    TeamBalance_Settling
+    TeamBalance_Settling,
+    TeamBalance_AFKRemoval,
+    TeamBalance_QueueJoin,
+    TeamBalance_SpectatorMove
 };
 
 StringMap g_hMapImmunity = null;
@@ -178,6 +183,7 @@ int g_iSwapRequestTargetTeam[MAXPLAYERS + 1];
 Handle g_hSwapRequestTimer[MAXPLAYERS + 1];
 bool g_bSwapRequestFinalizing[MAXPLAYERS + 1];
 TeamBalanceState g_eTeamBalanceState = TeamBalance_Idle;
+int g_iBalanceOperationGeneration;
 float g_fTeamBalanceStateUntil = 0.0;
 float g_fScrambleCooldownUntil = 0.0;
 int g_iScramblesSinceImmunityClear = 0;
@@ -189,17 +195,24 @@ int g_iBalanceMovedOperationGeneration[MAXPLAYERS + 1];
 public Plugin myinfo =
 {
     name = "WhaleScramble",
-    author = "Hombre, AW 'Swixel' Stanley, Tsunami",
-    description = "Unified gamemode, respawn, class-limit, autobalance, team-swap, and scramble controller.",
+    author = "Hombre, AW 'Swixel' Stanley, Tsunami, random, Eric Zhang",
+    description = "Unified gamemode, respawn, class-limit, team-balance, AFK, and spectator-queue controller.",
     version = PLUGIN_VERSION,
     url = "https://kogasa.tf"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 {
+    if (FindPluginByFile("afkmanager.smx") != null
+        || FindPluginByFile("spec-when-full.smx") != null)
+    {
+        strcopy(error, errMax, "Unload retired afkmanager/spec-when-full before loading WhaleScramble.");
+        return APLRes_Failure;
+    }
     DGM_RegisterPluginApi();
     WhaleBalance_RegisterPluginApi();
     ClassLimits_RegisterOptionalNatives();
+    AFK_RegisterPluginApi();
     return APLRes_Success;
 }
 
@@ -208,10 +221,12 @@ public void OnPluginStart()
     DGM_OnPluginStart();
     WhaleBalance_OnPluginStart();
     ClassLimits_OnPluginStart();
+    AFK_OnPluginStart();
 }
 
 public void OnPluginEnd()
 {
+    AFK_OnPluginEnd();
     ClassLimits_OnPluginEnd();
     WhaleBalance_OnPluginEnd();
     DGM_OnPluginEnd();
@@ -222,10 +237,12 @@ public void OnMapStart()
     DGM_OnMapStart();
     WhaleBalance_OnMapStart();
     ClassLimits_OnMapStart();
+    AFK_OnMapStart();
 }
 
 public void OnMapEnd()
 {
+    AFK_OnMapEnd();
     WhaleBalance_OnMapEnd();
     DGM_OnMapEnd();
 }
@@ -235,6 +252,7 @@ public void OnConfigsExecuted()
     DGM_OnConfigsExecuted();
     WhaleBalance_OnConfigsExecuted();
     ClassLimits_OnConfigsExecuted();
+    AFK_OnConfigsExecuted();
 }
 
 public void OnAllPluginsLoaded()
@@ -252,8 +270,14 @@ public void OnLibraryRemoved(const char[] name)
     WhaleBalance_OnLibraryRemoved(name);
 }
 
+public void OnClientConnected(int client)
+{
+    AFK_OnClientConnected(client);
+}
+
 public void OnClientPutInServer(int client)
 {
+    AFK_OnClientPutInServer(client);
     DGM_OnClientPutInServer(client);
     WhaleBalance_OnClientPutInServer(client);
     ClassLimits_OnClientPutInServer(client);
@@ -261,10 +285,41 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    AFK_OnClientDisconnect(client);
     ClassLimits_OnClientDisconnect(client);
     WhaleBalance_OnClientDisconnect(client);
     DGM_OnClientDisconnect(client);
 }
+
+public void OnClientDisconnect_Post(int client)
+{
+    AFK_OnClientDisconnect_Post();
+}
+
+public void OnServerEnterHibernation()
+{
+    AFK_OnServerEnterHibernation();
+}
+
+public void OnServerExitHibernation()
+{
+    AFK_OnServerExitHibernation();
+}
+
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse,
+    float velocity[3], float angles[3], int &weapon, int &subtype,
+    int &cmdnum, int &tickcount, int &seed, int mouse[2])
+{
+    AFK_OnPlayerInput(client, buttons, impulse, weapon, mouse);
+    return Plugin_Continue;
+}
+
+public void OnClientSpeaking(int client)
+{
+    AFK_RecordActivity(client);
+}
+
+#include "afkmanager/module.sp"
 
 #include "dgm/objective_pace.sp"
 #include "dgm/population_and_objectives.sp"
@@ -285,6 +340,7 @@ public void OnClientDisconnect(int client)
 #include "whalebalance/native_api.sp"
 #include "whalebalance/plugin_api.sp"
 #include "whalebalance/runtime.sp"
+#include "whalebalance/admission.sp"
 #include "whalebalance/lifecycle.sp"
 #include "whalebalance/team_swaps.sp"
 #include "whalebalance/autobalance.sp"

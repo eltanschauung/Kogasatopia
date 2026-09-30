@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../../.." && pwd)
-afk="$root/tf/addons/sourcemod/scripting/afkmanager.sp"
+afk="$root/tf/addons/sourcemod/scripting/afkmanager/module.sp"
 module="$root/tf/addons/sourcemod/scripting/afkmanager/spec-when-full.sp"
 scripting=${1:-$HOME/hlserver/tf2/tf/addons/sourcemod/scripting}
 output=${2:-/tmp/activity_queue_probe.smx}

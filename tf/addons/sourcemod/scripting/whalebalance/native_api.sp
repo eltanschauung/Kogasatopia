@@ -7,7 +7,8 @@ public any Native_HasPendingTeamSwap(Handle plugin, int numParams)
 public any Native_TeamBalanceIsBusy(Handle plugin, int numParams)
 {
     TeamBalance_RefreshState();
-    return g_eTeamBalanceState != TeamBalance_Idle;
+    return g_eTeamBalanceState != TeamBalance_Idle
+        || (SpecQueue_IsPluginOperational() && SpecQueue_GetPendingJoinCount() > 0);
 }
 
 public any Native_TeamBalanceIsScrambleCooldownActive(Handle plugin, int numParams)

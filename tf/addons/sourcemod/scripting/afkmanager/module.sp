@@ -1,27 +1,4 @@
-#pragma semicolon 1
-#pragma newdecls required
-
-#include <sourcemod>
-#include <sdktools>
-#include <sdktools_voice>
-#include <tf2_stocks>
-#include <morecolors>
-
-#undef REQUIRE_PLUGIN
-#include <dgm_api>
-#include <plugin_statistics>
-#include <adminsdb_api>
-#define REQUIRE_PLUGIN
-
-#include "include/client_validation.inc"
-
-public Plugin myinfo = {
-    name = "AFK Manager",
-    author = "random, Hombre, Eric Zhang",
-    description = "AFK management and spectator capacity/queue management",
-    version = "2.0",
-    url = "http://castaway.tf"
-};
+// AFK policy and real-input tracking, hosted by whalescramble.sp.
 
 #define AFK_ACTION_BUTTONS (IN_ATTACK | IN_JUMP | IN_DUCK | IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_ATTACK2 | IN_RELOAD | IN_SCORE | IN_USE)
 #define AFK_MAINTENANCE_INTERVAL 1.0
@@ -46,7 +23,6 @@ ConVar g_cvAFKAliveTime;
 ConVar g_cvAFKSpecTime;
 ConVar g_cvAFKSpecMovedTime;
 ConVar g_cvAFKMinPlayerCount;
-ConVar g_cvAFKKickSpecMinPlayerCount;
 ConVar g_cvEngineIdleMethod;
 int g_iOriginalIdleMethod;
 GlobalForward g_fwAFKKick;
@@ -54,44 +30,33 @@ GlobalForward g_fwAFKSwitch;
 Handle g_hAFKMaintenanceTimer;
 float g_flNextQueueActivityCheck;
 bool g_bAFKMapActive;
+bool g_bAFKInitialized;
 
-#include "afkmanager/spec-when-full.sp"
+#include "spec-when-full.sp"
 
-public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int errMax) {
-    MarkNativeAsOptional("DGM_ServerCapacitycheck");
+void AFK_RegisterPluginApi() {
     MarkNativeAsOptional("AdminsDB_GetClientWhitelistLevel");
-    SpecQueue_MarkNativesOptional();
     RegPluginLibrary("afkmanager");
-    CreateNative("AFKManager_GetLastActivityTime", Native_GetLastActivityTime);
-    return APLRes_Success;
+    CreateNative("AFKManager_GetLastActivityTime", AFK_Native_GetLastActivityTime);
 }
 
-public any Native_GetLastActivityTime(Handle plugin, int numParams) {
+public any AFK_Native_GetLastActivityTime(Handle plugin, int numParams) {
     return view_as<int>(AFK_GetLastActivityTime(GetNativeCell(1)));
 }
 
-public void OnPluginStart() {
-    // A late-load migration must not leave two owners of jointeam and !spec.
-    if (FindPluginByFile("spec-when-full.smx") != null) {
-        ServerCommand("sm plugins unload spec-when-full");
-        ServerExecute();
-        // SourceMod defers plugin removal until this startup callback returns.
-        RequestFrame(AFK_VerifyLegacyPluginRetired);
-    }
-
+void AFK_OnPluginStart() {
     g_cvAFKEnabled = CreateConVar("sm_afkmanager_enabled", "1", "Enable AFK management; spectator queue controls are independent.", _, true, 0.0, true, 1.0);
     g_cvAFKAction = CreateConVar("sm_afkmanager_afk_action", "1", "AFK action: 0 = kick, 1 = move to spectator and kick idle spectators, 2 = move to spectator only.", _, true, 0.0, true, 2.0);
     g_cvAFKAliveTime = CreateConVar("sm_afkmanager_alive_time", "60", "Idle live-player timeout in seconds.", _, true, 60.0);
     g_cvAFKSpecTime = CreateConVar("sm_afkmanager_spec_time", "300", "Idle spectator timeout in seconds.", _, true, 60.0);
     g_cvAFKSpecMovedTime = CreateConVar("sm_afkmanager_spec_moved_time", "180", "Idle spectator timeout after being moved by AFK Manager.", _, true, 60.0);
     g_cvAFKMinPlayerCount = CreateConVar("sm_afkmanager_min_player_count", "2", "Minimum in-game player count before AFK actions.", _, true, 0.0);
-    g_cvAFKKickSpecMinPlayerCount = CreateConVar("sm_afkmanager_kick_spec_min_player_count", "24", "Fallback population threshold for kicking idle spectators without DGM.", _, true, 0.0);
+    CreateConVar("sm_afkmanager_kick_spec_min_player_count", "24", "Legacy fallback threshold; integrated DGM now controls spectator capacity checks.", _, true, 0.0);
     g_cvAFKEnabled.AddChangeHook(AFK_OnEnabledChanged);
 
     g_fwAFKKick = new GlobalForward("OnAFKKick", ET_Hook, Param_Cell);
     g_fwAFKSwitch = new GlobalForward("OnAFKSwitch", ET_Ignore, Param_Cell);
 
-    HookEvent("player_team", AFK_EventPlayerTeam, EventHookMode_Post);
     HookEvent("player_changeclass", AFK_EventPlayerClass, EventHookMode_Post);
 
     static const char activityCommands[][] = {
@@ -109,63 +74,62 @@ public void OnPluginStart() {
 
     AFK_ResetAllClients();
     SpecQueue_Init();
+    g_bAFKInitialized = true;
     AutoExecConfig(true, "afkmanager", "sourcemod");
 }
 
-public void AFK_VerifyLegacyPluginRetired(any data) {
-    if (FindPluginByFile("spec-when-full.smx") != null) {
-        SetFailState("Unload the retired spec-when-full plugin before loading AFK Manager");
-    }
-}
-
-public void OnMapStart() {
+void AFK_OnMapStart() {
     g_bAFKMapActive = true;
     AFK_ResetAllClients();
     SpecQueue_OnMapStart();
     AFK_StartMaintenance();
 }
 
-public void OnMapEnd() {
+void AFK_OnMapEnd() {
     g_bAFKMapActive = false;
     AFK_StopMaintenance();
     SpecQueue_OnMapEnd();
 }
 
-public void OnConfigsExecuted() {
+void AFK_OnConfigsExecuted() {
     SpecQueue_OnConfigsExecuted();
 }
 
-public void OnClientConnected(int client) {
+void AFK_OnClientConnected(int client) {
     AFK_ResetClient(client);
     SpecQueue_OnClientConnected(client);
 }
 
-public void OnClientPutInServer(int client) {
+void AFK_OnClientPutInServer(int client) {
     AFK_ResetIdle(client, GetEngineTime());
     SpecQueue_OnClientPutInServer(client);
 }
 
-public void OnClientDisconnect(int client) {
+void AFK_OnClientDisconnect(int client) {
     SpecQueue_OnClientDisconnect(client);
     AFK_ResetClient(client);
 }
 
-public void OnClientDisconnect_Post(int client) {
+void AFK_OnClientDisconnect_Post() {
     SpecQueue_OnClientDisconnect_Post();
 }
 
-public void OnServerEnterHibernation() {
+void AFK_OnServerEnterHibernation() {
     AFK_StopMaintenance();
     SpecQueue_OnServerEnterHibernation();
 }
 
-public void OnServerExitHibernation() {
+void AFK_OnServerExitHibernation() {
     if (g_bAFKMapActive) {
         AFK_StartMaintenance();
     }
 }
 
-public void OnPluginEnd() {
+void AFK_OnPluginEnd() {
+    if (!g_bAFKInitialized) {
+        return;
+    }
+    g_bAFKInitialized = false;
     AFK_StopMaintenance();
     SpecQueue_Shutdown();
     if (g_cvEngineIdleMethod != null && g_cvEngineIdleMethod.IntValue == 0) {
@@ -175,18 +139,11 @@ public void OnPluginEnd() {
     delete g_fwAFKSwitch;
 }
 
-public Action OnPlayerRunCmd(int client, int &buttons, int &impulse,
-    float velocity[3], float angles[3], int &weapon, int &subtype,
-    int &cmdnum, int &tickcount, int &seed, int mouse[2]) {
+void AFK_OnPlayerInput(int client, int buttons, int impulse, int weapon, const int mouse[2]) {
     if ((buttons & AFK_ACTION_BUTTONS) != 0 || impulse != 0 || weapon != 0
         || mouse[0] != 0 || mouse[1] != 0) {
         AFK_RecordActivity(client);
     }
-    return Plugin_Continue;
-}
-
-public void OnClientSpeaking(int client) {
-    AFK_RecordActivity(client);
 }
 
 public Action AFK_OnActivityCommand(int client, const char[] command, int argc) {
@@ -194,7 +151,7 @@ public Action AFK_OnActivityCommand(int client, const char[] command, int argc) 
     return Plugin_Continue;
 }
 
-public void AFK_EventPlayerTeam(Event event, const char[] name, bool dontBroadcast) {
+void AFK_OnPlayerTeamEvent(Event event) {
     if (event.GetBool("disconnect")) {
         return;
     }
@@ -203,6 +160,7 @@ public void AFK_EventPlayerTeam(Event event, const char[] name, bool dontBroadca
         return;
     }
     int team = event.GetInt("team");
+    TeamBalance_OnClientTeamChanged(client, team);
     AFK_ResetIdle(client, GetEngineTime());
     if (SpecQueue_IsPlayingTeam(team)) {
         g_AFKClients[client].movedToSpec = false;
@@ -294,31 +252,41 @@ bool AFK_HasDoubleLiveTimeout(int client) {
 }
 
 bool AFK_CanKickSpectators() {
-    if (GetFeatureStatus(FeatureType_Native, "DGM_ServerCapacitycheck") == FeatureStatus_Available) {
-        return DGM_ServerCapacitycheck(1.0, false);
-    }
-    return GetClientCount(false) >= g_cvAFKKickSpecMinPlayerCount.IntValue;
+    return DGM_ServerCapacitycheck(1.0, false);
 }
 
 bool AFK_KickClient(int client) {
-    if (SpecQueue_BlocksAFKKick(client)) {
+    if (SpecQueue_BlocksAFKKick(client)
+        || !TeamBalance_TryBegin(TeamBalance_AFKRemoval, TEAM_BALANCE_OPERATION_LEASE, true)) {
         return false;
     }
     int userId = GetClientUserId(client);
+    int operation = g_iBalanceOperationGeneration;
     Action result = Plugin_Continue;
     Call_StartForward(g_fwAFKKick);
     Call_PushCell(client);
     Call_Finish(result);
-    if (result != Plugin_Continue || !Client_IsHumanInGame(client)
-        || GetClientUserId(client) != userId) {
+    if (operation != g_iBalanceOperationGeneration) {
         return false;
     }
+    if (result != Plugin_Continue || !Client_IsHumanInGame(client)
+        || GetClientUserId(client) != userId) {
+        TeamBalance_FinishOperation(false);
+        return false;
+    }
+    TeamBalance_ClearRespawnState(client);
+    ClearTeamSwapRequestsForClient(client);
     KickClient(client, "#TF_Idle_kicked");
+    if (operation == g_iBalanceOperationGeneration) {
+        TeamBalance_FinishOperation(true);
+    }
     return true;
 }
 
 void AFK_MoveToSpectator(int client, float now) {
-    TF2_ChangeClientTeam(client, TFTeam_Spectator);
+    if (!TeamBalance_MoveToSpectator(client, "afk_timeout", true)) {
+        return;
+    }
     AFK_ResetIdle(client, now);
     if (Client_IsHumanInGame(client) && GetClientTeam(client) == view_as<int>(TFTeam_Spectator)) {
         g_AFKClients[client].movedToSpec = true;
@@ -363,6 +331,10 @@ void AFK_ManageClients(float now) {
                 ? g_cvAFKSpecTime.FloatValue : g_cvAFKSpecMovedTime.FloatValue;
         }
         if (g_AFKClients[client].idleSeconds <= timeout) {
+            continue;
+        }
+        // Keep accrued idle time while another team operation is in progress.
+        if (!TeamBalance_CanRunAFKAction()) {
             continue;
         }
         if (playing && action != AFKAction_Kick) {

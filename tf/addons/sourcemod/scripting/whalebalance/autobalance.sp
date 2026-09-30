@@ -47,6 +47,13 @@ public Action Timer_Autobalance(Handle timer)
         teamCounts[team]++;
     }
 
+    // Count incoming humans without changing the existing bot-inclusive snapshot.
+    if (SpecQueue_IsPluginOperational())
+    {
+        teamCounts[TEAM_RED] += SpecQueue_GetPendingJoinCountForTeam(TEAM_RED);
+        teamCounts[TEAM_BLUE] += SpecQueue_GetPendingJoinCountForTeam(TEAM_BLUE);
+    }
+
     // Build the list of active teams (always RED + BLU; add GREEN/YELLOW if populated).
     int activeTeams[GAME_TEAM_COUNT];
     int activeCount = 0;

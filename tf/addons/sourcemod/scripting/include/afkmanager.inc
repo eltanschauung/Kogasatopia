@@ -30,7 +30,7 @@ forward void OnAFKSwitch(int client);
 
 public SharedPlugin __pl_afkmanager = {
     name = "afkmanager",
-    file = "afkmanager.smx",
+    file = "whalescramble.smx",
 #if defined REQUIRE_PLUGIN
     required = 1,
 #else

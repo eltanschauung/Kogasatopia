@@ -50,6 +50,7 @@ int teams[MAXPLAYERS + 1];
 bool alive[MAXPLAYERS + 1];
 TFClassType classes[MAXPLAYERS + 1];
 bool gProbeCanKickSpectators;
+bool gProbeTeamBusy;
 bool gProbeWhitelistAvailable;
 int gProbeWhitelistLevel;
 int population;
@@ -99,6 +100,7 @@ void ResetScenario() {
     alive[1] = true;
     classes[1] = TFClass_Soldier;
     gProbeCanKickSpectators = true;
+    gProbeTeamBusy = false;
     gProbeWhitelistAvailable = true;
     gProbeWhitelistLevel = 0;
     population = 24;
@@ -161,6 +163,7 @@ FeatureStatus ProbeFeatureStatus(FeatureType type, const char[] name) {
 bool ProbeAlive(int client) { return alive[client]; }
 TFClassType ProbeClass(int client) { return classes[client]; }
 bool AFK_CanKickSpectators() { return gProbeCanKickSpectators; }
+bool TeamBalance_CanRunAFKAction() { return !gProbeTeamBusy; }
 bool AFK_KickClient(int client) {
     #pragma unused client
     kicks++;
@@ -277,6 +280,12 @@ public Action RunProbe(int client, int args) {
 
     ResetScenario(); g_cvAFKAction.IntValue = 0; AFK_ManageClients(161.0);
     Check(kicks == 1 && moves == 0, "kick action kicks instead of spectating");
+
+    ResetScenario(); gProbeTeamBusy = true; AFK_ManageClients(161.0);
+    Check(moves == 0 && g_AFKClients[1].idleSeconds == 61.0,
+        "busy coordinator defers AFK move without resetting accrued idle time");
+    gProbeTeamBusy = false; AFK_ManageClients(162.0);
+    Check(moves == 1, "deferred AFK move resumes when coordinator is idle");
 
     ResetScenario(); alive[1] = false; AFK_ManageClients(200.0);
     Check(moves == 0 && g_AFKClients[1].idleSeconds == 0.0, "dead players with a selected class pause idle time");
