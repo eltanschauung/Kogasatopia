@@ -8,8 +8,10 @@ install -d -o root -g root -m 0700 /var/lib/kogasatopia-demo-cleanup
 install -o root -g root -m 0644 tools/cron/kogasatopia-demos /etc/cron.d/kogasatopia-demos
 ```
 
-The hourly cron checks a persistent timestamp and deletes closed `.dem` and
-`.dem.bz2` recordings every 72 hours from the TF2 server and FastDL demos directory.
+The hourly cron checks a persistent timestamp and runs cleanup once daily.
+Only closed `.dem` and `.dem.bz2` recordings at least 14 days old are deleted
+from the TF2 server and FastDL demos directory. Age is measured from last write,
+so a recently completed recording gets two full weeks of retention.
 Open recordings are preserved until a later cleanup. Root execution lets `lsof`
 inspect all processes and permits deleting recordings regardless of file owner.
 If the open-file check fails, no recordings are deleted and the timestamp stays

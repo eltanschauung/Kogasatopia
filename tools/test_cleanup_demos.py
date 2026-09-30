@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -20,9 +21,13 @@ class DemoCleanupTest(unittest.TestCase):
             compressed = root / 'old.dem.bz2'
             active = root / 'active.dem'
             asset = root / 'map.bsp'
+            recent = root / 'recent.dem'
             outside = Path(directory) / 'outside.dem'
-            for path in (closed, compressed, active, asset, outside):
+            for path in (closed, compressed, active, asset, outside, recent):
                 path.write_text('data')
+            expired = time.time() - cleanup_demos.RETENTION - 1
+            for path in (closed, compressed, active):
+                os.utime(path, (expired, expired))
             (root / 'link.dem').symlink_to(outside)
             with patch.object(cleanup_demos, 'open_demos', return_value={active}):
                 cleanup_demos.cleanup([root], state, dry_run=True)
@@ -33,12 +38,16 @@ class DemoCleanupTest(unittest.TestCase):
                 self.assertFalse(compressed.exists())
                 self.assertTrue(active.exists())
                 self.assertTrue(asset.exists())
+                self.assertTrue(recent.exists())
                 self.assertTrue(outside.exists())
                 closed.write_text('new recording')
                 cleanup_demos.cleanup([root], state)
                 self.assertTrue(closed.exists())
                 (state / 'last_run').write_text(str(int(time.time()) - cleanup_demos.INTERVAL))
                 cleanup_demos.cleanup([root], state)
+                self.assertTrue(closed.exists())
+                os.utime(closed, (expired, expired))
+                cleanup_demos.cleanup([root], state, force=True)
                 self.assertFalse(closed.exists())
 
     def test_open_file_check_failure_does_not_delete_or_advance_schedule(self):

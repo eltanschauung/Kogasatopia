@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Delete closed demo recordings at most once every 72 hours."""
+"""Delete closed demo recordings older than two weeks, checking once daily."""
 
 import argparse
 import fcntl
@@ -13,7 +13,8 @@ ROOTS = (
     Path('/var/www/fastdl/demos'),
 )
 STATE_DIR = Path('/var/lib/kogasatopia-demo-cleanup')
-INTERVAL = 3 * 24 * 60 * 60
+INTERVAL = 24 * 60 * 60
+RETENTION = 14 * 24 * 60 * 60
 
 
 def find_demos(roots):
@@ -64,7 +65,10 @@ def cleanup(roots=ROOTS, state_dir=STATE_DIR, force=False, dry_run=False):
                 skipped += 1
                 continue
             try:
-                size += path.stat().st_size
+                stat = path.stat()
+                if now - stat.st_mtime < RETENTION:
+                    continue
+                size += stat.st_size
                 if not dry_run:
                     path.unlink()
                 removed += 1
