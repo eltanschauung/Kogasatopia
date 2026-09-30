@@ -73,7 +73,7 @@
 		for (int i = 0; i < target_count; i++)
 		{
 			int target = target_list[i];
-			if (target == client) continue;
+			if (target == client || Oblivion_InteractionBlocked(client, target)) continue;
 
 			if (!EnsureStatsReady(target, false))
 			{
@@ -84,21 +84,21 @@
 			GetClientName(target, targetNameDisplay, sizeof(targetNameDisplay));
 
 			// Send message to the recipient unless they are redlisted
-			if (!IsClientRedlisted(target))
+			if (!IsClientRedlisted(target) && !PublicActivity_IsPairExcluded(client, target))
 			{
 				PrintToChat(target, "\x01[SM] \x04%s \x01hugged you!", clientName);
 			}
 
 			// Send message to the sender
-			PrintToChat(client, "\x01[SM] You hugged \x04%s\x01!", targetNameDisplay);
+			if (!PublicActivity_IsPairExcluded(client, target)) PrintToChat(client, "\x01[SM] You hugged \x04%s\x01!", targetNameDisplay);
 
 			// Update hug stats
 			// If it's a group target, we don't increment per target here
 			UpdateHugStats(client, target, !isGroupTarget);
 
 			// Update last huggers list
-			UpdateLastHuggers(target, clientName);
-			
+			if (!PublicActivity_IsExcluded(client)) UpdateLastHuggers(target, clientName);
+
 			successCount++;
 		}
 
@@ -178,7 +178,7 @@
 		for (int i = 0; i < target_count; i++)
 		{
 			int target = target_list[i];
-			if (target == client) continue;
+			if (target == client || Oblivion_InteractionBlocked(client, target)) continue;
 
 			if (!EnsureStatsReady(target, false))
 			{
@@ -189,20 +189,20 @@
 			GetClientName(target, targetNameDisplay, sizeof(targetNameDisplay));
 
 			// Send message to the recipient unless they are redlisted
-			if (!IsClientRedlisted(target))
+			if (!IsClientRedlisted(target) && !PublicActivity_IsPairExcluded(client, target))
 			{
 				PrintToChat(target, "\x01[SM] \x04%s \x01fed you!", clientName);
 			}
 
 			// Send message to the sender
-			PrintToChat(client, "\x01[SM] You fed \x04%s\x01!", targetNameDisplay);
+			if (!PublicActivity_IsPairExcluded(client, target)) PrintToChat(client, "\x01[SM] You fed \x04%s\x01!", targetNameDisplay);
 
 			// Update feed stats
 			// If it's a group target, we don't increment per target here
 			UpdateFeedStats(client, target, !isGroupTarget);
 
 			// Update last feeders list
-			UpdateLastFeeders(target, clientName);
+			if (!PublicActivity_IsExcluded(client)) UpdateLastFeeders(target, clientName);
 
 			successCount++;
 		}
@@ -251,7 +251,7 @@
 		float currentTime = GetGameTime();
 		float remaining = 0.0;
 		if (IsCooldownBlocked(g_fLastRapeTime[client], currentTime, remaining))
-		{ 
+		{
 			ReplyToCommand(client, "[SM] You must wait %.1f seconds before raping again.", remaining);
 			return Plugin_Handled;
 		}
@@ -283,7 +283,7 @@
 		for (int i = 0; i < target_count; i++)
 		{
 			int target = target_list[i];
-			if (target == client) continue;
+			if (target == client || Oblivion_InteractionBlocked(client, target)) continue;
 
 			if (IsRapeProtected(target))
 			{
@@ -300,13 +300,13 @@
 			GetClientName(target, targetNameDisplay, sizeof(targetNameDisplay));
 
 			// Send message to the recipient unless they are redlisted
-			if (!IsClientRedlisted(target))
+			if (!IsClientRedlisted(target) && !PublicActivity_IsPairExcluded(client, target))
 			{
 				PrintToChat(target, "\x01[SM] \x04%s \x01raped you!", clientName);
 			}
 
 			// Send message to the sender
-			PrintToChat(client, "\x01[SM] You raped \x04%s\x01!", targetNameDisplay);
+			if (!PublicActivity_IsPairExcluded(client, target)) PrintToChat(client, "\x01[SM] You raped \x04%s\x01!", targetNameDisplay);
 
 			// Update rape stats
 			// If it's a group target, we don't increment per target here
@@ -314,7 +314,7 @@
 
 			// Update last rapists list
 			UpdateLastRapists(target, client);
-			
+
 			successCount++;
 		}
 
@@ -379,13 +379,13 @@
 
 		PrintToChat(client, "\x01[SM] Rapes Received: \x04%d\x01 | Rapes Given: \x04%d", g_iRapesReceived[client], g_iRapesGiven[client]);
 		PrintToChat(client, "\x01[SM] Last Rapists: \x04%s", lastRapists);
-		
+
 		char name[MAX_NAME_LENGTH];
 		GetClientName(client, name, sizeof(name));
 
 		char rankStr[64];
 		GetRapeRank(count, rankStr, sizeof(rankStr));
-		PrintToChatAll("%s's rapes have reached a new rank: %s!", name, rankStr);
+		if (!PublicActivity_IsExcluded(client)) PrintToChatAll("%s's rapes have reached a new rank: %s!", name, rankStr);
 
 		return Plugin_Handled;
 	}
@@ -467,4 +467,3 @@
 
 		return Plugin_Handled;
 	}
-

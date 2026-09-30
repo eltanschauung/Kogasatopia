@@ -21,11 +21,13 @@
 		TrimString(targetName);
 
 		int target = FindPlayerBySubstring(targetName, client);
-		if (target == 0)
+		if (target == 0 || Oblivion_InteractionBlocked(client, target))
 		{
 			PrintToChat(client, "No player found matching \"%s\".", targetName);
 			return Plugin_Handled;
 		}
+		if (PublicActivity_IsPairExcluded(client, target)) return Plugin_Handled;
+
 		if (target == client)
 		{
 			PrintToChat(client, "You cannot duel yourself.");
@@ -43,7 +45,7 @@
 		StartRequestTimer(timeout);
 
 		// Private messages only to challenger and target
-		PrintToChatAll("\x04[RAPE DUEL]\x01 %N challenged %N to a duel! (expires in %.0fs)", client, target, timeout);
+		Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 %N challenged %N to a duel! (expires in %.0fs)", client, target, timeout);
 		PrintToChat(target, "\x04[RAPE DUEL]\x01 %N challenged you to a duel! Type !accept to start! (expires in %.0fs).", client, timeout);
 
 		// Play sound to both
@@ -71,7 +73,7 @@
 
 		int targetScore = g_hTargetScore.IntValue;
 
-		PrintToChatAll("\x04[RAPE DUEL]\x01 %N accepted %N's challenge! First to %d rapes wins!",
+		Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 %N accepted %N's challenge! First to %d rapes wins!",
 					   g_iTarget, g_iRequester, targetScore);
 
 		ClientCommand(g_iTarget, "playgamesound ui/duel_challenge_accepted.wav");
@@ -106,7 +108,7 @@
 		else
 			g_iScoreTgt++;
 
-		PrintToChatAll("\x04[RAPE DUEL]\x01 %N raped %N! Score: %N %d - %N %d",
+		Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 %N raped %N! Score: %N %d - %N %d",
 					   attacker, victim,
 					   g_iRequester, g_iScoreReq,
 					   g_iTarget,    g_iScoreTgt);
@@ -117,7 +119,7 @@
 			int winner = (g_iScoreReq > g_iScoreTgt) ? g_iRequester : g_iTarget;
 			int loser  = (winner == g_iRequester) ? g_iTarget : g_iRequester;
 
-			PrintToChatAll("\x04[RAPE DUEL]\x01 %N HAS RAPED %N!!! Final Score: %N %d - %N %d",
+			Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 %N HAS RAPED %N!!! Final Score: %N %d - %N %d",
 						   winner, loser,
 						   g_iRequester, g_iScoreReq,
 						   g_iTarget,    g_iScoreTgt);
@@ -145,18 +147,18 @@
 
 		if (g_iScoreReq == 0 && g_iScoreTgt == 0)
 		{
-			PrintToChatAll("\x04[RAPE DUEL]\x01 Duel between %N and %N ended with no rapes.", g_iRequester, g_iTarget);
+			Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 Duel between %N and %N ended with no rapes.", g_iRequester, g_iTarget);
 		}
 		else if (g_iScoreReq == g_iScoreTgt)
 		{
-			PrintToChatAll("\x04[RAPE DUEL]\x01 Duel between %N and %N ended in a tie (%d - %d).",
+			Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 Duel between %N and %N ended in a tie (%d - %d).",
 						   g_iRequester, g_iTarget, g_iScoreReq, g_iScoreTgt);
 		}
 		else
 		{
 			int winner = (g_iScoreReq > g_iScoreTgt) ? g_iRequester : g_iTarget;
 			int loser  = (winner == g_iRequester) ? g_iTarget : g_iRequester;
-			PrintToChatAll("\x04[RAPE DUEL]\x01 Round ended: %N wins the rape duel over %N! Final Score: %N %d - %N %d",
+			Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 Round ended: %N wins the rape duel over %N! Final Score: %N %d - %N %d",
 						   winner, loser,
 						   g_iRequester, g_iScoreReq,
 						   g_iTarget,    g_iScoreTgt);
@@ -168,3 +170,24 @@
 		ResetDuel();
 	}
 
+
+
+void Hugs_PrintDuelAnnouncement(const char[] format, any ...)
+{
+    if (PublicActivity_IsPairExcluded(g_iRequester, g_iTarget)) return;
+    char message[512];
+    VFormat(message, sizeof(message), format, 2);
+    for (int viewer = 1; viewer <= MaxClients; viewer++)
+    {
+        if (!IsClientInGame(viewer)
+            || Oblivion_ShouldHide(viewer, g_iRequester)
+            || Oblivion_ShouldHide(viewer, g_iTarget)) continue;
+        PrintToChat(viewer, "%s", message);
+    }
+}
+
+public void Oblivion_OnStateChanged()
+{
+    if ((g_bDuelRequested || g_bDuelActive)
+        && Oblivion_InteractionBlocked(g_iRequester, g_iTarget)) ResetDuel();
+}

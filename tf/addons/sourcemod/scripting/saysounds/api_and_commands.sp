@@ -153,7 +153,7 @@ public int Native_PlayCommandAs(Handle plugin, int numParams)
     }
 
     PrecacheSound(soundPath, true);
-    bool played = PlaySaySoundToTarget(targetClient, soundPath, groupName, forcePlayback);
+    bool played = PlaySaySoundToTarget(targetClient, soundPath, groupName, forcePlayback, sourceClient);
     if (played)
     {
         LogSaySoundUsage("saysound_used", sourceClient, targetClient, selectedCommand, soundPath, groupName, fromGroup, sourceGroup, true, "api_command_as");
@@ -379,7 +379,7 @@ static bool BuildSoundPreferenceList(int client, const char[] input, char[] aggr
 
         // Move past the comma
         start = end + 1;
-        
+
         // Safety check: if we've moved past the end, break
         if (start > len)
         {
@@ -559,4 +559,3 @@ public Action Command_PlaySpecificSound(int client, int args)
     g_fNextAllowedSound[client] = GetGameTime() + DEFAULT_COOLDOWN;
     return Plugin_Handled;
 }
-

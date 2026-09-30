@@ -9,3 +9,7 @@ tf/addons/sourcemod/scripting/compiled/
 *.o
 *.obj
 __pycache__/
+
+# Oblivion and public-activity identities are private server data.
+/tf/addons/sourcemod/configs/public_activity_exclusions.txt
+/tf/addons/sourcemod/data/oblivion_*.kv*

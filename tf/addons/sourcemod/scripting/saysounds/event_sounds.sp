@@ -109,14 +109,14 @@ public void Event_PlayerDeathPost(Event event, const char[] name, bool dontBroad
     {
         if (GetRandomInt(0, 1) == 0)
         {
-            if (PlaySaySound(victimPath, victimGroup))
+            if (PlaySaySound(victimPath, victimGroup, victim))
             {
                 LogSaySoundUsage("diesound_used", victim, 0, victimCommand, victimPath, victimGroup, victimFromGroup, victimSourceGroup, false, "diesound");
             }
         }
         else
         {
-            if (PlaySaySound(attackerPath, attackerGroup))
+            if (PlaySaySound(attackerPath, attackerGroup, attacker))
             {
                 LogSaySoundUsage("killsound_used", attacker, 0, attackerCommand, attackerPath, attackerGroup, attackerFromGroup, attackerSourceGroup, false, "killsound");
             }
@@ -126,14 +126,14 @@ public void Event_PlayerDeathPost(Event event, const char[] name, bool dontBroad
 
     if (haveVictim)
     {
-        if (PlaySaySound(victimPath, victimGroup))
+        if (PlaySaySound(victimPath, victimGroup, victim))
         {
             LogSaySoundUsage("diesound_used", victim, 0, victimCommand, victimPath, victimGroup, victimFromGroup, victimSourceGroup, false, "diesound");
         }
     }
     else if (haveAttacker)
     {
-        if (PlaySaySound(attackerPath, attackerGroup))
+        if (PlaySaySound(attackerPath, attackerGroup, attacker))
         {
             LogSaySoundUsage("killsound_used", attacker, 0, attackerCommand, attackerPath, attackerGroup, attackerFromGroup, attackerSourceGroup, false, "killsound");
         }

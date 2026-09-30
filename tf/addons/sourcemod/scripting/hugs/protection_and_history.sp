@@ -1,3 +1,5 @@
+bool g_HugsPrivateProtection[MAXPLAYERS + 1];
+
 	public Action Command_RapeProtect(int client, int args)
 	{
 		if (!IsHumanClientInGame(client))
@@ -19,6 +21,8 @@
 			return Plugin_Handled;
 		}
 
+		if (Oblivion_InteractionBlocked(client, target)) return Plugin_Handled;
+
 		if (target == client)
 		{
 			CPrintToChat(client, "{green}[Hugs]{default} You cannot protect yourself.");
@@ -31,13 +35,14 @@
 			return Plugin_Handled;
 		}
 
+		g_HugsPrivateProtection[target] = PublicActivity_IsPairExcluded(client, target);
 		BuildHugsChatName(client, g_szRapeProtectorName[target], sizeof(g_szRapeProtectorName[]));
 		BuildHugsChatName(target, g_szRapeProtectedName[target], sizeof(g_szRapeProtectedName[]));
 		g_iRapeProtectorUserId[target] = GetClientUserId(client);
 		float duration = g_hRapeProtectionDuration.FloatValue;
 		g_hRapeProtectionTimer[target] = CreateTimer(duration, Timer_RapeProtectionExpired, GetClientSerial(target));
 
-		CPrintToChatAllEx(client, "{green}[Hugs]{default} %s{default} is now protecting %s{default} from rape!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
+		if (!g_HugsPrivateProtection[target]) CPrintToChatAllEx(client, "{green}[Hugs]{default} %s{default} is now protecting %s{default} from rape!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
 		return Plugin_Handled;
 	}
 
@@ -50,7 +55,7 @@
 		}
 
 		g_hRapeProtectionTimer[target] = null;
-		if (IsHumanClientInGame(target))
+		if (IsHumanClientInGame(target) && !g_HugsPrivateProtection[target])
 		{
 			CPrintToChatAllEx(target, "{green}[Hugs]{default} %s{default}'s rape protection of %s{default} has now expired!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
 		}
@@ -203,4 +208,3 @@
 		}
 		output[out] = '\0';
 	}
-

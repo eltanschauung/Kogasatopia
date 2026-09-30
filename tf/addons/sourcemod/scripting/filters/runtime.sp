@@ -67,6 +67,7 @@ public void OnConfigsExecuted()
 
 public void OnLibraryAdded(const char[] name)
 {
+    if (StrEqual(name, "oblivion")) RequestFrame(Filters_OblivionRefreshVoice);
     if (!StrEqual(name, "hugs", false) && !StrEqual(name, "whaletracker", false)) return;
     for (int client = 1; client <= MaxClients; client++)
         if (IsClientInGame(client)) Filters_UpdateExternalStats(client);
@@ -74,6 +75,7 @@ public void OnLibraryAdded(const char[] name)
 
 public void OnLibraryRemoved(const char[] name)
 {
+    if (StrEqual(name, "oblivion")) RequestFrame(Filters_OblivionRefreshVoice);
     if (!StrEqual(name, "hugs", false) && !StrEqual(name, "whaletracker", false)) return;
     for (int client = 1; client <= MaxClients; client++)
         if (IsClientInGame(client)) Filters_ResetExternalStats(client);

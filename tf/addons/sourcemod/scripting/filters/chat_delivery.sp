@@ -5,6 +5,8 @@ bool Filters_ShouldReceiveChat(int receiver, int sender)
         return false;
     }
 
+    if (Oblivion_ShouldHide(receiver, sender)) return false;
+
     if (!Filters_RedlistEnabled())
     {
         return true;
@@ -36,6 +38,7 @@ void Filters_PrintToChatAll(const char[] message, bool skipArchivedMuted = false
 
 static void Filters_PrintRecreatedChat(int receiver, int sender, const char[] message)
 {
+    if (Oblivion_ShouldHide(receiver, sender)) return;
     char rendered[MAX_BUFFER_LENGTH];
     FormatEx(rendered, sizeof(rendered), "\x01%s", message);
 
@@ -97,6 +100,8 @@ void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, 
     {
         return;
     }
+
+    if (Oblivion_ShouldHide(receiver, sender)) return;
 
     if (Filters_HasMutedArchivedSpeakers(receiver) && Filters_IsConnectedParseeClient(sender))
     {
@@ -183,6 +188,8 @@ void Filters_UpdateVoiceOverrides()
                     shouldBlock = senderBlacklisted && !receiverWhitelisted;
                 }
             }
+
+            if (Oblivion_ShouldHide(receiver, sender)) shouldBlock = true;
 
             if (shouldBlock)
             {
@@ -428,7 +435,7 @@ void SendToWhitelistedAdmins(int sender, const char[] message, const char[] pref
     {
         if (!IsClientInGame(i))
             continue;
-            
+
         if (g_PlayerState[i].isWhitelisted)
         {
             if (prefix[0] != '\0')
@@ -446,4 +453,15 @@ void SendToWhitelistedAdmins(int sender, const char[] message, const char[] pref
 void SendToWhitelistedAdminsBlacklisted(int sender, const char[] message, const char[] prefix = "")
 {
     SendToWhitelistedAdmins(sender, message, prefix);
+}
+
+
+public void Oblivion_OnStateChanged()
+{
+    Filters_UpdateVoiceOverrides();
+}
+
+public void Filters_OblivionRefreshVoice(any unused)
+{
+    Filters_UpdateVoiceOverrides();
 }

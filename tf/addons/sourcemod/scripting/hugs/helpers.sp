@@ -1,16 +1,17 @@
 	public void checkRapeChievements(int client)
 	{
+		if (PublicActivity_IsExcluded(client)) return;
 		if (!IsClientIndexValid(client) || !IsClientInGame(client))
 			return;
-		
+
 		if (!EnsureStatsReady(client, false))
 			return;
 
 		int count = g_iRapesGiven[client];
-		
+
 		char name[MAX_NAME_LENGTH];
 		GetClientName(client, name, sizeof(name));
-		
+
 		switch (count)
 		{
 			case 1:
@@ -316,4 +317,3 @@
 		VFormat(buffer, sizeof(buffer), fmt, 3);
 		PrintToChat(client, "%s", buffer);
 	}
-

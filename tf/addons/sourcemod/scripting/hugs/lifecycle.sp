@@ -29,7 +29,7 @@
 
 		// Set default values for cookies if they don't exist
 		SetCookieMenuItem(StatsCookieMenuHandler, 0, "Hug/Rape Stats");
-		
+
 		RegConsoleCmd("sm_duel",   Command_Duel,   "Challenge a player: !duel <name substring>");
 		RegConsoleCmd("sm_rapeduel",   Command_Duel,   "Alias of !duel");
 		RegConsoleCmd("sm_duelhistory", Command_DuelHistory, "Show recent duel victories");
@@ -265,7 +265,7 @@
 			int winner = (client == g_iRequester) ? g_iTarget : g_iRequester;
 				if (IsClientInGame(winner))
 				{
-					PrintToChatAll("\x04[RAPE DUEL]\x01 %N disconnected. %N wins the rape duel by forfeit! Final Score: %N %d - %N %d",
+					Hugs_PrintDuelAnnouncement("\x04[RAPE DUEL]\x01 %N disconnected. %N wins the rape duel by forfeit! Final Score: %N %d - %N %d",
 								   client, winner,
 								   g_iRequester, g_iScoreReq,
 								   g_iTarget,    g_iScoreTgt);
@@ -277,4 +277,3 @@
 		}
 	}
 }
-

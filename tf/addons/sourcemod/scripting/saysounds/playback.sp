@@ -167,7 +167,7 @@ bool GetCommandSoundData(const char[] commandName, char[] soundPath, int soundLe
         char token[MAX_COMMAND_NAME];
         int start = 0;
         int len = strlen(working);
-        
+
         while (start < len && optionCount < MAX_SOUND_OPTIONS)
         {
             // Find next comma starting from current position
@@ -208,7 +208,7 @@ bool GetCommandSoundData(const char[] commandName, char[] soundPath, int soundLe
             }
 
             start = end + 1;
-            
+
             // Safety check
             if (start > len)
             {
@@ -543,7 +543,7 @@ static bool EmitSaySoundToClient(int client, const char[] soundPath, float emitV
     return true;
 }
 
-bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] groupName, bool forcePlayback = false)
+bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] groupName, bool forcePlayback = false, int initiator = 0)
 {
     bool played = false;
 
@@ -551,6 +551,7 @@ bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] group
     {
         for (int i = 1; i <= MaxClients; i++)
         {
+            if (Oblivion_ShouldHide(i, initiator)) continue;
             float emitVolume;
             if (!CanPlaySaySoundToClient(i, groupName, emitVolume, forcePlayback))
             {
@@ -566,6 +567,7 @@ bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] group
         return played;
     }
 
+    if (Oblivion_ShouldHide(client, initiator)) return false;
     float emitVolume;
     if (!CanPlaySaySoundToClient(client, groupName, emitVolume, forcePlayback))
     {
@@ -575,8 +577,7 @@ bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] group
     return EmitSaySoundToClient(client, soundPath, emitVolume);
 }
 
-bool PlaySaySound(const char[] soundPath, const char[] groupName)
+bool PlaySaySound(const char[] soundPath, const char[] groupName, int initiator = 0)
 {
-    return PlaySaySoundToTarget(0, soundPath, groupName);
+    return PlaySaySoundToTarget(0, soundPath, groupName, false, initiator);
 }
-

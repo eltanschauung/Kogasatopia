@@ -62,7 +62,7 @@ void UpdateRapeStatsDuel(int sender, int recipient, int score1, int score2)
 
 	g_iRapesReceived[recipient] += score2 * amount;
 	PrintToChat(recipient, "[SM] you just received %i rapes!", score2 * amount);
-		
+
 	UpdateLastRapists(recipient, sender);
 	SaveClientStats(sender);
 	SaveClientStats(recipient);
@@ -158,6 +158,7 @@ void UpdateLastFeeders(int recipient, const char[] feederName)
 
 void UpdateLastRapists(int recipient, int sender)
 {
+    if (PublicActivity_IsExcluded(sender)) return;
 	char rapistName[MAX_NAME_LENGTH];
 	GetClientName(sender, rapistName, sizeof(rapistName));
 	UpdateLastRapistsByName(recipient, rapistName);
@@ -227,4 +228,3 @@ void UpdateLastRapistsByName(int recipient, const char[] rapistName)
 
 		return false;
 	}
-

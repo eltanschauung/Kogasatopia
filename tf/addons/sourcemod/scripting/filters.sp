@@ -2,6 +2,8 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <public_activity>
+#include <oblivion>
 #include <clientprefs>
 #include <sdktools>
 #include <sdktools_functions>

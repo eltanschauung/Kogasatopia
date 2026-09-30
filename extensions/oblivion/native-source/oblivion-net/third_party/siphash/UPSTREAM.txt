@@ -1,0 +1,2 @@
+https://github.com/veorq/SipHash
+Commit: 32d067603b93b47828700880649198e0bfbbcffa

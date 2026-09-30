@@ -124,7 +124,7 @@
 		if (rape)
 		{
 			g_iRapesReceived[receiver] += amount;
-			UpdateLastRapistsByName(receiver, senderName);
+			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastRapistsByName(receiver, senderName);
 			if (sender > 0)
 			{
 				checkRapeChievements(sender);
@@ -133,12 +133,12 @@
 		else if (feed)
 		{
 			g_iFeedsReceived[receiver] += amount;
-			UpdateLastFeeders(receiver, senderName);
+			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastFeeders(receiver, senderName);
 		}
 		else
 		{
 			g_iHugsReceived[receiver] += amount;
-			UpdateLastHuggers(receiver, senderName);
+			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastHuggers(receiver, senderName);
 		}
 		SaveClientStats(receiver);
 		AnnounceMailedInteraction(sender, receiver, senderSteamId64, senderName, rape, feed);
@@ -153,6 +153,8 @@
 		bool rape,
 		bool feed)
 	{
+		if (PublicActivity_IsExcludedSteam(senderSteamId64) || PublicActivity_IsExcluded(receiver)) return;
+		if (Oblivion_InteractionBlocked(sender, receiver)) return;
 		char senderDisplay[256];
 		BuildMailedHugsChatName(sender, senderSteamId64, senderName, senderDisplay, sizeof(senderDisplay));
 
@@ -270,4 +272,3 @@
 	int g_iRapeProtectorUserId[MAXPLAYERS + 1];
 	char g_szRapeProtectorName[MAXPLAYERS + 1][MAX_NAME_LENGTH + 32];
 	char g_szRapeProtectedName[MAXPLAYERS + 1][MAX_NAME_LENGTH + 32];
-

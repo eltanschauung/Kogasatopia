@@ -54,7 +54,9 @@ static void TidyChat_PrintTeamJoinAlert(int client, int team)
         Format(renderedName, sizeof(renderedName), "{teamcolor}%s{default}", clientName);
     }
 
-    CPrintToChatAllEx(client, "%s %s", renderedName, teamText);
+    for (int viewer = 1; viewer <= MaxClients; viewer++)
+        if (IsClientInGame(viewer) && !Oblivion_ShouldHide(viewer, client))
+            CPrintToChatEx(viewer, client, "%s %s", renderedName, teamText);
 }
 
 public any Native_FilterAlerts_MarkAutobalance(Handle plugin, int numParams)
@@ -182,4 +184,3 @@ public Action TidyChat_UserMessageVoiceSubtitle(UserMsg msgId, BfRead message, c
     }
     return Plugin_Continue;
 }
-

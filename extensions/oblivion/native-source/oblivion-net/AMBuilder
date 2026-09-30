@@ -1,0 +1,14 @@
+import os.path
+for compiler in Extension.compilers:
+    builder.compiler = Extension.configure(compiler)
+    project = builder.project = Extension.HL2Project(builder, 'oblivion_net.ext')
+    project.sources += ['extension.cpp', 'team_mirrors.cpp', 'browser_protocol.cpp', 'browser_hooks.cpp', 'udp_reply_sender.cpp',
+                        'siphash_wrapper.cpp', os.path.join(Extension.sm_root, 'public', 'smsdk_ext.cpp')]
+    for sdk in Extension.sdks.values():
+        if sdk.specPasses(compiler.target):
+            binary = Extension.HL2Config(builder, 'oblivion_net.ext.' + sdk.ext, sdk)
+            if compiler.target.platform == 'windows':
+                binary.compiler.linkflags += ['ws2_32.lib']
+            if builder.options.network_tests:
+                binary.compiler.defines += ['OBLIVION_NETWORK_TESTS']
+    Extension.extensions += builder.Add(project)

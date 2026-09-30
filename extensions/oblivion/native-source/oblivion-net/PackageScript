@@ -1,0 +1,4 @@
+builder.SetBuildFolder('package')
+for task in Extension.extensions:
+    folder = 'addons/sourcemod/extensions' + ('/x64' if task.target.arch == 'x86_64' else '')
+    builder.AddCopy(task.binary, builder.AddFolder(folder))

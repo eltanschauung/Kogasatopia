@@ -1,0 +1,185 @@
+"Games"
+{
+    "tf"
+    {
+        "Offsets"
+        {
+            "FVisible"
+            {
+                "windows" "149"
+                "windows64" "149"
+                "linux" "150"
+                "linux64" "150"
+            }
+        }
+        "Signatures"
+        {
+            "Oblivion_ObserverTarget"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x56\x8B\x75\x08\x57\x8B\xF9\x85\xF6\x0F\x84\xE5\x01\x00\x00\x3B\xF7\x0F\x84\xDD\x01\x00\x00"
+                "linux" "@_ZN9CTFPlayer21IsValidObserverTargetEP11CBaseEntity"
+                "linux64" "@_ZN9CTFPlayer21IsValidObserverTargetEP11CBaseEntity"
+            }
+            "Oblivion_DispenserTarget"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x53\x56\x8B\x75\x08\x57\x8B\xF9\x8B\x87\x38\x01\x00\x00\xC1\xE8\x02\xA8\x01\x75\x1C\x8B\x06\x8B\xCE"
+                "linux" "@_ZN16CObjectDispenser15CouldHealTargetEP11CBaseEntity"
+                "linux64" "@_ZN16CObjectDispenser15CouldHealTargetEP11CBaseEntity"
+            }
+            "Oblivion_PlayerDamage"
+            {
+                "library" "server"
+                "windows" "\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x04\x89\x6C\x24\x04\x8B\xEC\x81\xEC\xD8\x05\x00\x00\x56\x57\xFF\x73\x08"
+                "linux" "@_ZN9CTFPlayer12OnTakeDamageERK15CTakeDamageInfo"
+                "linux64" "@_ZN9CTFPlayer12OnTakeDamageERK15CTakeDamageInfo"
+            }
+            "Oblivion_ObjectDamage"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x83\xEC\x18\x53\x56\x57\x8B\xF9\x8B\x07\x8B\x80\x0C\x01\x00\x00\xFF\xD0\x84\xC0\x75\x2A\x8B\x45\x08\xF3\x0F\x2C\x40\x30"
+                "linux" "@_ZN11CBaseObject12OnTakeDamageERK15CTakeDamageInfo"
+                "linux64" "@_ZN11CBaseObject12OnTakeDamageERK15CTakeDamageInfo"
+            }
+            "Oblivion_MedigunTarget"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x53\x8B\xD9\x56\x57\x8B\x93\x10\x02\x00\x00\x85\xD2\x0F\x84\xD0\x00\x00\x00"
+                "linux" "@_ZN14CWeaponMedigun19AllowedToHealTargetEP11CBaseEntity"
+                "linux64" "@_ZN14CWeaponMedigun19AllowedToHealTargetEP11CBaseEntity"
+            }
+            "Oblivion_AirblastTarget"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x81\xEC\x88\x00\x00\x00\x56\x57\x8B\x7D\x08\x89\x4D\xF8\x8B\xCF\xE8\x2A\x2A\x2A\x2A\x8B\x4D\x0C\x8B\xF0"
+                "linux" "@_ZN15CTFFlameThrower13DeflectPlayerEP9CTFPlayerS1_R6Vector"
+                "linux64" "@_ZN15CTFFlameThrower13DeflectPlayerEP9CTFPlayerS1_R6Vector"
+            }
+            "Oblivion_DeflectEntity"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x53\x56\x57\x6A\x01\x6A\x00\x8B\xF9\x57\x68\x2A\x2A\x2A\x2A\x6A\x00\xE8\x2A\x2A\x2A\x2A\x83\xC4\x14\x85\xC0\x74\x75\x6A\x00"
+                "linux" "@_ZN15CTFFlameThrower13DeflectEntityEP11CBaseEntityP9CTFPlayerR6Vector"
+                "linux64" "@_ZN15CTFFlameThrower13DeflectEntityEP11CBaseEntityP9CTFPlayerR6Vector"
+            }
+        }
+        "Functions"
+        {
+            "Oblivion_ObserverTarget"
+            {
+                "signature" "Oblivion_ObserverTarget"
+                "callconv" "thiscall"
+                "return" "bool"
+                "this" "entity"
+                "arguments"
+                {
+                    "target"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "Oblivion_DispenserTarget"
+            {
+                "signature" "Oblivion_DispenserTarget"
+                "callconv" "thiscall"
+                "return" "bool"
+                "this" "entity"
+                "arguments"
+                {
+                    "target"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "Oblivion_PlayerDamage"
+            {
+                "signature" "Oblivion_PlayerDamage"
+                "callconv" "thiscall"
+                "return" "int"
+                "this" "entity"
+                "arguments"
+                {
+                    "info"
+                    {
+                        "type" "objectptr"
+                    }
+                }
+            }
+            "Oblivion_ObjectDamage"
+            {
+                "signature" "Oblivion_ObjectDamage"
+                "callconv" "thiscall"
+                "return" "int"
+                "this" "entity"
+                "arguments"
+                {
+                    "info"
+                    {
+                        "type" "objectptr"
+                    }
+                }
+            }
+            "Oblivion_MedigunTarget"
+            {
+                "signature" "Oblivion_MedigunTarget"
+                "callconv" "thiscall"
+                "return" "bool"
+                "this" "entity"
+                "arguments"
+                {
+                    "target"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "Oblivion_AirblastTarget"
+            {
+                "signature" "Oblivion_AirblastTarget"
+                "callconv" "thiscall"
+                "return" "bool"
+                "this" "entity"
+                "arguments"
+                {
+                    "target"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "owner"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "direction"
+                    {
+                        "type" "vectorptr"
+                    }
+                }
+            }
+            "Oblivion_DeflectEntity"
+            {
+                "signature" "Oblivion_DeflectEntity"
+                "callconv" "thiscall"
+                "return" "bool"
+                "this" "entity"
+                "arguments"
+                {
+                    "target"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "owner"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "direction"
+                    {
+                        "type" "vectorptr"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -2,6 +2,8 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <public_activity>
+#include <oblivion>
 #include <clientprefs>
 #include <textparse>
 
@@ -539,6 +541,7 @@ public int MenuHandler_AnnouncerGroups(Menu menu, MenuAction action, int client,
 
 public void OnKillstreak(int client, int killstreak)
 {
+    if (PublicActivity_IsExcluded(client)) return;
     if (!IsValidAnnouncerClient(client))
     {
         return;
@@ -558,6 +561,7 @@ public void OnKillstreak(int client, int killstreak)
 
 public void OnKillstreakEnd(int attacker, int victim, int killstreak)
 {
+    if (PublicActivity_IsPairExcluded(attacker, victim)) return;
     if (!IsValidAnnouncerClient(victim))
     {
         return;
@@ -634,13 +638,17 @@ void AnnounceKillstreakEnd(int client, int killstreak)
     {
         char displayName[256];
         GetClientChatDisplayName(client, displayName, sizeof(displayName));
-        CPrintToChatAllEx(client, "%s{default}'s killstreak was shut down! (%d)", displayName, killstreak);
+        for (int viewer = 1; viewer <= MaxClients; viewer++)
+            if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, client))
+                CPrintToChatEx(viewer, client, "%s{default}'s killstreak was shut down! (%d)", displayName, killstreak);
         return;
     }
 
     char clientName[MAX_NAME_LENGTH];
     GetClientName(client, clientName, sizeof(clientName));
-    PrintCenterTextAll("%s's killstreak was shut down! (%d)", clientName, killstreak);
+    for (int viewer = 1; viewer <= MaxClients; viewer++)
+        if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, client))
+            PrintCenterText(viewer, "%s's killstreak was shut down! (%d)", clientName, killstreak);
 }
 
 void PlayShutdownSounds(int attacker, int victim, int killstreak)
@@ -925,6 +933,7 @@ void FormatMultikillMessage(const char[] clientName, const char[] label, int kil
 
 void Announcer_CenterText(int target, int sourceClient, const char[] commandName, bool useSound, const char[] message)
 {
+    if (target > 0 && Oblivion_ShouldHide(target, sourceClient)) return;
     if (target > 0)
     {
         if (IsHumanAnnouncerClient(target) && (!useSound || Announcer_PlaySound(target, sourceClient, commandName)))
@@ -936,7 +945,8 @@ void Announcer_CenterText(int target, int sourceClient, const char[] commandName
 
     if (!useSound)
     {
-        PrintCenterTextAll("%s", message);
+        for (int viewer = 1; viewer <= MaxClients; viewer++)
+            Announcer_CenterText(viewer, sourceClient, commandName, false, message);
         return;
     }
 
@@ -1019,6 +1029,7 @@ bool Announcer_PlaySound(int target, int sourceClient, const char[] commandName)
 
 static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[] commandName)
 {
+    if (target > 0 && Oblivion_ShouldHide(target, sourceClient)) return false;
     if (!commandName[0])
     {
         return false;
@@ -1040,6 +1051,7 @@ static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[
 
 void Announcer_MessageClient(int target, int author, const char[] message)
 {
+    if (Oblivion_ShouldHide(target, author)) return;
     if (IsValidAnnouncerClient(author) && IsClientInGame(author))
     {
         CPrintToChatEx(target, author, "%s", message);
@@ -1051,20 +1063,12 @@ void Announcer_MessageClient(int target, int author, const char[] message)
 
 void Announcer_MessageAll(int author, bool useChat, const char[] message)
 {
-    if (useChat)
+    for (int viewer = 1; viewer <= MaxClients; viewer++)
     {
-        if (IsValidAnnouncerClient(author) && IsClientInGame(author))
-        {
-            CPrintToChatAllEx(author, "%s", message);
-        }
-        else
-        {
-            CPrintToChatAll("%s", message);
-        }
-        return;
+        if (!IsHumanAnnouncerClient(viewer) || Oblivion_ShouldHide(viewer, author)) continue;
+        if (useChat) Announcer_MessageClient(viewer, author, message);
+        else PrintCenterText(viewer, "%s", message);
     }
-
-    PrintCenterTextAll("%s", message);
 }
 
 void GetClientChatDisplayName(int client, char[] buffer, int maxlen)

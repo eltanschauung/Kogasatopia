@@ -94,14 +94,13 @@ Action ChatCommandListener(int client, const char[] command, int argc)
 			g_fNextAllowedSound[initiator] = now + ADMIN_COOLDOWN;
 		else
 			g_fNextAllowedSound[initiator] = now + DEFAULT_COOLDOWN;
-        
+
     }
 
-    if (PlaySaySound(soundPath, groupName))
+    if (PlaySaySound(soundPath, groupName, initiator))
     {
         LogSaySoundUsage("saysound_used", initiator, 0, selectedCommand, soundPath, groupName, fromGroup, sourceGroup, false, "chat");
     }
 
     return silentTrigger ? Plugin_Handled : Plugin_Continue;
 }
-
