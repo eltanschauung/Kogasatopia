@@ -1,5 +1,6 @@
 void WhaleBalance_OnPluginStart()
 {
+    HookEvent("player_hurt", WhaleBalance_PlayerHurt, EventHookMode_Post);
     LoadTranslations("common.phrases");
     DuelDetection_Initialize();
     g_hLogEnabled = CreateConVar("sm_autobalance_log", "1", "Enable autobalance debug logging.", _, true, 0.0, true, 1.0);

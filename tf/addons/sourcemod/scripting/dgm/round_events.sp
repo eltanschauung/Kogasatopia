@@ -1,5 +1,6 @@
 public void DGM_Event_RoundActive(Event event, const char[] name, bool dontBroadcast)
 {
+    DGM_ResetObjectivePace();
     g_bGameRulesReady = true;
     g_bSetupTeamRatioForwardFired = false;
     DGM_ClearAllRespawnTimers();
@@ -45,12 +46,14 @@ public void DGM_Event_RoundActive(Event event, const char[] name, bool dontBroad
 
 public void DGM_Event_SetupFinished(Event event, const char[] name, bool dontBroadcast)
 {
+    RequestFrame(DGM_PrimeObjectivePace);
     g_bGameRulesReady = true;
     DGM_SetSetupActive(false);
 }
 
 public void DGM_Event_RoundFullyActive(Event event, const char[] name, bool dontBroadcast)
 {
+    RequestFrame(DGM_PrimeObjectivePace);
     g_bGameRulesReady = true;
     if (DGM_IsSetupBhopActive())
     {
@@ -142,6 +145,13 @@ public Action Command_ExtendTimer(int client , int args)
 
 public Action Command_AddTimer(int client, int args)
 {
+    // Older installations also run AddKOTHTime (addtime.smx), which owns this
+    // same command and sm_pause. SourceMod dispatches both registered handlers.
+    // Leave that provider intact and execute its KOTH command only once.
+    Handle legacy = FindPluginByFile("addtime.smx");
+    if (DGM_IsCurrentKothMode() && legacy != INVALID_HANDLE
+        && GetPluginStatus(legacy) == Plugin_Running)
+        return Plugin_Handled;
     int time;
     if (args < 1 || !GetCmdArgIntEx(1, time) || time <= 0)
     {

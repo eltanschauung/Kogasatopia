@@ -42,7 +42,7 @@ native int FilterAlerts_MarkAutobalance(int client);
 native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 native bool Announcers_IsGroupEnabled(int client, const char[] groupName);
 
-#define PLUGIN_VERSION "5.0"
+#define PLUGIN_VERSION "5.1"
 
 // DGM state and policy.
 #define DGM_MAX_CONTROL_POINTS 8
@@ -266,6 +266,7 @@ public void OnClientDisconnect(int client)
     DGM_OnClientDisconnect(client);
 }
 
+#include "dgm/objective_pace.sp"
 #include "dgm/population_and_objectives.sp"
 #include "dgm/gamemodes.sp"
 #include "dgm/internal_api.sp"

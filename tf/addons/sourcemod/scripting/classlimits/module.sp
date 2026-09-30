@@ -20,7 +20,6 @@
 #define TF_TEAM_BLU             3
 #define TF_TEAM_RED             2
 
-#define POPULATION_RESTRICTION_MIN_PLAYERS 3
 
 int g_iClass[MAXPLAYERS + 1];
 bool g_bForcedRespawn[MAXPLAYERS + 1];
@@ -140,6 +139,7 @@ void ClassLimits_OnPluginStart()
     }
 
     HookEvent("player_changeclass", Event_PlayerClass);
+    AddCommandListener(ClassLimits_JoinClass, "joinclass");
     HookEvent("player_spawn",       Event_PlayerSpawn);
     HookEvent("player_team",        Event_PlayerTeam);
     HookEvent("player_say",         Event_PlayerSay, EventHookMode_Post);
@@ -252,6 +252,7 @@ public Action Timer_RecordClassStats(Handle timer, any data)
 
 public Action Timer_UpdateClassState(Handle timer, any data)
 {
+    EnforceClassPopulationLimits();
     UpdateOverhealState();
     CheckPendingClassAvailability();
     return Plugin_Continue;
@@ -365,6 +366,20 @@ void ClassLimits_OnConfigsExecuted()
     LoadClassBans();
     UpdateGameModeName();
     UpdateOverhealState();
+    EnforceClassPopulationLimits();
+}
+
+public Action ClassLimits_JoinClass(int client, const char[] command, int args)
+{
+    if (client <= 0 || !IsClientInGame(client) || !g_hEnabled.BoolValue || args < 1)
+        return Plugin_Continue;
+    char name[32];GetCmdArg(1, name, sizeof(name));
+    int classId = TF_CLASS_UNKNOWN;
+    if (StrEqual(name, "heavyweapons", false) || StrEqual(name, "heavy", false)) classId = TF_CLASS_HEAVY;
+    else if (StrEqual(name, "medic", false)) classId = TF_CLASS_MEDIC;
+    if (!IsClassPopulationRestricted(classId)) return Plugin_Continue;
+    NotifyClassRestricted(client, classId, 0);
+    return Plugin_Handled;
 }
 
 public void Event_PlayerClass(Event event, const char[] name, bool dontBroadcast)
@@ -392,7 +407,7 @@ public void Event_PlayerClass(Event event, const char[] name, bool dontBroadcast
         NotifyClassRestricted(iClient, iClass, limit);
 
         // Revert the class selection and reopen the class panel.
-        // Never call TF2_RespawnPlayer here — the panel keeps them off the
+        // Never call TF2_RespawnPlayer here â€” the panel keeps them off the
         // field, and Event_PlayerSpawn enforces the limit when they spawn.
         TF2_SetPlayerClass(iClient, view_as<TFClassType>(g_iClass[iClient]));
         ShowVGUIPanel(iClient, iTeam == TF_TEAM_BLU ? "class_blue" : "class_red");
@@ -411,9 +426,8 @@ public void Event_ClearClassAvailabilityRequests(Event event, const char[] name,
 public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     int iClient = GetClientOfUserId(event.GetInt("userid"));
-    int iTeam   = GetClientTeam(iClient);
-
     if (iClient <= 0 || !IsClientInGame(iClient)) return;
+    int iTeam   = GetClientTeam(iClient);
 
     // This spawn was triggered by our own forced class respawn; don't recurse.
     if (g_bForcedRespawn[iClient])
@@ -512,10 +526,14 @@ static bool IsClassLimitImmune(int client)
 static bool IsClientClassRestricted(int client, int team, int classId, int &limitOut)
 {
     limitOut = -1;
-    if (!g_hEnabled.BoolValue)
+    if (!g_hEnabled.BoolValue || client <= 0 || client > MaxClients
+        || !IsClientInGame(client) || team < TF_TEAM_RED || team > TF_TEAM_BLU
+        || classId < TF_CLASS_SCOUT || classId > TF_CLASS_ENGINEER)
         return false;
 
-    if (IsClientClassBanned(client, classId))
+    // Population bans are absolute. Otherwise every zero-score player is a
+    // top scorer at round start and can bypass a configured Heavy ban.
+    if (IsClientClassBanned(client, classId) || IsClassPopulationRestricted(classId))
     {
         limitOut = 0;
         return true;
@@ -810,11 +828,28 @@ static bool GetClassPopulationRestrictionState(int classId, int &currentPlayers,
     if (restrictionCvar == null)
         return false;
 
-    if (!GetReliableGameplayHumanClientCount(currentPlayers))
-        return false;
-
+    // Count the real playing humans directly, including the first one or two.
+    // SourceTV, spectators and connecting slots must not disable this check.
+    currentPlayers = GetHumanTeamClientCount(TF_TEAM_RED) + GetHumanTeamClientCount(TF_TEAM_BLU);
     threshold = restrictionCvar.IntValue;
-    return threshold > 0 && currentPlayers >= POPULATION_RESTRICTION_MIN_PLAYERS && currentPlayers < threshold;
+    return threshold > 0 && currentPlayers < threshold;
+}
+
+void EnforceClassPopulationLimits()
+{
+    if (g_hEnabled == null || !g_hEnabled.BoolValue)
+        return;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client) || IsFakeClient(client) || GetClientTeam(client) < TF_TEAM_RED)
+            continue;
+        int classId = view_as<int>(TF2_GetPlayerClass(client));
+        if (!IsClassPopulationRestricted(classId))
+            continue;
+        NotifyClassRestricted(client, classId, 0);
+        if (!PickClass(client, classId) && IsPlayerAlive(client))
+            ForcePlayerSuicide(client);
+    }
 }
 
 bool IsClassAtLimit(int client, int iTeam, int iClass, int &limitOut)
@@ -1072,7 +1107,7 @@ static void CheckPendingClassAvailability()
 
 static bool IsClassAvailableForClient(int client, int classId)
 {
-    if (g_hEnabled == null || !g_hEnabled.BoolValue || IsClassLimitImmune(client))
+    if (g_hEnabled == null || !g_hEnabled.BoolValue)
     {
         return true;
     }
@@ -1080,6 +1115,8 @@ static bool IsClassAvailableForClient(int client, int classId)
     {
         return false;
     }
+    if (IsClassLimitImmune(client))
+        return true;
 
     int team = GetClientTeam(client);
     if (team < TF_TEAM_RED || team > TF_TEAM_BLU)

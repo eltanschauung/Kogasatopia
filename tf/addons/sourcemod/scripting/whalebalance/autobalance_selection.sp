@@ -1,3 +1,25 @@
+static float g_LastVolunteerEnemyDamageAt[MAXPLAYERS + 1];
+static int g_VolunteerDamageSerial[MAXPLAYERS + 1];
+
+public void WhaleBalance_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
+{
+    int attacker = GetClientOfUserId(event.GetInt("attacker"));
+    int victim = GetClientOfUserId(event.GetInt("userid"));
+    if (attacker <= 0 || victim <= 0 || attacker == victim || event.GetInt("damageamount") <= 0
+        || !IsClientInGame(attacker) || !IsClientInGame(victim)
+        || GetClientTeam(attacker) < TEAM_RED || GetClientTeam(victim) < TEAM_RED
+        || GetClientTeam(attacker) == GetClientTeam(victim))
+        return;
+    g_LastVolunteerEnemyDamageAt[attacker] = GetEngineTime();
+    g_VolunteerDamageSerial[attacker] = GetClientSerial(attacker);
+}
+
+bool VolunteerRecentlyDamagedEnemy(int client)
+{
+    return g_VolunteerDamageSerial[client] == GetClientSerial(client)
+        && GetEngineTime() - g_LastVolunteerEnemyDamageAt[client] < 3.0;
+}
+
 void StopAutobalanceTimer()
 {
     if (g_hAutoBalanceTimer == INVALID_HANDLE)
@@ -62,7 +84,8 @@ bool IsBasicBalanceCandidate(int client, int team)
     if (TeamBalance_IsRecentlyMoved(client)) return false;
     if (ClientHasDecapitationHeads(client)) return false;
     if (IsClientVolunteer(client)
-        && (IsClientUnderUberEffect(client) || TeamBalance_HasProtectedKillstreak(client))) return false;
+        && (IsClientUnderUberEffect(client) || TeamBalance_HasProtectedKillstreak(client)
+            || VolunteerRecentlyDamagedEnemy(client))) return false;
 
     return true;
 }

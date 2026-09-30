@@ -109,6 +109,12 @@ DGMObjectiveLeader DGM_GetObjectiveLeaderValue(
     neutralOwned = 0;
     total = 0;
 
+    g_ObjectiveLeaderReason[0]='\0';
+    char mode[32];DGM_CopyCurrentGameModeKey(mode,sizeof(mode));
+    if(StrEqual(mode,"pl") || StrEqual(mode,"plr"))
+        return DGM_PayloadLeader(StrEqual(mode,"plr"),redOwned,blueOwned,neutralOwned,total);
+    if(StrEqual(mode,"ctf"))return DGM_FlagCaptureLeader(redOwned,blueOwned,neutralOwned,total);
+
     if (DGM_IsCurrentKothMode())
     {
         DGMObjectiveLeader kothLeader = DGM_GetKothTimerLeaderValue(redOwned, blueOwned, neutralOwned, total);
@@ -126,6 +132,13 @@ DGMObjectiveLeader DGM_GetObjectiveLeaderValue(
     if (total <= 0)
     {
         return DGMObjectiveLeader_None;
+    }
+
+    if(StrEqual(mode,"ad"))
+    {
+        int attacking=DGM_GetAttackingRoleTeam();
+        float progress=float(attacking==2?redOwned:blueOwned)/float(total);
+        return DGM_PaceAdvantage(attacking,progress,0);
     }
 
     if (redOwned > blueOwned)
@@ -521,15 +534,15 @@ void DGM_ObjectiveLeaderToString(DGMObjectiveLeader leader, char[] buffer, int m
     {
         case DGMObjectiveLeader_Red:
         {
-            strcopy(buffer, maxlen, isKoth ? "RED is leading by KOTH timer" : "RED is leading by objective ownership");
+            strcopy(buffer, maxlen, isKoth ? "RED is leading by KOTH timer" : "RED has the objective advantage");
         }
         case DGMObjectiveLeader_Blue:
         {
-            strcopy(buffer, maxlen, isKoth ? "BLU is leading by KOTH timer" : "BLU is leading by objective ownership");
+            strcopy(buffer, maxlen, isKoth ? "BLU is leading by KOTH timer" : "BLU has the objective advantage");
         }
         case DGMObjectiveLeader_Tie:
         {
-            strcopy(buffer, maxlen, isKoth ? "KOTH timers are tied" : "Objective ownership is tied");
+            strcopy(buffer, maxlen, isKoth ? "KOTH timers are tied" : "No clear objective advantage");
         }
         default:
         {

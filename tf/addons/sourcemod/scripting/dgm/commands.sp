@@ -68,11 +68,11 @@ public Action Command_ObjectiveLeader(int client, int args)
     {
         if (client <= 0 || !IsClientInGame(client))
         {
-            PrintToServer("[DGM] No control points were found or counted on this map.");
+            PrintToServer("[DGM] Objective data is not available for this map yet.");
         }
         else
         {
-            PrintToChat(client, "\x04[DGM]\x01 No control points were found or counted on this map.");
+            PrintToChat(client, "\x04[DGM]\x01 Objective data is not available for this map yet.");
         }
 
         return Plugin_Handled;
@@ -80,6 +80,19 @@ public Action Command_ObjectiveLeader(int client, int args)
 
     char status[96];
     DGM_ObjectiveLeaderToString(leader, status, sizeof(status));
+
+    char mode[32];DGM_CopyCurrentGameModeKey(mode,sizeof(mode));
+    if(StrEqual(mode,"pl") || StrEqual(mode,"plr") || StrEqual(mode,"ad") || StrEqual(mode,"ctf"))
+    {
+        if(StrEqual(mode,"pl"))
+            ReplyToCommand(client,"[DGM] %s | Attack progress: %d%% | %.0fs left | %s",status,
+                g_ObjectiveAttackingTeam==2?redOwned:blueOwned,DGM_GetHudRoundTimerRemaining(),g_ObjectiveLeaderReason);
+        else if(StrEqual(mode,"plr"))
+            ReplyToCommand(client,"[DGM] %s | Cart progress RED=%d%% BLU=%d%%",status,redOwned,blueOwned);
+        else
+            ReplyToCommand(client,"[DGM] %s | RED=%d BLU=%d | %s",status,redOwned,blueOwned,g_ObjectiveLeaderReason);
+        return Plugin_Handled;
+    }
 
     if (client <= 0 || !IsClientInGame(client))
     {
