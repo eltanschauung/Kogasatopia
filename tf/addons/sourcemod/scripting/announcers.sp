@@ -66,7 +66,10 @@ enum AnnouncerConfigMode
     AnnouncerConfig_ShutdownYours,
     AnnouncerConfig_ShutdownTheirs,
     AnnouncerConfig_MedicDrops,
-    AnnouncerConfig_Airshots
+    AnnouncerConfig_Airshots,
+    AnnouncerConfig_UberTeam,
+    AnnouncerConfig_UberEnemy,
+    AnnouncerConfig_UberYou
 }
 
 ConVar g_cvMultikillsChat = null;
@@ -90,6 +93,7 @@ StringMap g_ShutdownSoundMap = null;
 StringMap g_ShutdownTheirsSoundMap = null;
 StringMap g_MedicDropSoundMap = null;
 StringMap g_AirshotSoundMap = null;
+StringMap g_UberSoundMaps[3]; // teammate, enemy, self/patient
 AnnouncerConfigMode g_ConfigMode = AnnouncerConfig_None;
 int g_ConfigDepth = 0;
 int g_ConfigLevel = 0;
@@ -105,7 +109,7 @@ public Plugin myinfo =
     name = "Announcers",
     author = "Kogasatopia",
     description = "Announcement handlers for shared gameplay events.",
-    version = "1.0.0",
+    version = "1.1.0",
     url = ""
 };
 
@@ -117,6 +121,8 @@ public void OnPluginStart()
     g_ShutdownTheirsSoundMap = new StringMap();
     g_MedicDropSoundMap = new StringMap();
     g_AirshotSoundMap = new StringMap();
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)g_UberSoundMaps[i]=new StringMap();
+    HookEvent("player_chargedeployed",Announcer_UberDeployed,EventHookMode_Post);
     g_hAnnouncerGroupsCookie = RegClientCookie(
         ANNOUNCER_GROUP_COOKIE,
         "Disabled paid announcer sound groups.",
@@ -202,7 +208,7 @@ public void OnPluginStart()
     );
     g_cvMultikillRollupWindow = CreateConVar(
         "announcers_multikill_rollup_window",
-        "3.0",
+        "4.0",
         "Seconds to wait for higher multikill levels before announcing the latest one.",
         FCVAR_NONE,
         true,
@@ -291,6 +297,10 @@ public void OnConfigsExecuted()
 
 public void OnPluginEnd()
 {
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)
+    {
+        ClearSoundMap(g_UberSoundMaps[i]);delete g_UberSoundMaps[i];g_UberSoundMaps[i]=null;
+    }
     ClearAllMultikillRollups();
     ClearSoundMap(g_KillstreakSoundMap);
     ClearSoundMap(g_MultikillSoundMap);
@@ -412,6 +422,22 @@ public int Native_PlayAirshot(Handle plugin, int numParams)
     return Announcer_PlaySound(0, attacker, commandName);
 }
 
+public void Announcer_UberDeployed(Event event,const char[] name,bool dontBroadcast)
+{
+    int medic=GetClientOfUserId(event.GetInt("userid")),patient=GetClientOfUserId(event.GetInt("targetid"));
+    if(!IsHumanAnnouncerClient(medic) || PublicActivity_IsExcluded(medic) || !Announcer_ShouldPlaySound(true))return;
+    char commands[3][ANNOUNCER_MAX_COMMAND_NAME];
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)
+        GetAnnouncerSoundCommand(g_UberSoundMaps[i],0,"",medic,commands[i],sizeof(commands[]));
+    int team=GetClientTeam(medic);
+    for(int listener=1;listener<=MaxClients;listener++)
+    {
+        if(!IsHumanAnnouncerClient(listener) || GetClientTeam(listener)<2)continue;
+        int category=listener==medic || listener==patient ? 2 : (GetClientTeam(listener)==team ? 0 : 1);
+        if(commands[category][0])Announcer_PlaySound(listener,medic,commands[category]);
+    }
+}
+
 public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
 {
     int client = GetNativeCell(1);
@@ -439,6 +465,7 @@ public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_AirshotSoundMap);
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)AddPurchasedAnnouncerGroupsFromMap(client,groups,g_UberSoundMaps[i]);
 
     bool enabled = false;
     char groupName[ANNOUNCER_MAX_GROUP_NAME];
@@ -488,6 +515,7 @@ void ShowAnnouncerGroupsMenu(int client)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_AirshotSoundMap);
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)AddPurchasedAnnouncerGroupsFromMap(client,groups,g_UberSoundMaps[i]);
 
     if (groups.Length == 0)
     {
@@ -1146,6 +1174,12 @@ void LoadAnnouncerConfig()
     ClearSoundMap(g_MedicDropSoundMap);
     ClearSoundMap(g_AirshotSoundMap);
 
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)
+    {
+        if(g_UberSoundMaps[i]==null)g_UberSoundMaps[i]=new StringMap();
+        ClearSoundMap(g_UberSoundMaps[i]);
+    }
+
     g_ConfigDepth = 0;
     g_ConfigLevel = 0;
     g_ConfigMode = AnnouncerConfig_None;
@@ -1207,10 +1241,13 @@ public SMCResult AnnouncerConfig_EnterSection(SMCParser parser, const char[] nam
         {
             g_ConfigMode = AnnouncerConfig_MedicDrops;
         }
-        else if (StrEqual(sectionName, "airshot"))
+        else if (StrEqual(sectionName, "airshot") || StrEqual(sectionName, "airshot_kill"))
         {
             g_ConfigMode = AnnouncerConfig_Airshots;
         }
+        else if(StrEqual(sectionName,"uber_team"))g_ConfigMode=AnnouncerConfig_UberTeam;
+        else if(StrEqual(sectionName,"uber_enemy"))g_ConfigMode=AnnouncerConfig_UberEnemy;
+        else if(StrEqual(sectionName,"uber_you"))g_ConfigMode=AnnouncerConfig_UberYou;
         else
         {
             g_ConfigMode = AnnouncerConfig_None;
@@ -1265,7 +1302,8 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
     }
 
     if (g_ConfigMode == AnnouncerConfig_MedicDrops
-        || g_ConfigMode == AnnouncerConfig_Airshots)
+        || g_ConfigMode == AnnouncerConfig_Airshots
+        || (g_ConfigMode >= AnnouncerConfig_UberTeam && g_ConfigMode <= AnnouncerConfig_UberYou))
     {
         if (g_ConfigDepth != 2)
         {
@@ -1278,6 +1316,8 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
         {
             StringMap map = g_ConfigMode == AnnouncerConfig_MedicDrops
                 ? g_MedicDropSoundMap : g_AirshotSoundMap;
+            if(g_ConfigMode>=AnnouncerConfig_UberTeam)
+                map=g_UberSoundMaps[view_as<int>(g_ConfigMode)-view_as<int>(AnnouncerConfig_UberTeam)];
             AddAnnouncerSoundCommand(map, 0, commandName);
         }
         return SMCParse_Continue;
@@ -1595,7 +1635,14 @@ static ArrayList FindAnnouncerSoundCommandList(const char[] commandName)
         return commands;
     }
 
-    return FindAnnouncerSoundCommandListInMap(g_AirshotSoundMap, commandName);
+    commands=FindAnnouncerSoundCommandListInMap(g_AirshotSoundMap,commandName);
+    if(commands!=null)return commands;
+    for(int i=0;i<sizeof(g_UberSoundMaps);i++)
+    {
+        commands=FindAnnouncerSoundCommandListInMap(g_UberSoundMaps[i],commandName);
+        if(commands!=null)return commands;
+    }
+    return null;
 }
 
 static ArrayList FindAnnouncerSoundCommandListInMap(StringMap map, const char[] commandName)
