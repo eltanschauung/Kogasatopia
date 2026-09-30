@@ -4,7 +4,7 @@
 #include "new_engi_buildings/engipads.inc"
 #include "new_engi_buildings/amplifier.inc"
 
-#define NEW_ENGI_BUILDINGS_VERSION "1.0.0"
+#define NEW_ENGI_BUILDINGS_VERSION "1.1.0"
 
 public Plugin myinfo =
 {
@@ -104,6 +104,9 @@ public void NewEngiBuildings_ObjectDestroyed(Event event, const char[] name, boo
 {
 	ObjectDestroyed(event, name, dontBroadcast);
 	Event_ObjectDestroyed(event, name, dontBroadcast);
+	// Destroying one end resets its match to level 1 in vanilla TF2.
+	if (event.GetInt("objecttype") == view_as<int>(TFObject_Teleporter))
+		QueueAllMinimumTeleporters();
 }
 
 public void NewEngiBuildings_ObjectDetonated(Event event, const char[] name, bool dontBroadcast)

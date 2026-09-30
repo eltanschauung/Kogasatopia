@@ -107,6 +107,8 @@ static float g_flPadRechargeEnd[2048];
 static char g_szOffsetStartProp[64];
 static int g_iOffsetMatchingTeleporter = -1;
 static Handle g_hGetMaxHealthForCurrentLevel = INVALID_HANDLE;
+static ArrayList g_MinimumTeleporterQueue;
+static Handle g_MinimumTeleporterTimer;
 
 static Handle g_hPadCookie;
 static Handle g_hPadTimerAnnounce;
@@ -163,6 +165,7 @@ void InitNormalTeleporterHealthCall()
 
 void EngiPads_OnPluginStart()
 {
+	g_MinimumTeleporterQueue = new ArrayList();
 	InitGamedata();
 	InitNormalTeleporterHealthCall();
 	
@@ -206,6 +209,7 @@ cvarPads[BoostBlockAiming] = CreateConVar("pads_boost_block_aiming", "1", "Set t
 	
 	//Hooks
 	cvarPads[VersionNumber].AddChangeHook(CvarChange);
+	g_hTeleporterMinLevel.AddChangeHook(TeleporterMinimumChanged);
 	cvarPads[PadsEnabled].AddChangeHook(CvarChange);
 	cvarPads[PadsAnnounce].AddChangeHook(CvarChange);
 	
@@ -227,11 +231,14 @@ cvarPads[BoostBlockAiming] = CreateConVar("pads_boost_block_aiming", "1", "Set t
 
 void EngiPads_OnPluginEnd()
 {
+	delete g_MinimumTeleporterTimer;
+	delete g_MinimumTeleporterQueue;
 	ConvertAllPadsToTeleporters(); //Convert all Pads back to teleporters if the plugin is unloaded.
 }
 
 void EngiPads_OnConfigsExecuted()
 {
+	QueueAllMinimumTeleporters();
 	/* Version checker taken from VSH */
 	static char szOldVersion[12];
 	cvarPads[VersionNumber].GetString(szOldVersion, sizeof(szOldVersion));
@@ -302,6 +309,9 @@ void EngiPads_OnMapStart()
 
 void EngiPads_OnMapEnd()
 {
+	delete g_MinimumTeleporterTimer;
+	g_MinimumTeleporterTimer = null;
+	g_MinimumTeleporterQueue.Clear();
 	ClearTimer(g_hPadTimerAnnounce);
 }
 
@@ -397,26 +407,51 @@ public void ObjectBuilt(Event event, const char[] name, bool dontBroadcast)
     else
         TF2Attrib_RemoveByName(wrench, ATTRIBUTE_BUILD_SPEED);
 
-    if (g_iPadType[obj] == PadType_None && g_hTeleporterMinLevel.IntValue > 1)
-        SDKHook(obj, SDKHook_ThinkPost, NormalTeleporter_ThinkPost);
+    QueueMinimumTeleporter(obj);
 }
 
-public void NormalTeleporter_ThinkPost(int teleporter)
+void QueueMinimumTeleporter(int teleporter)
 {
-	if (!IsValidEntity(teleporter))
+	if (teleporter <= MaxClients || teleporter >= sizeof(g_iPadType) || !IsValidEntity(teleporter)
+		|| g_iPadType[teleporter] != PadType_None || g_hTeleporterMinLevel.IntValue <= 1)
 		return;
+	int reference = EntIndexToEntRef(teleporter);
+	if (g_MinimumTeleporterQueue.FindValue(reference) == -1)
+		g_MinimumTeleporterQueue.Push(reference);
+	if (g_MinimumTeleporterTimer == null)
+		g_MinimumTeleporterTimer = CreateTimer(0.1, Timer_MinimumTeleporters, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+}
 
-	if (g_iPadType[teleporter] != PadType_None)
+void QueueAllMinimumTeleporters()
+{
+	int teleporter = -1;
+	while ((teleporter = FindEntityByClassname(teleporter, "obj_teleporter")) != -1)
+		QueueMinimumTeleporter(teleporter);
+}
+
+public void TeleporterMinimumChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	QueueAllMinimumTeleporters();
+}
+
+public Action Timer_MinimumTeleporters(Handle timer)
+{
+	// Object construction uses context thinks; SDKHook_ThinkPost is not a
+	// reliable completion notification. Poll only this small pending set.
+	for (int i = g_MinimumTeleporterQueue.Length - 1; i >= 0; i--)
 	{
-		SDKUnhook(teleporter, SDKHook_ThinkPost, NormalTeleporter_ThinkPost);
-		return;
+		int teleporter = EntRefToEntIndex(g_MinimumTeleporterQueue.Get(i));
+		if (teleporter > MaxClients && IsValidEntity(teleporter)
+			&& g_iPadType[teleporter] == PadType_None && g_hTeleporterMinLevel.IntValue > 1)
+		{
+			if (GetEntProp(teleporter, Prop_Send, "m_bBuilding")) continue;
+			ApplyMinimumTeleporterLevel(teleporter);
+		}
+		g_MinimumTeleporterQueue.Erase(i);
 	}
-
-	if (GetEntProp(teleporter, Prop_Send, "m_bBuilding"))
-		return;
-
-	SDKUnhook(teleporter, SDKHook_ThinkPost, NormalTeleporter_ThinkPost);
-	ApplyMinimumTeleporterLevel(teleporter);
+	if (g_MinimumTeleporterQueue.Length) return Plugin_Continue;
+	g_MinimumTeleporterTimer = null;
+	return Plugin_Stop;
 }
 
 void ApplyMinimumTeleporterLevel(int teleporter)
@@ -897,7 +932,7 @@ void ConvertTeleporterToPad(int iEnt, int iPadType, bool bAddHealth)
 	g_iPadType[iEnt] = iPadType;
 	g_flPadRechargeEnd[iEnt] = 0.0;
 	
-	// SetEntityModel(iEnt, "MODEL_PAD");	//Coming soon™, maybe...
+	// SetEntityModel(iEnt, "MODEL_PAD");	//Coming soonâ„¢, maybe...
 	
 	SetEntProp(iEnt, Prop_Send, "m_iHighestUpgradeLevel", 3);	//Set Pads to level 3 for cosmetic reasons related to recharging
 	SetEntProp(iEnt, Prop_Send, "m_iUpgradeLevel", 3);
