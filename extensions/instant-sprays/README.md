@@ -1,4 +1,4 @@
-# Instant Sprays 1.3.3
+# Instant Sprays 1.3.5
 
 Select a different spray in TF2's Options, then use the normal spray key. Your
 new image appears locally using the texture already on your PC. The server
@@ -27,7 +27,8 @@ need only ordinary TF2 and permitted spray uploads/downloads.
 - Players can use `!refreshspray` after replacing an image under the same filename.
 - Root admins can use `sm_instant_sprays_status` for transfer diagnostics.
 
-Update the plugin and extension together; 1.3.3 requires native API 6.
+Update the plugin, extension, and `gamedata/instant_sprays.games.txt` together;
+1.3.5 requires native API 6.
 
 Client upload/download and spray-visibility preferences are respected. Supported sprays are 2D VTF
 7.0–7.5 files up to 512 KiB inside `materials/vgui/logos/`, plus the stock
@@ -45,7 +46,13 @@ timeout; they are never restarted by repeated spray presses. Server-side file
 delivery uses TF2's normal packet scheduling and file priority. The extension
 does not force extra packets or promote file transfers over gameplay traffic.
 Before publishing a new CRC, the extension delivers its renderer texture into
-`materials/temp/` and waits for the transfer to drain. This prevents the stock
+`materials/temp/` and waits for that file to finish. Linux uses the engine's
+`CNetChan::IsFileInWaitingList` symbol; other platforms retain the conservative
+whole-channel fallback until a matching queue query is supplied. Preview models,
+renderer textures, customization DATs, and shared meshes are checked separately,
+so another player's queued files do not delay a completed spray. Continuing file
+progress extends a stalled-delivery deadline within a 180-second hard limit.
+This prevents the stock
 PlayerLogo proxy from retaining a missing-texture lookup. Four reserved VTF
 padding bytes provide a stable new cache identity; image pixels, dimensions,
 animation frames, and texture flags are unchanged. Clients may also request the
@@ -77,8 +84,13 @@ Spray Tracer and Resizable Sprays integrations use these hooks. Failed shared
 model transfers have a 60-second bound so one stalled viewer cannot hold up
 everyone else. Owner preview models also have distinct connection identities.
 
-Only server components are installed. There are no binary patches, signatures,
-client extensions, or forced reconnects. Cached spray files use TF2's normal
+Only server components are installed. Filesystem detours resolve their targets
+through public SDK interfaces, without signature scans or changes to engine files
+on disk. Background compression threads bypass the upload policy and SourceHook;
+only the game thread can route an incoming spray into isolated storage. This fixes
+the v1.3.3 crash in parallel outgoing file compression. The prepared-texture CRC
+namespace is refreshed to avoid reusing missing-texture entries from failed transfers.
+Cached spray files use TF2's normal
 `tf/download/user_custom/` directory; preview assets are stored under
 `tf/download/materials/instant_sprays/v7/` and `tf/download/models/instant_sprays/v7/`.
 Unique preview models are capped at 192 per map and 128 per client connection;
@@ -92,4 +104,6 @@ are supported within the same VTF size and data-validation limits.
 
 Windows runtime checks cover local previews, complete background transfers,
 cached selections, unchanged sprays, same-filename refreshes, and invalid uploads.
-Linux binaries still need runtime testing on the destination server.
+The filesystem hook bridge also has a concurrent I/O regression with separate
+upload identities. Full multiplayer spray visibility still needs in-game testing
+on the destination server after the v1.3.4 crash fix and v1.3.5 per-file wait fix.

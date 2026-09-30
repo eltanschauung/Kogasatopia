@@ -611,7 +611,9 @@ class ExtensionConfig(object):
 Extension = ExtensionConfig()
 Extension.detectSDKs()
 
-
+sh = SafetyHookShim()
+sh.all_targets = Extension.compilers
+builder.Build('AMBuilderSafetyHook', {'Extension': Extension, 'sh': sh})
 
 # Add additional buildscripts here
 BuildScripts = [
@@ -623,4 +625,4 @@ if builder.backend == 'amb2':
 		'PackageScript',
 	]
 
-builder.Build(BuildScripts, {'Extension': Extension})
+builder.Build(BuildScripts, {'Extension': Extension, 'sh': sh})

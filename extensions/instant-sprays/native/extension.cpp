@@ -2,6 +2,7 @@
 #include "smsdk_ext.h"
 #include "spray_policy.h"
 #include "spray_delivery.h"
+#include "filesystem_hooks.h"
 #include "preview_model.h"
 #include "preview_geometry.h"
 #include "preview_surface.h"
@@ -36,11 +37,6 @@ SH_DECL_HOOK2_void(INetChannelHandler,FileReceived,SH_NOATTRIB,0,const char *,un
 SH_DECL_HOOK2_void(INetChannelHandler,FileDenied,SH_NOATTRIB,0,const char *,unsigned int);
 SH_DECL_HOOK2_void(INetChannelHandler,FileRequested,SH_NOATTRIB,0,const char *,unsigned int);
 SH_DECL_HOOK2_void(INetChannelHandler,FileSent,SH_NOATTRIB,0,const char *,unsigned int);
-SH_DECL_HOOK3(IBaseFileSystem,Open,SH_NOATTRIB,0,FileHandle_t,const char *,const char *,const char *);
-SH_DECL_HOOK2(IBaseFileSystem,FileExists,SH_NOATTRIB,0,bool,const char *,const char *);
-SH_DECL_HOOK3(IBaseFileSystem,Write,SH_NOATTRIB,0,int,const void *,int,FileHandle_t);
-SH_DECL_HOOK1_void(IBaseFileSystem,Close,SH_NOATTRIB,0,FileHandle_t);
-SH_DECL_HOOK2_void(IFileSystem,CreateDirHierarchy,SH_NOATTRIB,0,const char *,const char *);
 SH_DECL_HOOK3_void(INetworkStringTable,SetStringUserData,SH_NOATTRIB,0,int,int,const void *);
 SH_DECL_HOOK0_void(IServerGameDLL,LevelShutdown,SH_NOATTRIB,0);
 SH_DECL_HOOK3_void(IServerGameDLL,ServerActivate,SH_NOATTRIB,0,edict_t *,int,int);
@@ -70,6 +66,10 @@ INetworkStringTable *userinfo;
 IFileSystem *files;
 IBaseFileSystem *baseFiles;
 const CGlobalVars *globals;
+IGameConfig *queueConfig;
+class FileQueue {public:bool Contains(const char *);};
+using FileQueueMethod=bool(FileQueue::*)(const char *);
+FileQueueMethod fileWaiting=nullptr;
 IPluginContext *owner;
 std::filesystem::path incomingRoot;
 std::vector<int> globalHooks;
@@ -80,7 +80,7 @@ IForward *placedForward,*guardForward,*visibleForward,*changedForward;
 uint64_t sequence;
 int nextToken;
 struct Download {unsigned transfer=0;bool pending=false,denied=false;};
-struct ModelDelivery {double settle=0,deadline=0;bool ready=false,failed=false;std::set<unsigned> transfers;};
+struct ModelDelivery {double settle=0,deadline=0,hardDeadline=0;bool ready=false,failed=false;std::set<unsigned> transfers;};
 class Recipients final : public IRecipientFilter {
 public:
     std::vector<int> members;
@@ -119,10 +119,13 @@ struct Client {
     std::string selected,error,cache;
     std::string textureCache;
     std::string wanted,previewMaterial;
+    std::vector<std::string> previewAssets;
     double previewSettle=0,previewDeadline=0,hardDeadline=0;
     bool previewReady=false,previewEnabled=false,previewFailed=false,placementDirty=false;
     std::set<unsigned> previewTransfers;
     int lastProgress=0;
+    int lastOutboundProgress=0,lastOutboundTotal=0;
+    bool outboundMoved=false;
     Placement placement;
     std::filesystem::path incoming;
     uint32_t activeCrc=0,targetCrc=0,originalCrc=0;
@@ -140,6 +143,7 @@ std::map<std::string,CachedAssets> mapAssets;
 struct Route {
     std::string original;
     std::filesystem::path temporary;
+    std::string redirectedName;
     FileHandle_t handle=nullptr;
     size_t written=0;
     bool claimed=false,rejected=false;
@@ -165,6 +169,15 @@ bool QueueFile(int client,const char *name,unsigned transfer){
     // Let TF2 schedule file fragments alongside its normal game snapshots.
     // Extra Transmit calls can consume the channel's budget before snapshots.
     return clients[client].net&&clients[client].net->SendFile(name,transfer);
+}
+bool WaitingForFile(int client,const std::string &name){
+    auto net=clients[client].net;if(!net)return true;
+    if(fileWaiting)return (reinterpret_cast<FileQueue *>(net)->*fileWaiting)(name.c_str());
+    return net->HasPendingReliableData();
+}
+bool WaitingForFiles(int client,const std::vector<std::string> &names){
+    for(const auto &name:names)if(WaitingForFile(client,name))return true;
+    return false;
 }
 std::string GamePath(const std::string &name){char out[1024];smutils->BuildPath(Path_Game,out,sizeof(out),"%s",name.c_str());return out;}
 uint32_t Swap(uint32_t n){return (n>>24)|((n>>8)&0xff00)|((n<<8)&0xff0000)|(n<<24);}
@@ -279,7 +292,7 @@ void PreparePublication(int client,uint32_t crc){
         auto &d=c.downloads[recipient];d.transfer=static_cast<unsigned>(++sequence);d.pending=true;
         if(!QueueFile(recipient,c.textureCache.c_str(),d.transfer)){d.pending=false;d.denied=true;}
     }
-    c.settle=Now()+.25;c.deadline=Now()+60;c.phase=Preloading;
+    c.settle=Now()+.25;c.deadline=Now()+60;c.hardDeadline=Now()+180;c.phase=Preloading;
 }
 void Complete(int client) {
     auto &c=clients[client];std::vector<uint8_t> data;std::string reason;
@@ -340,8 +353,9 @@ bool PreparePreview(int client,const std::string &path,const spray_geometry::Mod
     // Other clients may have cached an unavailable owner-only model during
     // signon. A new connection must never reuse that model-precache identity.
     if(!WriteSurfaceAssets(client,path,mesh,model,assets,"owner:"+std::to_string(c.serial)))return false;
+    c.previewAssets=assets;
     if(c.previewMaterial==model)return true;
-    if(c.previewDelivered.count(model)){c.previewMaterial=model;c.previewReady=true;return true;}
+    if(c.previewDelivered.count(model)){c.previewMaterial=model;c.previewReady=true;c.previewFailed=false;c.previewTransfers.clear();return true;}
     c.previewMaterial=model;c.previewReady=false;c.previewFailed=false;c.previewTransfers.clear();
     c.previewSettle=Now()+std::max(.15,4.0*c.net->GetAvgLatency(FLOW_OUTGOING));c.previewDeadline=Now()+15;
     for(const auto &asset:assets){
@@ -364,6 +378,41 @@ bool IncomingName(const char *name,const char *pathID) {
     auto p=Context();return p&&name&&pathID&&!strcmp(pathID,"download")
         &&clients[p->client].requested.count(name)!=0;
 }
+// Only spray_files' game-thread gate may enter these upload policy callbacks.
+// TF2 opens/compresses outgoing files on worker threads, where SourceHook's
+// shared context stack and SourceMod's player helpers must never be touched.
+bool UploadExists(const char *name,const char *pathID,bool &result){
+    if(!IncomingName(name,pathID))return false;
+    auto p=Context();if(!p->route.claimed)RemoveIncoming(p->route.temporary);
+    p->route=Route{};p->route.original=name;
+    p->route.temporary=incomingRoot/("upload_"+std::to_string(clients[p->client].serial)+"_"+std::to_string(++sequence)+".vtf");
+    result=false;return true;
+}
+bool UploadOpen(const char *&name,const char *options,const char *&pathID){
+    auto p=Context();
+    if(!p||!IncomingName(name,pathID)||!options||!strchr(options,'w')||p->route.original!=name||p->route.temporary.empty())return false;
+    p->route.redirectedName=p->route.temporary.string();
+    name=p->route.redirectedName.c_str();pathID=nullptr;return true;
+}
+void UploadOpened(void *handle){auto p=Context();if(p)p->route.handle=handle;}
+bool UploadWrite(int size,void *handle,int &result){
+    auto p=Context();
+    if(p&&handle&&p->route.handle==handle){
+        if(size<0||size>int(sprays::MaxBytes)||p->route.written+size>sprays::MaxBytes){p->route.rejected=true;result=0;return true;}
+        p->route.written+=size;
+    }
+    return false;
+}
+void UploadClosed(void *handle){auto p=Context();if(p&&p->route.handle==handle)p->route.handle=nullptr;}
+bool UploadDirectory(const char *path,const char *pathID){
+    auto p=Context();
+    if(p&&path&&pathID&&!strcmp(pathID,"download")&&!p->route.temporary.empty()){
+        std::string directory=path;while(!directory.empty()&&(directory.back()=='/'||directory.back()=='\\'))directory.pop_back();
+        auto slash=p->route.original.find_last_of('/');
+        return slash!=std::string::npos&&directory==p->route.original.substr(0,slash);
+    }
+    return false;
+}
 class Hooks {
 public:
     void PacketBegin(int,int){
@@ -378,38 +427,6 @@ public:
     void PacketEnd(){
         for(auto &p:packets)if(!p.route.claimed)RemoveIncoming(p.route.temporary);
         packets.clear();
-        RETURN_META(MRES_IGNORED);
-    }
-    bool Exists(const char *name,const char *pathID) {
-        if(!IncomingName(name,pathID))RETURN_META_VALUE(MRES_IGNORED,false);
-        auto p=Context();if(!p->route.claimed)RemoveIncoming(p->route.temporary);
-        p->route=Route{};p->route.original=name;
-        p->route.temporary=incomingRoot/("upload_"+std::to_string(clients[p->client].serial)+"_"+std::to_string(++sequence)+".vtf");
-        RETURN_META_VALUE(MRES_SUPERCEDE,false);
-    }
-    FileHandle_t Open(const char *name,const char *options,const char *pathID) {
-        auto p=Context();
-        if(!p||!IncomingName(name,pathID)||!options||!strchr(options,'w')||p->route.original!=name||p->route.temporary.empty())
-            RETURN_META_VALUE(MRES_IGNORED,nullptr);
-        p->route.handle=SH_CALL(baseFiles,&IBaseFileSystem::Open)(p->route.temporary.string().c_str(),options,nullptr);
-        RETURN_META_VALUE(MRES_SUPERCEDE,p->route.handle);
-    }
-    int Write(const void *,int size,FileHandle_t handle) {
-        auto p=Context();
-        if(p&&handle&&p->route.handle==handle){
-            if(size<0||size>int(sprays::MaxBytes)||p->route.written+size>sprays::MaxBytes){p->route.rejected=true;RETURN_META_VALUE(MRES_SUPERCEDE,0);}
-            p->route.written+=size;
-        }
-        RETURN_META_VALUE(MRES_IGNORED,0);
-    }
-    void Close(FileHandle_t handle){auto p=Context();if(p&&p->route.handle==handle)p->route.handle=nullptr;RETURN_META(MRES_IGNORED);}
-    void Directory(const char *path,const char *pathID){
-        auto p=Context();
-        if(p&&path&&pathID&&!strcmp(pathID,"download")&&!p->route.temporary.empty()){
-            std::string directory=path;while(!directory.empty()&&(directory.back()=='/'||directory.back()=='\\'))directory.pop_back();
-            auto slash=p->route.original.find_last_of('/');
-            if(slash!=std::string::npos&&directory==p->route.original.substr(0,slash))RETURN_META(MRES_SUPERCEDE);
-        }
         RETURN_META(MRES_IGNORED);
     }
     void Received(const char *name,unsigned transfer) {
@@ -562,7 +579,10 @@ void Frame(bool){
                 placedForward->PushCell(i);placedForward->PushArray(origin,3);placedForward->PushCell(p.entity);
                 placedForward->PushCell(p.suppress?1:0);placedForward->PushCell(p.guard?1:0);placedForward->Execute(nullptr);
             }
-            if(!c.previewReady&&!c.previewFailed&&!c.previewMaterial.empty()&&now>=c.previewSettle&&!c.net->HasPendingReliableData()){
+            int receivedOut=0,totalOut=0;c.net->GetStreamProgress(FLOW_OUTGOING,&receivedOut,&totalOut);
+            c.outboundMoved=receivedOut!=c.lastOutboundProgress||totalOut!=c.lastOutboundTotal;
+            c.lastOutboundProgress=receivedOut;c.lastOutboundTotal=totalOut;
+            if(!c.previewReady&&!c.previewFailed&&!c.previewMaterial.empty()&&now>=c.previewSettle&&!WaitingForFiles(i,c.previewAssets)){
                 c.previewReady=true;c.previewDelivered.insert(c.previewMaterial);
             }
             if(c.phase==Uploading){int received=0,total=0;
@@ -578,7 +598,8 @@ void Frame(bool){
         else if(c.phase==Preloading){bool pending=false,denied=false;
             for(int recipient=1;recipient<Slots;++recipient){auto &d=c.downloads[recipient];
                 if(!Current(recipient)){d.pending=false;continue;}
-                if(d.pending&&now>=c.settle&&!clients[recipient].net->HasPendingReliableData()){
+                if(d.pending&&clients[recipient].outboundMoved)c.deadline=std::min(now+60.0,c.hardDeadline);
+                if(d.pending&&now>=c.settle&&!WaitingForFile(recipient,c.textureCache)){
                     d.pending=false;clients[recipient].readyTextures.insert(c.targetCrc);
                 }
                 pending|=d.pending;denied|=(recipient==i&&d.denied);
@@ -592,9 +613,9 @@ void Frame(bool){
         }
         else if(c.phase==Distributing){bool pending=false;
             for(int recipient=1;recipient<Slots;++recipient){auto &d=c.downloads[recipient];
-                // Some stock builds do not deliver FileSent for these custom
-                // files. A drained reliable/file queue also confirms delivery.
-                if(d.pending&&(!Current(recipient)||!clients[recipient].net->HasPendingReliableData()))d.pending=false;
+                // Only this image's DAT matters; another player's queued file
+                // or ordinary reliable traffic must not hold up its handoff.
+                if(d.pending&&(!Current(recipient)||!WaitingForFile(recipient,c.cache)))d.pending=false;
                 pending|=d.pending;
             }
             if((now>=c.settle&&!pending)||now>=c.deadline)c.phase=Ready;
@@ -708,16 +729,18 @@ cell_t SurfaceModel(IPluginContext *context,const cell_t *params){
     context->StringToLocalUTF8(params[3],params[4],c.surfaceModel.c_str(),nullptr);
     auto found=peer.surfaceDownloads.find(c.surfaceModel);
     if(found==peer.surfaceDownloads.end()){
-        ModelDelivery d;d.settle=Now()+std::max(.15,4.0*peer.net->GetAvgLatency(FLOW_OUTGOING));d.deadline=Now()+60;
+        ModelDelivery d;d.settle=Now()+std::max(.15,4.0*peer.net->GetAvgLatency(FLOW_OUTGOING));d.deadline=Now()+60;d.hardDeadline=Now()+180;
         auto send=[&](const std::string &name){auto id=static_cast<unsigned>(++sequence);d.transfers.insert(id);if(!QueueFile(recipient,name.c_str(),id))d.failed=true;};
         if(!peer.readyTextures.count(c.surfaceCrc))send("materials/temp/"+sprays::Hex(c.surfaceCrc)+".vtf");
         for(const auto &name:c.surfaceAssets)send(name);
         peer.surfaceDownloads.emplace(c.surfaceModel,std::move(d));return 0;
     }
     auto &d=found->second;
+    if(!d.ready&&peer.outboundMoved)d.deadline=std::min(Now()+60.0,d.hardDeadline);
     if(!d.ready&&Now()>d.deadline)d.failed=true;
     if(d.failed)return -1;
-    if(!d.ready&&Now()>=d.settle&&!peer.net->HasPendingReliableData()){
+    if(!d.ready&&Now()>=d.settle&&!WaitingForFiles(recipient,c.surfaceAssets)
+       &&!WaitingForFile(recipient,"materials/temp/"+sprays::Hex(c.surfaceCrc)+".vtf")){
         d.ready=true;peer.readyTextures.insert(c.surfaceCrc);
     }
     if(!d.ready)return 0;
@@ -797,18 +820,28 @@ bool InstantSprays::SDK_OnLoad(char *error,size_t length,bool){
     incomingRoot=GamePath("addons/sourcemod/data/instant_sprays/incoming");std::error_code ec;
     std::filesystem::create_directories(incomingRoot,ec);
     if(ec){snprintf(error,length,"Cannot create the isolated spray-upload directory");return false;}
+    char configError[256];void *queueAddress=nullptr;
+    if(gameconfs->LoadGameConfigFile("instant_sprays.games",&queueConfig,configError,sizeof(configError))
+       &&queueConfig->GetMemSig("CNetChan::IsFileInWaitingList",&queueAddress)&&queueAddress)
+        std::memcpy(&fileWaiting,&queueAddress,sizeof(queueAddress));
+    smutils->LogMessage(myself,"Transfer completion tracking: %s",fileWaiting?"per file":"whole-channel fallback");
+    const spray_files::Targets fsTargets{
+        SH_GET_ORIG_VFNPTR_ENTRY(baseFiles,&IBaseFileSystem::FileExists),
+        SH_GET_ORIG_VFNPTR_ENTRY(baseFiles,&IBaseFileSystem::Open),
+        SH_GET_ORIG_VFNPTR_ENTRY(baseFiles,&IBaseFileSystem::Write),
+        SH_GET_ORIG_VFNPTR_ENTRY(baseFiles,&IBaseFileSystem::Close),
+        SH_GET_ORIG_VFNPTR_ENTRY(files,&IFileSystem::CreateDirHierarchy)};
+    if(!spray_files::Install(fsTargets,{UploadExists,UploadOpen,UploadOpened,UploadWrite,UploadClosed,UploadDirectory},error,length)){
+        if(queueConfig)gameconfs->CloseGameConfigFile(queueConfig);
+        queueConfig=nullptr;fileWaiting=nullptr;return false;
+    }
     sequence=static_cast<uint64_t>(Now()*1000000);
     globalHooks={
-        SH_ADD_HOOK(IBaseFileSystem,FileExists,baseFiles,SH_MEMBER(&hooks,&Hooks::Exists),false),
-        SH_ADD_HOOK(IBaseFileSystem,Open,baseFiles,SH_MEMBER(&hooks,&Hooks::Open),false),
-        SH_ADD_HOOK(IBaseFileSystem,Write,baseFiles,SH_MEMBER(&hooks,&Hooks::Write),false),
-        SH_ADD_HOOK(IBaseFileSystem,Close,baseFiles,SH_MEMBER(&hooks,&Hooks::Close),true),
-        SH_ADD_HOOK(IFileSystem,CreateDirHierarchy,files,SH_MEMBER(&hooks,&Hooks::Directory),false),
         SH_ADD_HOOK(IServerGameDLL,LevelShutdown,serverDll,SH_MEMBER(&hooks,&Hooks::Shutdown),false),
         SH_ADD_HOOK(IServerGameDLL,ServerActivate,serverDll,SH_MEMBER(&hooks,&Hooks::Activate),true),
         SH_ADD_HOOK(IVEngineServer,PlaybackTempEntity,serverEngine,SH_MEMBER(&hooks,&Hooks::SprayBefore),false),
         SH_ADD_HOOK(IVEngineServer,PlaybackTempEntity,serverEngine,SH_MEMBER(&hooks,&Hooks::SprayAfter),true)};
-    for(int hook:globalHooks)if(!hook){for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();snprintf(error,length,"Cannot install spray transport hooks");return false;}
+    for(int hook:globalHooks)if(!hook){for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();spray_files::Uninstall();if(queueConfig)gameconfs->CloseGameConfigFile(queueConfig);queueConfig=nullptr;fileWaiting=nullptr;snprintf(error,length,"Cannot install spray transport hooks");return false;}
     sharesys->AddNatives(myself,natives);sharesys->RegisterLibrary(myself,"instant_sprays");
     placedForward=forwards->CreateForward("ISprays_OnSprayPlaced",ET_Ignore,5,nullptr,Param_Cell,Param_Array,Param_Cell,Param_Cell,Param_Cell);
     guardForward=forwards->CreateForward("ISprays_ShouldGuardSurface",ET_Event,3,nullptr,Param_Cell,Param_Array,Param_Cell);
@@ -817,7 +850,7 @@ bool InstantSprays::SDK_OnLoad(char *error,size_t length,bool){
     playerhelpers->AddClientListener(this);plsys->AddPluginsListener(this);smutils->AddGameFrameHook(Frame);
     if(smutils->IsMapRunning()){BindTable();for(int i=1;i<=globals->maxClients;++i)BindClient(i);}return true;
 }
-void InstantSprays::SDK_OnUnload(){smutils->RemoveGameFrameHook(Frame);playerhelpers->RemoveClientListener(this);plsys->RemovePluginsListener(this);StopMap();for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();if(placedForward)forwards->ReleaseForward(placedForward);if(guardForward)forwards->ReleaseForward(guardForward);if(visibleForward)forwards->ReleaseForward(visibleForward);if(changedForward)forwards->ReleaseForward(changedForward);placedForward=nullptr;guardForward=nullptr;visibleForward=nullptr;changedForward=nullptr;owner=nullptr;}
+void InstantSprays::SDK_OnUnload(){spray_files::Uninstall();if(queueConfig)gameconfs->CloseGameConfigFile(queueConfig);queueConfig=nullptr;fileWaiting=nullptr;smutils->RemoveGameFrameHook(Frame);playerhelpers->RemoveClientListener(this);plsys->RemovePluginsListener(this);StopMap();for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();if(placedForward)forwards->ReleaseForward(placedForward);if(guardForward)forwards->ReleaseForward(guardForward);if(visibleForward)forwards->ReleaseForward(visibleForward);if(changedForward)forwards->ReleaseForward(changedForward);placedForward=nullptr;guardForward=nullptr;visibleForward=nullptr;changedForward=nullptr;owner=nullptr;}
 void InstantSprays::OnClientPutInServer(int client){BindClient(client);}
 void InstantSprays::OnClientDisconnecting(int client){if(client>0&&client<Slots)ClearClient(client);}
 void InstantSprays::OnPluginUnloaded(IPlugin *plugin){if(plugin->GetBaseContext()==owner){for(auto &c:clients){RemoveIncoming(c.incoming);c.incoming.clear();c.phase=Idle;c.activeCrc=0;c.originalCrc=0;c.previewEnabled=false;c.placementDirty=false;c.placement={};c.downloads={};}owner=nullptr;}}

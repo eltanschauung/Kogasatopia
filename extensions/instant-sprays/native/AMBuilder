@@ -2,7 +2,11 @@ import os.path
 for compiler in Extension.compilers:
     builder.compiler=Extension.configure(compiler)
     project=builder.project=Extension.HL2Project(builder,'instant_sprays.ext')
-    project.sources+=['extension.cpp','spray_policy.cpp','preview_geometry.cpp','preview_surface.cpp',os.path.join(Extension.sm_root,'public','smsdk_ext.cpp')]
+    project.sources+=['extension.cpp','filesystem_hooks.cpp','spray_policy.cpp','preview_geometry.cpp','preview_surface.cpp',os.path.join(Extension.sm_root,'public','smsdk_ext.cpp')]
     for sdk in Extension.sdks.values():
-        if sdk.specPasses(compiler.target): Extension.HL2Config(builder,'instant_sprays.ext.'+sdk.ext,sdk)
+        if sdk.specPasses(compiler.target):
+            binary=Extension.HL2Config(builder,'instant_sprays.ext.'+sdk.ext,sdk)
+            binary.compiler.cxxincludes += [os.path.join(Extension.sm_root,'public','safetyhook','include')]
+            for task in sh.libsafetyhook:
+                if task.target.arch==compiler.target.arch:binary.compiler.postlink += [task.binary]
     Extension.extensions+=builder.Add(project)

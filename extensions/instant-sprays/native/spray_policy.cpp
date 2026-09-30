@@ -81,7 +81,7 @@ bool ValidTexture(const std::vector<uint8_t> &d,std::string &error) {
     error.clear();return true;
 }
 void CanonicalTexture(std::vector<uint8_t> &data) {
-    if(data.size()>=64)std::memcpy(data.data()+28,"IS13",4);
+    if(data.size()>=64)std::memcpy(data.data()+28,"IS14",4);
 }
 uint32_t Crc(const std::vector<uint8_t> &data) {
     static const auto table=[](){std::array<uint32_t,256> t{};for(unsigned i=0;i<256;++i){auto c=i;for(int j=0;j<8;++j)c=(c>>1)^(0xedb88320u&uint32_t(-int(c&1)));t[i]=c;}return t;}();

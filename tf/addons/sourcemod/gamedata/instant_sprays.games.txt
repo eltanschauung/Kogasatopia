@@ -1,0 +1,15 @@
+"Games"
+{
+    "#default"
+    {
+        "Signatures"
+        {
+            "CNetChan::IsFileInWaitingList"
+            {
+                "library" "engine"
+                "linux" "@_ZN8CNetChan19IsFileInWaitingListEPKc"
+                "linux64" "@_ZN8CNetChan19IsFileInWaitingListEPKc"
+            }
+        }
+    }
+}

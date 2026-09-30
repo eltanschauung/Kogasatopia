@@ -5,7 +5,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <instant_sprays>
-#define VERSION "1.3.3"
+#define VERSION "1.3.5"
 
 public Plugin myinfo={name="Instant Sprays",author="Codex",description="Instant local spray changes with background synchronization",version=VERSION,url=""};
 ConVar g_Enabled,g_Upload,g_Download;
