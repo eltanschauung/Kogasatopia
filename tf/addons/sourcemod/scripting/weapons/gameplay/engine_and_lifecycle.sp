@@ -304,6 +304,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 
 		HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
 		HookEvent("player_hurt", Event_PlayerHurt_DoubleDonk, EventHookMode_Post);
+		HookEvent("player_hurt", Harvester_OnConfirmedHit, EventHookMode_Post);
 		HookEvent("post_inventory_application", Event_Resupply, EventHookMode_Post);
 		HookEvent("player_spawn", OnPlayerSpawn);
 		HookEvent("player_changeclass", Event_PlayerChangeClass, EventHookMode_Post);
@@ -596,6 +597,13 @@ public void OnEntityDestroyed(int entity)
 }
 
 public void OnGameFrame()
+{
+	int profile=KogasaPerfBegin();
+	WeaponsProfiled_OnGameFrame();
+	KogasaPerfEnd(profile,"OnGameFrame");
+}
+
+void WeaponsProfiled_OnGameFrame()
 {
 	if (!WeaponsGameplay_IsEnabled())
 	{

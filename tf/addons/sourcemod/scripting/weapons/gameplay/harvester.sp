@@ -1,6 +1,6 @@
 bool Harvester_IsEligibleClient(int client)
 {
-	return IsClientInGame(client) && TF2_GetPlayerClass(client) == TFClass_Pyro;
+	return Weapons_IsClientInGame(client) && TF2_GetPlayerClass(client) == TFClass_Pyro;
 }
 
 void Harvester_ClearState(int client)
@@ -27,7 +27,7 @@ bool Harvester_IsWeapon(int weapon)
 void Harvester_AddHealCount(int client, int amount)
 {
 	if (!Harvester_IsEligibleClient(client) || amount <= 0
-		|| GetEntProp(client, Prop_Send, "m_iRevengeCrits") > 0)
+		|| Harvester_HasRevengeCrit(client))
 	{
 		return;
 	}
@@ -110,7 +110,7 @@ void Harvester_ShowHealHint(int client)
 		tf2_players[client].harvesterHintTimer = null;
 	}
 
-	if (GetEntProp(client, Prop_Send, "m_iRevengeCrits") > 0)
+	if (Harvester_HasRevengeCrit(client))
 	{
 		PrintHintText(client, "Heal count: revenge");
 	}
@@ -222,20 +222,26 @@ void Harvester_SetCritBoost(int client, bool enabled)
 {
 	if (enabled)
 	{
-		if (!IsClientInGame(client) || !IsPlayerAlive(client)
-			|| TF2_IsPlayerInCondition(client, TFCond_Kritzkrieged))
+		if (!IsClientInGame(client) || !IsPlayerAlive(client))
 		{
 			return;
 		}
 
-		TF2_AddCondition(client, TFCond_Kritzkrieged, TFCondDuration_Infinite);
+		if (TF2_IsPlayerInCondition(client, TFCond_Kritzkrieged))
+		{
+			if (TF2Util_GetPlayerConditionProvider(client, TFCond_Kritzkrieged) != client)
+				tf2_players[client].harvesterCritBoostApplied = false;
+			return;
+		}
+		TF2_AddCondition(client, TFCond_Kritzkrieged, TFCondDuration_Infinite, client);
 		tf2_players[client].harvesterCritBoostApplied = true;
 		return;
 	}
 
 	if (tf2_players[client].harvesterCritBoostApplied)
 	{
-		if (IsClientInGame(client))
+		if (IsClientInGame(client)
+			&& TF2Util_GetPlayerConditionProvider(client, TFCond_Kritzkrieged) == client)
 		{
 			TF2_RemoveCondition(client, TFCond_Kritzkrieged);
 		}
@@ -245,7 +251,11 @@ void Harvester_SetCritBoost(int client, bool enabled)
 
 static void Harvester_SetRevengeCrit(int client)
 {
-	SetEntProp(client, Prop_Send, "m_iRevengeCrits", 1);
+	int weapon = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee);
+	if (!Harvester_IsWeapon(weapon)) return;
+	tf2_players[client].harvesterRevengeReady = true;
+	tf2_players[client].harvesterRevengeWeaponRef = EntIndexToEntRef(weapon);
+	tf2_players[client].harvesterRevengeGeneration++;
 	int activeWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 	Harvester_SetCritBoost(client, Harvester_IsWeapon(activeWeapon));
 }
@@ -253,24 +263,57 @@ static void Harvester_SetRevengeCrit(int client)
 static void Harvester_ClearRevengeCrit(int client)
 {
 	tf2_players[client].harvesterCritConsumePending = false;
-	if (IsClientInGame(client))
-	{
-		SetEntProp(client, Prop_Send, "m_iRevengeCrits", 0);
-	}
+	tf2_players[client].harvesterRevengeReady = false;
+	tf2_players[client].harvesterRevengeWeaponRef = INVALID_ENT_REFERENCE;
+	tf2_players[client].harvesterRevengeGeneration++;
 	Harvester_SetCritBoost(client, false);
 }
 
-public void Harvester_ConsumeRevengeCrit(any userId)
+bool Harvester_HasRevengeCrit(int client)
 {
-	int client = GetClientOfUserId(userId);
-	if (client <= 0 || !IsClientInGame(client))
-	{
-		return;
-	}
+	if (!Harvester_IsEligibleClient(client) || !tf2_players[client].harvesterRevengeReady) return false;
+	int weapon = EntRefToEntIndex(tf2_players[client].harvesterRevengeWeaponRef);
+	return weapon > MaxClients && IsValidEntity(weapon)
+		&& GetPlayerWeaponSlot(client, TFWeaponSlot_Melee) == weapon && Harvester_IsWeapon(weapon);
+}
 
-	tf2_players[client].harvesterCritConsumePending = false;
-	SetEntProp(client, Prop_Send, "m_iRevengeCrits", 0);
-	Harvester_SetCritBoost(client, false);
-	Harvester_ShowHealHint(client);
+bool Harvester_ApplyRevengeCrit(int attacker, int victim, int weapon, int inflictor)
+{
+	if (!Harvester_HasRevengeCrit(attacker) || inflictor != attacker
+		|| weapon != EntRefToEntIndex(tf2_players[attacker].harvesterRevengeWeaponRef)) return false;
+	// Charge state belongs to this weapon, not TF2's shared revenge counter or
+	// a transient crit-glow condition that deploying another weapon can change.
+	tf2_players[attacker].harvesterCritConsumePending = true;
+	tf2_players[attacker].harvesterCritVictimUserId = GetClientUserId(victim);
+	tf2_players[attacker].harvesterCritAttemptTick = GetGameTickCount();
+	DataPack attempt = new DataPack();
+	attempt.WriteCell(GetClientUserId(attacker));
+	attempt.WriteCell(tf2_players[attacker].harvesterRevengeGeneration);
+	attempt.WriteCell(GetGameTickCount());
+	RequestFrame(Harvester_ClearMissedAttempt, attempt);
+	return true;
+}
+
+public void Harvester_ClearMissedAttempt(any data)
+{
+	DataPack attempt = view_as<DataPack>(data);attempt.Reset();
+	int client = GetClientOfUserId(attempt.ReadCell());
+	int generation = attempt.ReadCell(), tick = attempt.ReadCell();delete attempt;
+	if (client > 0 && tf2_players[client].harvesterRevengeGeneration == generation
+		&& tf2_players[client].harvesterCritAttemptTick == tick)
+		tf2_players[client].harvesterCritConsumePending = false;
+}
+
+public void Harvester_OnConfirmedHit(Event event, const char[] name, bool dontBroadcast)
+{
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	if (attacker <= 0 || !Harvester_HasRevengeCrit(attacker)
+		|| !tf2_players[attacker].harvesterCritConsumePending || event.GetInt("damageamount") <= 0
+		|| event.GetInt("userid") != tf2_players[attacker].harvesterCritVictimUserId
+		|| GetGameTickCount() != tf2_players[attacker].harvesterCritAttemptTick) return;
+	int weapon = EntRefToEntIndex(tf2_players[attacker].harvesterRevengeWeaponRef);
+	if (event.GetInt("weaponid") != TF2Util_GetWeaponID(weapon)) return;
+	Harvester_ClearRevengeCrit(attacker);
+	Harvester_ShowHealHint(attacker);
 }
 

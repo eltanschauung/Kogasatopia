@@ -142,6 +142,11 @@ enum struct tf2_player
 	bool harvesterHealHintVisible;
 	bool harvesterCritConsumePending;
 	bool harvesterCritBoostApplied;
+	bool harvesterRevengeReady;
+	int harvesterRevengeWeaponRef;
+	int harvesterRevengeGeneration;
+	int harvesterCritVictimUserId;
+	int harvesterCritAttemptTick;
 	float lastUber;
 	int lastUberMedigunDefIndex;
 	int engiMetal;

@@ -20,6 +20,15 @@ Handle g_WeaponsCustomAttributesForward;
 
 StringMap g_WeaponsCustomAttributeKVs;
 int g_WeaponsCustomAttributeNextToken = 1;
+// Attribute 192 is private to this provider. Cache only within one game tick;
+// provider writes, entity creation and collection explicitly invalidate it.
+#define WEAPONS_ATTRIBUTE_CACHE_SIZE 2049
+int g_AttributeCacheRef[WEAPONS_ATTRIBUTE_CACHE_SIZE];
+int g_AttributeCacheTick[WEAPONS_ATTRIBUTE_CACHE_SIZE];
+int g_AttributeCacheEpoch[WEAPONS_ATTRIBUTE_CACHE_SIZE];
+KeyValues g_AttributeCacheValue[WEAPONS_ATTRIBUTE_CACHE_SIZE];
+int g_AttributeCacheCurrentEpoch = 1;
+int g_AttributeCacheHits,g_AttributeCacheMisses;
 
 void WeaponsCustomAttributes_RegisterNatives() {
 	RegPluginLibrary("tf2custattr");
@@ -37,6 +46,7 @@ void WeaponsCustomAttributes_RegisterNatives() {
 }
 
 void WeaponsCustomAttributes_OnPluginStart() {
+	RegAdminCmd("sm_weapons_perf", WeaponsCustomAttributes_PerfStatus, ADMFLAG_ROOT, "Show custom attribute cache effectiveness.");
 	g_WeaponsCustomAttributesForward = CreateGlobalForward("TF2CustAttr_OnKeyValuesAdded",
 			ET_Event, Param_Cell, Param_Cell);
 
@@ -70,6 +80,7 @@ void WeaponsCustomAttributes_OnPluginEnd() {
  * Schedule a garbage collection routine.
  */
 void WeaponsCustomAttributes_OnMapStart() {
+	g_AttributeCacheHits=0;g_AttributeCacheMisses=0;
 	CreateTimer(60.0, WeaponsCustomAttributes_GarbageCollect, .flags = TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -79,6 +90,8 @@ void WeaponsCustomAttributes_OnMapEnd() {
 }
 
 void WeaponsCustomAttributes_OnEntityCreated(int entity) {
+	if (entity > 0 && entity < WEAPONS_ATTRIBUTE_CACHE_SIZE)
+		g_AttributeCacheEpoch[entity] = 0;
 	if (HasEntProp(entity, Prop_Send, "m_AttributeList")) {
 		SDKHook(entity, SDKHook_SpawnPost, WeaponsCustomAttributes_OnItemSpawnPost);
 	}
@@ -115,7 +128,17 @@ public void WeaponsCustomAttributes_OnItemSpawnPost(int entity) {
  * We can't just keep a reference to entities because dropped weapons exist, invalidating those
  * references but still keeping the KV handle accessible.
  */
-public Action WeaponsCustomAttributes_GarbageCollect(Handle timer) {
+public Action WeaponsCustomAttributes_GarbageCollect(Handle timer)
+{
+	int profile=KogasaPerfBegin();
+	Action result=WeaponsProfiled_WeaponsCustomAttributes_GarbageCollect();
+	KogasaPerfEnd(profile,"WeaponsCustomAttributes_GarbageCollect");
+	return result;
+}
+
+Action WeaponsProfiled_WeaponsCustomAttributes_GarbageCollect()
+{
+	g_AttributeCacheCurrentEpoch++;
 	StringMapSnapshot attributeTokens = g_WeaponsCustomAttributeKVs.Snapshot();
 	if (!attributeTokens.Length) {
 		delete attributeTokens;
@@ -182,6 +205,33 @@ int WeaponsCustomAttributes_GetToken(int entity) {
  * Returns the KeyValues handle associated with an entity, if one exists.
  */
 KeyValues WeaponsCustomAttributes_GetStruct(int entity, bool validate) {
+	bool cacheable = validate && entity > 0 && entity < WEAPONS_ATTRIBUTE_CACHE_SIZE && IsValidEntity(entity);
+	int tick, reference;
+	if (cacheable) {
+		tick = GetGameTickCount();reference = EntIndexToEntRef(entity);
+		if (g_AttributeCacheTick[entity] == tick && g_AttributeCacheRef[entity] == reference
+				&& g_AttributeCacheEpoch[entity] == g_AttributeCacheCurrentEpoch) {
+			g_AttributeCacheHits++;
+			return g_AttributeCacheValue[entity];
+		}
+		g_AttributeCacheMisses++;
+	}
+	KeyValues value = WeaponsCustomAttributes_ResolveStruct(entity, validate);
+	if (cacheable) {
+		g_AttributeCacheTick[entity] = tick;g_AttributeCacheRef[entity] = reference;
+		g_AttributeCacheEpoch[entity] = g_AttributeCacheCurrentEpoch;g_AttributeCacheValue[entity] = value;
+	}
+	return value;
+}
+
+public Action WeaponsCustomAttributes_PerfStatus(int client,int args) {
+	int total=g_AttributeCacheHits+g_AttributeCacheMisses;
+	ReplyToCommand(client,"[Weapons] Attribute cache: %d hits / %d lookups (%.1f%%). Use sm_lagdetails for measured callback timings.",
+		g_AttributeCacheHits,total,total>0?100.0*float(g_AttributeCacheHits)/float(total):0.0);
+	return Plugin_Handled;
+}
+
+KeyValues WeaponsCustomAttributes_ResolveStruct(int entity, bool validate) {
 	int token = WeaponsCustomAttributes_GetToken(entity);
 	if (token <= 0) {
 		if (validate && TF2Attrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE)) {
@@ -399,6 +449,8 @@ KeyValues WeaponsCustomAttributes_InitStruct(int entity) {
  * Stores the given KeyValues handle into the entity.
  */
 void WeaponsCustomAttributes_SetStruct(int entity, KeyValues kv) {
+	if (entity > 0 && entity < WEAPONS_ATTRIBUTE_CACHE_SIZE)
+		g_AttributeCacheEpoch[entity] = 0;
 	int token = WeaponsCustomAttributes_AllocateToken();
 	char tokenKey[16];
 	IntToString(token, tokenKey, sizeof(tokenKey));
@@ -444,6 +496,7 @@ stock void WeaponsCustomAttributes_SweepEmptyKeys(KeyValues kv) {
  * Disposes all KeyValues handles and empties the token registry.
  */
 void WeaponsCustomAttributes_Erase() {
+	g_AttributeCacheCurrentEpoch++;
 	StringMapSnapshot attributeTokens = g_WeaponsCustomAttributeKVs.Snapshot();
 	for (int i = 0; i < attributeTokens.Length; i++) {
 		char tokenKey[16];

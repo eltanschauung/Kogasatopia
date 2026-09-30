@@ -16,34 +16,62 @@
 
 Handle g_AdminMonitorTimer = null;
 float g_NextAdminAlertAt = 0.0;
+float g_RoundQuietUntil = 0.0;
+#include "checklag_diagnostics.inc"
 
 public Plugin myinfo =
 {
     name = "CheckLag",
     author = "Hombre",
     description = "Reports the server's current and expected tickrate.",
-    version = "1.0.1",
+    version = "1.1.0",
     url = "https://kogasa.tf"
 };
 
 public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
 {
     MarkNativeAsOptional("DGM_IsRoundRunning");
+    RegPluginLibrary("checklag");
+    CreateNative("CheckLag_RecordScope",Native_CheckLagRecordScope);
     return APLRes_Success;
 }
 
 public void OnPluginStart()
 {
+    g_LagScopeIndexes=new StringMap();g_LastFrameAt=GetEngineTime();
+    RegAdminCmd("sm_lagdetails",Command_LagDetails,ADMFLAG_ROOT,"Recent measured callback times and network context.");
     RegConsoleCmd("sm_lag", Command_CheckLag, "Broadcast the server tickrate.");
     RegConsoleCmd("sm_checklag", Command_CheckLag, "Broadcast the server tickrate.");
     RegConsoleCmd("sm_ddos", Command_CheckLag, "Broadcast the server tickrate.");
     AddCommandListener(Listener_Chat, "say");
     AddCommandListener(Listener_Chat, "say_team");
+    HookEvent("teamplay_round_start", Event_RoundQuietPeriod, EventHookMode_PostNoCopy);
+    HookEventEx("teamplay_round_end", Event_RoundQuietPeriod, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_round_win", Event_RoundQuietPeriod, EventHookMode_PostNoCopy);
+    HookEventEx("teamplay_round_stalemate", Event_RoundQuietPeriod, EventHookMode_PostNoCopy);
     g_AdminMonitorTimer = CreateTimer(CHECKLAG_MONITOR_INTERVAL, Timer_MonitorTickrate, _, TIMER_REPEAT);
+}
+
+public void Event_RoundQuietPeriod(Event event, const char[] name, bool dontBroadcast)
+{
+    g_PeakFrameGap=0.0;
+    g_RoundQuietUntil = GetEngineTime() + 5.0;
+    g_NextAdminAlertAt = g_RoundQuietUntil;
+}
+
+public void OnMapStart()
+{
+    g_PeakFrameGap=0.0;g_LastFrameAt=GetEngineTime();
+    g_LagScopeCount=0;if(g_LagScopeIndexes!=null)g_LagScopeIndexes.Clear();
+    g_RoundQuietUntil = GetEngineTime() + 5.0;
+    g_NextAdminAlertAt = g_RoundQuietUntil;
 }
 
 bool CheckLag_IsRoundRunning()
 {
+    Handle provider = FindPluginByFile("whalescramble.smx");
+    if (provider != INVALID_HANDLE && GetPluginStatus(provider) != Plugin_Running)
+        return false;
     return GetFeatureStatus(FeatureType_Native, "DGM_IsRoundRunning") == FeatureStatus_Available
         && DGM_IsRoundRunning();
 }
@@ -126,7 +154,7 @@ void PrintTickrateToClient(int client)
 
 public Action Timer_MonitorTickrate(Handle timer)
 {
-    if (!CheckLag_IsRoundRunning())
+    if (GetEngineTime() < g_RoundQuietUntil || !CheckLag_IsRoundRunning())
     {
         return Plugin_Continue;
     }
@@ -147,6 +175,10 @@ public Action Timer_MonitorTickrate(Handle timer)
     int serverTick = GetGameTickCount();
     g_NextAdminAlertAt = now + CHECKLAG_ADMIN_ALERT_INTERVAL;
     PluginStats_Record("tickrate_drop");
+    int measured=CheckLag_RecentMeasuredScope();
+    if(measured>=0)
+        LogMessage("[CheckLag] tick=%d rate=%.1f/%.1f frame_peak=%.1f ms measured=%s scope_peak=%.2f ms scope_total=%.2f ms calls=%d",
+            serverTick,current,maximum,g_PeakFrameGap*1000.0,g_LagScopeNames[measured],g_LagScopePeak[measured],g_LagScopeTotal[measured],g_LagScopeCalls[measured]);
 
     for (int client = 1; client <= MaxClients; client++)
     {
@@ -161,6 +193,8 @@ public Action Timer_MonitorTickrate(Handle timer)
             serverTick,
             current,
             maximum);
+        if(measured>=0)
+            CPrintToChat(client,"{gold}[CheckLag]{default} Measured: %s ({salmon}%.2f ms{default} peak). {gold}!lagdetails{default} for context.",g_LagScopeNames[measured],g_LagScopePeak[measured]);
     }
     return Plugin_Continue;
 }

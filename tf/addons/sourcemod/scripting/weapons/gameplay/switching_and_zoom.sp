@@ -186,7 +186,7 @@ public Action OnWeaponSwitch(int client, int weapon)
 			Harvester_StopHealTimer(client);
 		}
 	}
-	if (weapon != previousWeapon && GetEntProp(client, Prop_Send, "m_iRevengeCrits") > 0)
+	if (weapon != previousWeapon && Harvester_HasRevengeCrit(client))
 	{
 		if (Harvester_IsWeapon(previousWeapon) && !Harvester_IsWeapon(weapon))
 		{
@@ -219,6 +219,22 @@ public Action OnPlayerRunCmd(
 	int &tickCount,
 	int &randomSeed,
 	int mouse[2])
+{
+	int profile=KogasaPerfBegin();
+	Action result=WeaponsProfiled_OnPlayerRunCmd(client, buttons, impulse, weapon, subtype, commandNumber, tickCount, randomSeed);
+	KogasaPerfEnd(profile,"OnPlayerRunCmd");
+	return result;
+}
+
+Action WeaponsProfiled_OnPlayerRunCmd(
+	int client,
+	int &buttons,
+	int &impulse,
+	int &weapon,
+	int &subtype,
+	int &commandNumber,
+	int &tickCount,
+	int &randomSeed)
 {
 	if (!WeaponsGameplay_IsEnabled() || !Weapons_IsClientInGame(client) || !IsPlayerAlive(client))
 	{

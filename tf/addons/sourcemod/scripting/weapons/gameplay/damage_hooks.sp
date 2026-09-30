@@ -29,6 +29,21 @@ public Action TF2_OnTakeDamage(
 	int damageCustom,
 	CritType &critType)
 {
+	int profile=KogasaPerfBegin();
+	Action result=WeaponsProfiled_TF2_OnTakeDamage(victim, attacker, inflictor, damage, damageType, weapon, critType);
+	KogasaPerfEnd(profile,"TF2_OnTakeDamage");
+	return result;
+}
+
+Action WeaponsProfiled_TF2_OnTakeDamage(
+	int victim,
+	int &attacker,
+	int &inflictor,
+	float &damage,
+	int &damageType,
+	int &weapon,
+	CritType &critType)
+{
 	if (!WeaponsGameplay_IsEnabled()
 		|| !Weapons_IsClientInGame(victim)
 		|| !Weapons_IsClientInGame(attacker)
@@ -39,6 +54,12 @@ public Action TF2_OnTakeDamage(
 		|| GetClientTeam(victim) == GetClientTeam(attacker))
 	{
 		return Plugin_Continue;
+	}
+
+	if (Harvester_ApplyRevengeCrit(attacker, victim, weapon, inflictor))
+	{
+		critType = CritType_Crit;
+		return Plugin_Changed;
 	}
 
 	if (!HasTakeMinicritsProjectileAirborne(victim)
@@ -65,6 +86,14 @@ public Action TF2_OnTakeDamage(
 }
 
 public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
+{
+	int profile=KogasaPerfBegin();
+	Action result=WeaponsProfiled_OnTakeDamage(client, attacker, inflictor, damage, damagetype, weapon, damagePosition, damagecustom);
+	KogasaPerfEnd(profile,"OnTakeDamage");
+	return result;
+}
+
+Action WeaponsProfiled_OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damagePosition[3], int damagecustom)
 {
 	if (!WeaponsGameplay_IsEnabled()
 		|| client < 1 || client > MaxClients || !IsClientInGame(client))
@@ -125,19 +154,6 @@ public Action OnTakeDamage(int client, int &attacker, int &inflictor, float &dam
 	}
 
 	FullPelletIgnite_TryMark(attacker, client, damageWeapon);
-	if (attackerIsPlayer
-		&& damage > 0.0
-		&& client != attacker
-		&& GetClientTeam(client) != GetClientTeam(attacker)
-		&& directDamageWeapon > MaxClients
-		&& IsValidEntity(directDamageWeapon)
-		&& Harvester_IsWeapon(directDamageWeapon)
-		&& GetEntProp(attacker, Prop_Send, "m_iRevengeCrits") > 0
-		&& !tf2_players[attacker].harvesterCritConsumePending)
-	{
-		tf2_players[attacker].harvesterCritConsumePending = true;
-		RequestFrame(Harvester_ConsumeRevengeCrit, GetClientUserId(attacker));
-	}
 
 	if (attackerIsPlayer && damageWeapon > MaxClients && IsValidEntity(damageWeapon))
 	{
@@ -345,7 +361,7 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
         return Plugin_Continue;
 
     float pos[3];
-    GetClientAbsOrigin(victim, pos);  // was GetClientAbsAngles — wrong data
+    GetClientAbsOrigin(victim, pos);  // was GetClientAbsAngles â€” wrong data
     TF2_SetHealth(victim, buff);
     tf2_players[attacker].shockCharge = 0;
     ShockCharge_StartTimer(attacker);
@@ -360,7 +376,19 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 public Action OnTakeDamageAlive(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
-) {
+)
+{
+	int profile=KogasaPerfBegin();
+	Action result=WeaponsProfiled_OnTakeDamageAlive(victim, attacker, inflictor, damage, damage_type, weapon, damage_custom);
+	KogasaPerfEnd(profile,"OnTakeDamageAlive");
+	return result;
+}
+
+Action WeaponsProfiled_OnTakeDamageAlive(
+	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
+	int& weapon, int damage_custom
+)
+{
 
 	if (!WeaponsGameplay_IsEnabled()
 		|| !Accuracy_IsValidClient(attacker) || weapon < 1)
