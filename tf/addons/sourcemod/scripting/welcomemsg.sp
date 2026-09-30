@@ -4,6 +4,10 @@
 #include <sourcemod>
 
 #include <morecolors>
+#include <filters_api>
+#include <chat_colors>
+
+#define WELCOME_NAME_PLACEHOLDER "[WELCOMEMSG_CLIENT_NAME]"
 
 bool g_HasBeenWelcomed[MAXPLAYERS + 1];
 ConVar g_hUncleCycleState;
@@ -23,9 +27,15 @@ public Plugin myinfo = {
     name = "Welcome Message",
     author = "Hombre",
     description = "Welcome message & server info plugin for Kogasatopia, very specific",
-    version = "2.00",
+    version = "2.01",
     url = "https://kogasa.tf"
 };
+
+public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
+{
+    MarkNativeAsOptional("Filters_GetChatName");
+    return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
@@ -136,8 +146,8 @@ static void PrintSelectedWelcomeMessage(int client)
 
 static void PrintConfiguredWelcomeLines(int client, ConVar[] lines, int count)
 {
-    char line[256];
-    char buffer[256];
+    char line[512];
+    char buffer[512];
 
     for (int i = 0; i < count; i++)
     {
@@ -153,7 +163,28 @@ static void PrintConfiguredWelcomeLines(int client, ConVar[] lines, int count)
             continue;
         }
 
+        bool hasClientName = StrContains(line, "%N") != -1;
+        if (hasClientName)
+        {
+            ReplaceString(line, sizeof(line), "%N", WELCOME_NAME_PLACEHOLDER);
+        }
+
         Format(buffer, sizeof(buffer), line, client);
+
+        if (hasClientName)
+        {
+            char clientName[256];
+            if (GetFeatureStatus(FeatureType_Native, "Filters_GetChatName") != FeatureStatus_Available
+                || !Filters_GetChatName(client, clientName, sizeof(clientName))
+                || !clientName[0])
+            {
+                GetClientName(client, clientName, sizeof(clientName));
+            }
+
+            ChatColors_ResolveTeamTag(client, clientName, sizeof(clientName));
+            ReplaceString(buffer, sizeof(buffer), WELCOME_NAME_PLACEHOLDER, clientName);
+        }
+
         CPrintToChat(client, "%s", buffer);
     }
 }
