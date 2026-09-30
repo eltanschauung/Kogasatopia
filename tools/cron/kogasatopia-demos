@@ -1,3 +1,4 @@
 # Check hourly; daily cleanup removes only closed demos at least 14 days old.
 # Install script root-owned mode 0755 in /usr/local/sbin; state directory mode 0700.
+* * * * * root /usr/bin/ionice -c 3 /usr/bin/nice -n 19 /usr/local/sbin/kogasatopia-publish-demos >> /var/log/kogasatopia-demo-publish.log 2>&1
 10 * * * * root /usr/bin/ionice -c 3 /usr/bin/nice -n 19 /usr/local/sbin/kogasatopia-cleanup-demos >> /var/log/kogasatopia-demo-cleanup.log 2>&1
