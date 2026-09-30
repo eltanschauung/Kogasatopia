@@ -94,7 +94,7 @@ void RequestMailPlayerSearch(int client)
     g_MailSearchResults[client] = null;
     int generation = ++g_MailSearchGeneration[client];
 
-    char query[2048];
+    char query[4096];
     FormatEx(query, sizeof(query),
         "SELECT w.steamid, "
         ... "COALESCE(NULLIF(pr.newname COLLATE utf8mb4_uca1400_ai_ci, ''), NULLIF(fs.last_name, ''), NULLIF(w.cached_personaname, ''), w.steamid), "
@@ -104,10 +104,12 @@ void RequestMailPlayerSearch(int client)
         ... "LEFT JOIN prename_rules pr ON pr.pattern COLLATE utf8mb4_uca1400_ai_ci = w.steamid "
         ... "WHERE (COALESCE(pr.newname, '') LIKE '%%%s%%' "
         ... "OR COALESCE(fs.last_name, '') LIKE '%%%s%%' "
-        ... "OR COALESCE(w.cached_personaname, '') LIKE '%%%s%%') "
+        ... "OR COALESCE(w.cached_personaname, '') LIKE '%%%s%%' "
+        ... "OR EXISTS (SELECT 1 FROM filters_steam_name_history nh WHERE nh.steamid64 = BINARY w.steamid AND LOCATE(LOWER('%s'), nh.name_lower) > 0)) "
         ... "ORDER BY GREATEST(COALESCE(w.playtime, 0), 0) DESC, "
         ... "LOWER(COALESCE(NULLIF(pr.newname COLLATE utf8mb4_uca1400_ai_ci, ''), NULLIF(fs.last_name, ''), NULLIF(w.cached_personaname, ''), w.steamid)) ASC "
         ... "LIMIT %d",
+        escapedSearch,
         escapedSearch,
         escapedSearch,
         escapedSearch,

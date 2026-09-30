@@ -87,7 +87,7 @@ public Plugin myinfo =
     name = "server_mail",
     author = "Hombre",
     description = "Persistent player mail with optional currency attachments.",
-    version = "1.0.0",
+    version = "1.1.0",
     url = "https://kogasa.tf"
 };
 
