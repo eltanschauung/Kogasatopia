@@ -5,13 +5,16 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <instant_sprays>
-#define VERSION "1.3.5"
+#define VERSION "1.3.6"
 
 public Plugin myinfo={name="Instant Sprays",author="Codex",description="Instant local spray changes with background synchronization",version=VERSION,url=""};
 ConVar g_Enabled,g_Upload,g_Download;
 QueryCookie g_Cookies[MAXPLAYERS+1][5];
 int g_Bits[MAXPLAYERS+1],g_Serial[MAXPLAYERS+1],g_Token[MAXPLAYERS+1],g_Sprite[MAXPLAYERS+1];
 int g_Surface[MAXPLAYERS+1];
+int g_DecalSurface[MAXPLAYERS+1],g_ReplayContextRepairs;
+bool g_DecalRecorded[MAXPLAYERS+1],g_Sharing[MAXPLAYERS+1];
+float g_DecalOrigin[MAXPLAYERS+1][3];
 int g_PreviewOwner[2049];
 bool g_Query[MAXPLAYERS+1],g_Allowed[MAXPLAYERS+1],g_First[MAXPLAYERS+1],g_Force[MAXPLAYERS+1],g_Manual[MAXPLAYERS+1];
 bool g_ViewAllowed[MAXPLAYERS+1];
@@ -28,6 +31,21 @@ char g_Material[MAXPLAYERS+1][PLATFORM_MAX_PATH];
 static const char g_Settings[][]={"cl_logofile","cl_allowupload","cl_allowdownload","cl_downloadfilter","cl_spraydisable"};
 
 bool Human(int c){return c>0&&c<=MaxClients&&IsClientInGame(c)&&!IsFakeClient(c);}
+bool ReplaySpray(int c){
+    if(!Human(c)||!g_DecalRecorded[c])return false;
+    int entity=g_DecalSurface[c]==0?0:EntRefToEntIndex(g_DecalSurface[c]);
+    if(entity<0)return false;
+    // SDKTools TE hooks read the registered, shared CTEPlayerDecal object,
+    // not the copied sender buffer retained by the native extension. Rebuild
+    // that object so moderation and re-sends see THIS player's saved placement.
+    TE_Start("Player Decal");
+    float previous[3];TE_ReadVector("m_vecOrigin",previous);
+    if(TE_ReadNum("m_nPlayer")!=c||TE_ReadNum("m_nEntity")!=entity
+       ||GetVectorDistance(previous,g_DecalOrigin[c])>0.01)g_ReplayContextRepairs++;
+    TE_WriteNum("m_nPlayer",c);TE_WriteNum("m_nEntity",entity);
+    TE_WriteVector("m_vecOrigin",g_DecalOrigin[c]);
+    return ISprays_Replay(c);
+}
 void RemovePreview(int c){
     int e=EntRefToEntIndex(g_Sprite[c]);if(e>MaxClients&&IsValidEntity(e))RemoveEntity(e);g_Sprite[c]=INVALID_ENT_REFERENCE;
     g_Public[c]=false;for(int i=1;i<=MaxClients;i++)g_SurfaceViewer[c][i]=0;
@@ -43,6 +61,7 @@ void Stop(int c){
     ISprays_EnablePreview(c,false);RemovePreview(c);g_Placed[c]=false;g_Query[c]=false;
     g_Guarded[c]=false;
     g_QueuedKey[c]=false;g_ReplayKey[c]=false;g_Force[c]=false;g_Manual[c]=false;
+    g_DecalRecorded[c]=false;g_Sharing[c]=false;
 }
 void Initialize(int c,bool fresh){
     Stop(c);g_Serial[c]=GetClientSerial(c);g_First[c]=fresh;g_NextQuery[c]=0.0;g_Notice[c]=0.0;
@@ -66,6 +85,8 @@ void StartUpload(int c){
     g_Force[c]=false;
     if(token<1){strcopy(g_Failed[c],sizeof(g_Failed[]),g_Selected[c]);Notice(c,"Could not refresh this spray. Your existing spray still works.");ISprays_EnablePreview(c,false);return;}
     g_Token[c]=token;strcopy(g_Requested[c],sizeof(g_Requested[]),g_Selected[c]);
+    if(!g_Sharing[c])PrintToChat(c,"[Sprays] Sharing your new spray with other players...");
+    g_Sharing[c]=true;
 }
 public void OnPluginStart(){
     if(GetEngineVersion()!=Engine_TF2||ISprays_ApiVersion()!=6)SetFailState("Requires TF2 and the matching Instant Sprays extension (API 6).");
@@ -216,10 +237,12 @@ void DrawSurfaceFinal(int c){
 }
 public void ISprays_OnSprayPlaced(int c,const float origin[3],int entity,bool suppressed,bool guarded){
     if(!Human(c)||!g_Enabled.BoolValue)return;RemovePreview(c);g_Placed[c]=suppressed;g_Guarded[c]=guarded;g_NextSurfacePoll[c]=0.0;
+    g_DecalRecorded[c]=true;g_DecalSurface[c]=entity>0?EntIndexToEntRef(entity):0;
+    for(int axis=0;axis<3;axis++)g_DecalOrigin[c][axis]=origin[axis];
     if(!suppressed)return;
     // A late per-viewer replay may have been captured just before handoff.
     if(!guarded&&g_Token[c]==0&&StrEqual(g_Selected[c],g_Active[c])){
-        ISprays_Replay(c);g_Placed[c]=false;return;
+        ReplaySpray(c);g_Placed[c]=false;return;
     }
     strcopy(g_PlacementPath[c],sizeof(g_PlacementPath[]),g_Selected[c]);g_Surface[c]=entity>0?EntIndexToEntRef(entity):INVALID_ENT_REFERENCE;
     float normal[3],view[3],direction[3];SurfaceNormal(c,origin,normal,view);
@@ -227,7 +250,7 @@ public void ISprays_OnSprayPlaced(int c,const float origin[3],int entity,bool su
     GetVectorAngles(direction,g_Angles[c]);if(FloatAbs(normal[2])>0.98)g_Angles[c][1]=view[1];
     if(!ISprays_SetSurface(c,origin,g_Angles[c],entity)){
         g_Guarded[c]=false;
-        if(StrEqual(g_Selected[c],g_Active[c])){ISprays_Replay(c);g_Placed[c]=false;}
+        if(StrEqual(g_Selected[c],g_Active[c])){ReplaySpray(c);g_Placed[c]=false;}
         return;
     }
     DrawPreview(c);
@@ -244,15 +267,17 @@ public Action Poll(Handle timer){
             if(state==2){
                 if(StrEqual(g_Requested[c],g_Selected[c])){
                     strcopy(g_Active[c],sizeof(g_Active[]),g_Requested[c]);ISprays_EnablePreview(c,false);
-                    if(g_Placed[c]&&!g_Guarded[c]&&StrEqual(g_PlacementPath[c],g_Requested[c])){ISprays_Replay(c);g_Placed[c]=false;RemovePreview(c);}
-                    if(g_Manual[c])PrintToChat(c,"[Sprays] Your selected spray is ready.");
+                    if(g_Placed[c]&&!g_Guarded[c]&&StrEqual(g_PlacementPath[c],g_Requested[c])){ReplaySpray(c);g_Placed[c]=false;RemovePreview(c);}
+                    if(g_Manual[c]||g_Sharing[c])PrintToChat(c,"[Sprays] Your new spray is ready for other players.");
+                    g_Sharing[c]=false;
                 }
             }else{
                 strcopy(g_Failed[c],sizeof(g_Failed[]),g_Requested[c]);Notice(c,reason[0]?reason:"Spray refresh ended before completion.");
                 LogMessage("Spray refresh failed for client %d (%s): %s",c,g_Requested[c],reason);
                 ISprays_EnablePreview(c,false);
-                if(g_Placed[c])ISprays_Replay(c);
+                if(g_Placed[c])ReplaySpray(c);
                 g_Placed[c]=false;RemovePreview(c);
+                g_Sharing[c]=false;
             }
             g_Manual[c]=false;StartUpload(c);
         }
@@ -266,7 +291,7 @@ public Action Refresh(int c,int args){
     g_Manual[c]=true;g_Force[c]=true;g_Failed[c][0]=0;QuerySettings(c,true);return Plugin_Handled;
 }
 public Action Status(int c,int args){
-    ReplyToCommand(c,"[Instant Sprays] %s; enabled=%d",VERSION,g_Enabled.BoolValue);
+    ReplyToCommand(c,"[Instant Sprays] %s; enabled=%d; replay-context repairs=%d",VERSION,g_Enabled.BoolValue,g_ReplayContextRepairs);
     for(int i=1;i<=MaxClients;i++)if(Human(i)){
         int crc,requests,changes,repairs;int phase=ISprays_Inspect(i,crc,requests,changes,repairs);
         ReplyToCommand(c,"[Instant Sprays] %N: native=%d crc=%08x uploads=%d changes=%d local=%d terrain_guard=%d shared=%d",i,phase,crc,requests,changes,EntRefToEntIndex(g_Sprite[i])>MaxClients,g_Guarded[i],g_Public[i]);

@@ -1,4 +1,4 @@
-# Instant Sprays 1.3.5
+# Instant Sprays 1.3.6
 
 Select a different spray in TF2's Options, then use the normal spray key. Your
 new image appears locally using the texture already on your PC. The server
@@ -27,8 +27,9 @@ need only ordinary TF2 and permitted spray uploads/downloads.
 - Players can use `!refreshspray` after replacing an image under the same filename.
 - Root admins can use `sm_instant_sprays_status` for transfer diagnostics.
 
-Update the plugin, extension, and `gamedata/instant_sprays.games.txt` together;
-1.3.5 requires native API 6.
+This bundle uses SourcePawn plugin 1.3.6 with native extension 1.3.5 (API 6)
+and `gamedata/instant_sprays.games.txt`. The 1.3.6 replay correction can be hot-reloaded
+after in-flight uploads finish; it does not require replacing the native extension.
 
 Client upload/download and spray-visibility preferences are respected. Supported sprays are 2D VTF
 7.0–7.5 files up to 512 KiB inside `materials/vgui/logos/`, plus the stock
@@ -75,6 +76,11 @@ original recipients once its small model/material files have arrived. Client
 spray visibility/download settings and one-spray replacement still apply.
 Native temp-entity hooks preserve moderation vetoes before
 creating a preview; delayed placements pass through those hooks again.
+Before replaying a saved decal, the plugin restores that player's entity and
+position into SDKTools' shared Player Decal object. Otherwise moderation hooks
+can read the last other player's decal while the engine sends the saved copy.
+Private sharing/ready notices distinguish the immediate local preview from an
+image that has finished synchronizing to other players.
 Per-viewer moderation re-sends in the same frame are combined into one accepted
 audience. Connection serials prevent a replacement player inheriting visibility.
 The optional `instant_sprays_optional.inc` API lets spray tools read the current
