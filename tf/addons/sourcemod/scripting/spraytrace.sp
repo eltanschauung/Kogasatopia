@@ -247,6 +247,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <clientprefs>
+#include <instant_sprays_optional>
 #undef REQUIRE_PLUGIN
 #include <adminmenu>
 #include <whaletracker_api>
@@ -323,6 +324,8 @@ public Plugin:myinfo =
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], errMax) {
         MarkNativeAsOptional("WhaleTracker_GetRankedPlaytimeSeconds");
+        MarkNativeAsOptional("ISprays_GetDecalFile");
+        MarkNativeAsOptional("ISprays_ClearViewer");
         return APLRes_Success;
 }
 
@@ -806,11 +809,21 @@ stock bool:GetSprayMuteSteamId64(client, String:steamId64[], maxLength) {
 stock bool:GetSprayHash(client, String:sprayHash[], maxLength) {
         sprayHash[0] = '\0';
 
-        if(!IsValidClient(client) || !GetPlayerDecalFile(client, sprayHash, maxLength))
-                return false;
+        if(!IsValidClient(client))return false;
+        if(GetFeatureStatus(FeatureType_Native, "ISprays_GetDecalFile") == FeatureStatus_Available) {
+                if(!ISprays_GetDecalFile(client, sprayHash, maxLength, true))return false;
+        } else if(!GetPlayerDecalFile(client, sprayHash, maxLength))return false;
 
         TrimString(sprayHash);
         return sprayHash[0] != '\0' && !StrEqual(sprayHash, "00000000");
+}
+
+public Action ISprays_CanSeeSpray(int client, int viewer) {
+        return IsSprayerMutedForViewer(viewer, client) ? Plugin_Handled : Plugin_Continue;
+}
+
+public void ISprays_OnSprayChanged(int client) {
+        if(IsValidClient(client))RecordSprayIdentifier(client);
 }
 
 stock BuildSprayMuteKey(const String:viewerSteamId64[], const String:sprayerSteamId64[], String:key[], maxLength) {
@@ -1827,6 +1840,11 @@ public GlowEffect(client, Float:vecPos[3], Float:flLife, Float:flSize, bright, m
 
 stock SendPlayerDecalToClient(client, viewer, entIndex, const Float:vecPos[3], Float:delay = 0.0) {
         if(!IsValidClient(client) || !IsValidClient(viewer))
+                return;
+
+        if(entIndex == 0 && vecPos[0] == 0.0 && vecPos[1] == 0.0 && vecPos[2] == 0.0
+                && GetFeatureStatus(FeatureType_Native, "ISprays_ClearViewer") == FeatureStatus_Available
+                && ISprays_ClearViewer(client, viewer))
                 return;
 
         new bool:wasResending = g_bResendingSprayDecal;

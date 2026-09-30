@@ -1,0 +1,19 @@
+Instant Sprays 1.3.3 / API 6
+
+Use AMBuild and the source trees pinned in source.json. From an empty build
+directory run native/configure.py with --sdks=tf2 --targets=x86,x86_64
+--enable-optimize --hl2sdk-root=<SDK parent> --sm-path=<SourceMod>
+--mms-path=<Metamod>, then ambuild. Windows uses --targets=x86.
+The compiled extension is in package/addons/sourcemod/extensions.
+Compile tf/addons/sourcemod/scripting/instant_sprays.sp with SourceMod 1.12,
+using scripting/include. Update the extension and plugin together.
+The optional spraytrace/resizablesprays integrations use API 6 when available.
+
+preview_model.h embeds the original compiled 64x64-unit mesh and identity
+idle pose. Its authored QC and SMD are in model_source; ordinary extension
+builds do not need StudioMDL or any external model assets. Generated preview
+models/materials are transferred over the existing game connection.
+
+Tests: compile tests/spray_policy_test.cpp with native/spray_policy.cpp,
+and tests/preview_geometry_test.cpp with native/preview_geometry.cpp,
+using C++17 and the native include directory. ASan/UBSan are supported.

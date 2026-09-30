@@ -15,6 +15,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <latedl>
+#include <instant_sprays_optional>
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -22,7 +23,7 @@
 #define PLUGIN_NAME "Resizable Sprays"
 #define PLUGIN_DESC "Extends default sprays to allow for scaling and spamming"
 #define PLUGIN_AUTHOR "Sappykun"
-#define PLUGIN_VERSION "3.4.0"
+#define PLUGIN_VERSION "3.4.1"
 #define PLUGIN_URL "https://forums.alliedmods.net/showthread.php?t=332418"
 
 // Normal sprays are 64 Hammer units tall
@@ -131,6 +132,37 @@ public Plugin myinfo =
 	url = PLUGIN_URL
 }
 
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int maxlen)
+{
+    MarkNativeAsOptional("ISprays_GetDecalFile");
+    return APLRes_Success;
+}
+
+bool CurrentSprayFile(int client, char[] filename, int maxlen)
+{
+    if(GetFeatureStatus(FeatureType_Native, "ISprays_GetDecalFile") == FeatureStatus_Available)
+        return ISprays_GetDecalFile(client, filename, maxlen);
+    return GetPlayerDecalFile(client, filename, maxlen);
+}
+
+public void ISprays_OnSprayChanged(int client)
+{
+    if(!IsValidClient(client))return;
+    g_Players[client].bSprayHasBeenProcessed = false;
+    g_Players[client].bIsReadyToSpray = false;
+    g_Logos[client].iHeight = 0;
+    g_Logos[client].fLogoPrecacheTime = 0.0;
+    CurrentSprayFile(client, g_Logos[client].sLogoFileShort, sizeof(g_Logos[].sLogoFileShort));
+    GetPlayerSprayFilePath(client, false, g_Logos[client].sLogoFileFull, sizeof(g_Logos[].sLogoFileFull));
+    for(int viewer = 1; viewer <= MaxClients; viewer++) {
+        g_Logos[client].iClientsWhoRequestedDat[viewer] = 0;
+        g_Logos[client].iClientsWhoAreDownloadingDat[viewer] = 0;
+    }
+    // Instant Sprays announces changes only once its validated DAT is cached.
+    if(ProcessPlayerLogoFile(client) && g_Players[client].bSprayHasBeenProcessed)
+        g_Players[client].bIsReadyToSpray = true;
+}
+
 public void OnPluginStart()
 {
 	RegConsoleCmd("sm_spray", Command_Spray, "Places a repeatable, scalable version of your spray as a decal.");
@@ -208,7 +240,7 @@ public void ResetSprayInfo(int client)
 	}
 
 	if (IsValidClient(client)) {
-		GetPlayerDecalFile(client, g_Logos[client].sLogoFileShort, sizeof(g_Logos[].sLogoFileShort));
+		CurrentSprayFile(client, g_Logos[client].sLogoFileShort, sizeof(g_Logos[].sLogoFileShort));
 		GetPlayerSprayFilePath(client, false, g_Logos[client].sLogoFileFull, sizeof(g_Logos[].sLogoFileFull));
 		RSPR_Log(LOG_DEBUG, "ResetSprayInfo (%N): Spray file path is %s", client, g_Logos[client].sLogoFileFull);
 		PlaceRealPlayerLogo(client, client);
@@ -846,7 +878,7 @@ stock void GetPlayerSprayFilePath(int client, int absolutePath = false, char[] b
 	char playerdecalfile[12];
 	char filePathBuffer[PLATFORM_MAX_PATH];
 
-	GetPlayerDecalFile(client, playerdecalfile, sizeof(playerdecalfile));
+	CurrentSprayFile(client, playerdecalfile, sizeof(playerdecalfile));
 
 	if (GetEngineVersion() > Engine_Left4Dead2) {
 		if (absolutePath)

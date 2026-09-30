@@ -1,0 +1,14 @@
+{
+  "version": "1.3.3",
+  "native_api": 6,
+  "sdk_revisions": {
+    "sourcemod": "2e229b111534b1be007dc3bd9acfcf2fc472e893",
+    "metamod-source": "75dd7b26fe92e535a11f0318ead73c3e05130d0b",
+    "hl2sdk-tf2": "0f358777e7a7f0ad4c6ed6595de1e4e81c15fa4e",
+    "ambuild": "01212cb57c96561f664b6dfb2ee10e66de6f81e4"
+  },
+  "binaries": {
+    "extensions/instant_sprays.ext.2.tf2.so": "7561260339bc3daa21a42151d084dafe17e14671677000f75c0583069fc580b9",
+    "extensions/x64/instant_sprays.ext.2.tf2.so": "950d50bbb9c3808d5c434225a9b275e72efb9dbb81c4f2bea4b946ad7dbcd19c"
+  }
+}
