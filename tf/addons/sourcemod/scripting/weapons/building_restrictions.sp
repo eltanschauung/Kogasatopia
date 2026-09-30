@@ -2,6 +2,20 @@
 
 bool g_bEngineerBuildingsDisabled[MAXPLAYERS + 1];
 
+void WeaponsBuildings_OnPluginStart()
+{
+    HookEvent("post_inventory_application", WeaponsBuildings_OnInventoryApplied, EventHookMode_Post);
+    HookEvent("player_builtobject", WeaponsBuildings_OnInventoryApplied, EventHookMode_Post);
+    AddCommandListener(WeaponsBuildings_OnBuildCommand, "build");
+}
+
+public Action WeaponsBuildings_OnBuildCommand(int client, const char[] command, int argc)
+{
+    if (!Weapons_IsValidClient(client) || !WeaponsBuildings_HasRestriction(client)) return Plugin_Continue;
+    WeaponsBuildings_Reconcile(client);
+    return Plugin_Handled;
+}
+
 void WeaponsBuildings_ResetClient(int client)
 {
     g_bEngineerBuildingsDisabled[client] = false;
@@ -82,12 +96,21 @@ void WeaponsBuildings_Reconcile(int client, bool inventoryApplied = false)
     if (!g_bEngineerBuildingsDisabled[client] || inventoryApplied)
     {
         if (GetFeatureStatus(FeatureType_Native, "Amplifier_DestroyOwnedBuildings")
-            != FeatureStatus_Available)
+            == FeatureStatus_Available)
         {
-            LogError("Cannot disable Engineer buildings: Amplifier_DestroyOwnedBuildings unavailable");
-            return;
+            Amplifier_DestroyOwnedBuildings(client);
         }
-        Amplifier_DestroyOwnedBuildings(client);
+        else
+        {
+            // The optional custom-building plugin must not disable this attribute.
+            int building = -1;
+            while ((building = FindEntityByClassname(building, "obj_*")) != -1)
+            {
+                if (HasEntProp(building, Prop_Send, "m_hBuilder")
+                    && GetEntPropEnt(building, Prop_Send, "m_hBuilder") == client)
+                    AcceptEntityInput(building, "Kill");
+            }
+        }
     }
     g_bEngineerBuildingsDisabled[client] = true;
     WeaponsBuildings_StripTools(client);

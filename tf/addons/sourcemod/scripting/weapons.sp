@@ -132,6 +132,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
 {
     WeaponsCustomAttributes_RegisterNatives();
     CustomHats_RegisterNatives();
+    MarkNativeAsOptional("Amplifier_DestroyOwnedBuildings");
     MarkNativeAsOptional("DGM_CurrentNormalizedMap");
     MarkNativeAsOptional("DGM_NormalizeMapName");
     MarkNativeAsOptional("DGM_GetGameModeKey");
@@ -185,7 +186,7 @@ public void OnPluginStart()
     HookUserMessage(GetUserMessageId("PlayerLoadoutUpdated"), OnPlayerLoadoutUpdated,
         .post = OnPlayerLoadoutUpdatedPost);
     HookEvent("post_inventory_application", WeaponsStats_OnLoadoutApplication, EventHookMode_Post);
-    HookEvent("post_inventory_application", WeaponsBuildings_OnInventoryApplied, EventHookMode_Post);
+    WeaponsBuildings_OnPluginStart();
     CreateVersionConVar("sm_weapons_version", "Unified weapons plugin version.");
     sm_weapons_enable_loadout = CreateConVar("sm_weapons_enable_loadout", "1", "Allows players to receive custom items they have selected.");
     sm_weapons_statistics = CreateConVar("sm_weapons_statistics", "1", "Record custom weapons equip/unequip popularity statistics.", _, true, 0.0, true, 1.0);
@@ -385,6 +386,7 @@ public void OnClientDisconnect(int client)
 
 void Weapons_OnWeaponSwitchPost(int client, int weapon)
 {
+    Harvester_SyncCritBoost(client);
     Plasma_OnWeaponSwitchPost(client);
     WeaponsMovement_OnWeaponSwitchPost(client, weapon);
     WeaponsSound_OnWeaponSwitchPost(client, weapon);

@@ -186,16 +186,11 @@ public Action OnWeaponSwitch(int client, int weapon)
 			Harvester_StopHealTimer(client);
 		}
 	}
-	if (weapon != previousWeapon && Harvester_HasRevengeCrit(client))
+	if (weapon != previousWeapon)
 	{
-		if (Harvester_IsWeapon(previousWeapon) && !Harvester_IsWeapon(weapon))
-		{
-			Harvester_SetCritBoost(client, false);
-		}
-		else if (Harvester_IsWeapon(weapon))
-		{
-			Harvester_SetCritBoost(client, true);
-		}
+		// Clear before switching; the post hook re-applies only to the weapon
+		// that the engine actually deployed, including a failed switch.
+		Harvester_SetCritBoost(client, false);
 	}
 	TryApplyHolsterReload(previousWeapon);
 

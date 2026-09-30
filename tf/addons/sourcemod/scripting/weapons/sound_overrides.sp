@@ -21,6 +21,9 @@
 
 StringMap g_WeaponsSoundGroups;
 DynamicHook g_WeaponsSoundPrimaryAttackHook;
+#define WEAPONS_SOUND_MAX_ENTITIES 2049
+float g_WeaponsSoundAttackTimeBefore[WEAPONS_SOUND_MAX_ENTITIES];
+bool g_WeaponsSoundPendingSwing[WEAPONS_SOUND_MAX_ENTITIES];
 int g_iWeaponsSoundWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 char g_sWeaponsSoundGroup[MAXPLAYERS + 1][64];
 float g_flWeaponsNextDeploySoundTime[MAXPLAYERS + 1][WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT];
@@ -103,17 +106,28 @@ static void WeaponsSound_HookWeaponEntity(int weapon, const char[] className)
 
 	g_WeaponsSoundPrimaryAttackHook.HookEntity(
 		Hook_Pre, weapon, WeaponsSound_PrimaryAttackPre);
+	g_WeaponsSoundPrimaryAttackHook.HookEntity(
+		Hook_Post, weapon, WeaponsSound_PrimaryAttackPost);
 }
 
 public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)
 {
-	if (weapon <= MaxClients
-			|| !IsValidEntity(weapon)
-			|| TF2Util_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
-	{
+	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES || !IsValidEntity(weapon))
 		return MRES_Ignored;
-	}
+	g_WeaponsSoundPendingSwing[weapon] = TF2Util_GetWeaponSlot(weapon) == TFWeaponSlot_Melee;
+	if (g_WeaponsSoundPendingSwing[weapon])
+		g_WeaponsSoundAttackTimeBefore[weapon] = GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack");
+	return MRES_Ignored;
+}
 
+public MRESReturn WeaponsSound_PrimaryAttackPost(int weapon)
+{
+	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES || !IsValidEntity(weapon)
+		|| !g_WeaponsSoundPendingSwing[weapon]) return MRES_Ignored;
+	g_WeaponsSoundPendingSwing[weapon] = false;
+	float nextAttack = GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack");
+	if (nextAttack <= g_WeaponsSoundAttackTimeBefore[weapon] || nextAttack <= GetGameTime())
+		return MRES_Ignored;
 	int client = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
 	WeaponsSound_EmitCustomMeleeAttribute(
 		client, weapon, Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND, "melee swing");

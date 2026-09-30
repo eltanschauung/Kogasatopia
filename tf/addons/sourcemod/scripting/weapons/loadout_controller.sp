@@ -136,6 +136,13 @@ void OnPlayerLoadoutUpdatedPost(UserMsg msg_id, bool sent)
 
 void ApplyClientCustomLoadout(int client)
 {
+    int profile = KogasaPerfBegin();
+    WeaponsProfiled_ApplyClientCustomLoadout(client);
+    KogasaPerfEnd(profile, "ApplyClientCustomLoadout");
+}
+
+void WeaponsProfiled_ApplyClientCustomLoadout(int client)
+{
     if (!Weapons_LoadoutClientValid(client) || !IsClientInGame(client)
         || !sm_weapons_enable_loadout.BoolValue)
     {
@@ -309,7 +316,20 @@ MRESReturn OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hPar
     return MRES_Supercede;
 }
 
+// This span includes the engine's inventory generation as well as plugin hooks.
+// Keep nested calls paired without allocating a profiler on every class change.
+int g_WeaponsInventoryProfiles[16];
+int g_WeaponsInventoryProfileDepth;
+
 MRESReturn OnManageRegularWeaponsPre(int client, Handle hParams)
+{
+    if (g_WeaponsInventoryProfileDepth < sizeof(g_WeaponsInventoryProfiles))
+        g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth] = KogasaPerfBegin();
+    g_WeaponsInventoryProfileDepth++;
+    return WeaponsProfiled_OnManageRegularWeaponsPre(client);
+}
+
+MRESReturn WeaponsProfiled_OnManageRegularWeaponsPre(int client)
 {
     if (!Weapons_IsValidClient(client)) return MRES_Ignored;
     TFClassType playerClass = TF2_GetPlayerClass(client);
@@ -332,6 +352,24 @@ MRESReturn OnManageRegularWeaponsPre(int client, Handle hParams)
 }
 
 MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams)
+{
+    MRESReturn result = WeaponsProfiled_OnManageRegularWeaponsPost(client);
+    if (g_WeaponsInventoryProfileDepth > 0)
+    {
+        g_WeaponsInventoryProfileDepth--;
+        if (g_WeaponsInventoryProfileDepth < sizeof(g_WeaponsInventoryProfiles))
+        {
+            char playerClass[16] = "unknown", scope[72];
+            if (Weapons_IsValidClient(client))
+                TF2Classes_GetKey(TF2_GetPlayerClass(client), playerClass, sizeof(playerClass), "unknown");
+            FormatEx(scope, sizeof(scope), "ManageRegularWeapons/%s(engine+hooks)", playerClass);
+            KogasaPerfEnd(g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth], scope);
+        }
+    }
+    return result;
+}
+
+MRESReturn WeaponsProfiled_OnManageRegularWeaponsPost(int client)
 {
     if (!Weapons_IsValidClient(client)) return MRES_Ignored;
     TFClassType playerClass = TF2_GetPlayerClass(client);

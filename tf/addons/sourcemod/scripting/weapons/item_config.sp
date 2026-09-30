@@ -312,6 +312,15 @@ static bool ComputeEquipSlotPosition(KeyValues kv, int itemdef,
  * Returns the item entity if successful.
  */
 int EquipCustomItem(int client, const CustomItemDefinition item) {
+	int profile = KogasaPerfBegin();
+	int entity = WeaponsProfiled_EquipCustomItem(client, item);
+	char scope[72];
+	FormatEx(scope, sizeof(scope), "EquipCustomItem/%s", item.uid);
+	KogasaPerfEnd(profile, scope);
+	return entity;
+}
+
+int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item) {
 	if (!Weapons_IsValidClient(client)) {
 		return INVALID_ENT_REFERENCE;
 	}

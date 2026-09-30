@@ -140,13 +140,10 @@ enum struct tf2_player
 	Handle harvesterHintTimer;
 	Handle shockChargeTimer;
 	bool harvesterHealHintVisible;
-	bool harvesterCritConsumePending;
 	bool harvesterCritBoostApplied;
 	bool harvesterRevengeReady;
 	int harvesterRevengeWeaponRef;
-	int harvesterRevengeGeneration;
-	int harvesterCritVictimUserId;
-	int harvesterCritAttemptTick;
+	float harvesterCritVisualRefreshAt;
 	float lastUber;
 	int lastUberMedigunDefIndex;
 	int engiMetal;

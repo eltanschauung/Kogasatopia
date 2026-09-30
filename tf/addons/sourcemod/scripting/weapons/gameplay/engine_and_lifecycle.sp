@@ -304,7 +304,6 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 
 		HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
 		HookEvent("player_hurt", Event_PlayerHurt_DoubleDonk, EventHookMode_Post);
-		HookEvent("player_hurt", Harvester_OnConfirmedHit, EventHookMode_Post);
 		HookEvent("post_inventory_application", Event_Resupply, EventHookMode_Post);
 		HookEvent("player_spawn", OnPlayerSpawn);
 		HookEvent("player_changeclass", Event_PlayerChangeClass, EventHookMode_Post);
@@ -621,6 +620,7 @@ void WeaponsProfiled_OnGameFrame()
 	{
 		for (int client = 1; client <= MaxClients; client++)
 		{
+			if (IsClientInGame(client)) Harvester_SyncCritBoost(client);
 			if (IsClientInGame(client) && IsPlayerAlive(client))
 			{
 				VitaSaw_CacheCharge(client);

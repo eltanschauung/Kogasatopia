@@ -168,7 +168,6 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	}
 
 	if (tf2_players[attacker].scytheWeapon != 0
-		&& GetEntProp(attacker, Prop_Send, "m_iRevengeCrits") <= 0
 		&& TF2_IsPlayerInCondition(client, TFCond_OnFire))
 	{
 		Harvester_AddHealCount(attacker, ATTR_HARVESTER_HEALING_COUNT);

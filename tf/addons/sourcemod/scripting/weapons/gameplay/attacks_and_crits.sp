@@ -75,6 +75,12 @@ public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname
 		}
 	}
 
+	if (Harvester_ShouldCritWeapon(client, weapon))
+	{
+		result = true;
+		return Plugin_Changed;
+	}
+
 	if (TF2CustAttr_GetInt(weapon, ATTR_RANDOM_CRITS_OVERRIDE, 0) != 0)
 	{
 		g_bCalculatingRandomCritOverride = true;

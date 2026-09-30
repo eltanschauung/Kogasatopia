@@ -218,35 +218,52 @@ void ShockCharge_StopTimer(int client)
 	tf2_players[client].shockChargeTimer = null;
 }
 
+// Use a separate, short-lived condition: Kritzkrieg's condition has a special
+// provider list and is also managed by Medic healing. Never leave an infinite
+// player-wide boost behind when the charged weapon is holstered or removed.
+#define HARVESTER_CRIT_VISUAL_CONDITION TFCond_CritOnDamage
+#define HARVESTER_CRIT_VISUAL_DURATION 0.25
+
 void Harvester_SetCritBoost(int client, bool enabled)
 {
-	if (enabled)
+	if (!Weapons_IsClientInGame(client))
 	{
-		if (!IsClientInGame(client) || !IsPlayerAlive(client))
-		{
-			return;
-		}
-
-		if (TF2_IsPlayerInCondition(client, TFCond_Kritzkrieged))
-		{
-			if (TF2Util_GetPlayerConditionProvider(client, TFCond_Kritzkrieged) != client)
-				tf2_players[client].harvesterCritBoostApplied = false;
-			return;
-		}
-		TF2_AddCondition(client, TFCond_Kritzkrieged, TFCondDuration_Infinite, client);
-		tf2_players[client].harvesterCritBoostApplied = true;
+		tf2_players[client].harvesterCritBoostApplied = false;
 		return;
 	}
 
-	if (tf2_players[client].harvesterCritBoostApplied)
+	int weapon = EntRefToEntIndex(tf2_players[client].harvesterRevengeWeaponRef);
+	bool present = TF2_IsPlayerInCondition(client, HARVESTER_CRIT_VISUAL_CONDITION);
+	int provider = present ? TF2Util_GetPlayerConditionProvider(client, HARVESTER_CRIT_VISUAL_CONDITION) : -1;
+	bool owned = present && tf2_players[client].harvesterCritBoostApplied
+		&& weapon > MaxClients && provider == weapon;
+	if (!enabled)
 	{
-		if (IsClientInGame(client)
-			&& TF2Util_GetPlayerConditionProvider(client, TFCond_Kritzkrieged) == client)
-		{
-			TF2_RemoveCondition(client, TFCond_Kritzkrieged);
-		}
+		if (owned) TF2_RemoveCondition(client, HARVESTER_CRIT_VISUAL_CONDITION);
 		tf2_players[client].harvesterCritBoostApplied = false;
+		tf2_players[client].harvesterCritVisualRefreshAt = 0.0;
+		return;
 	}
+
+	// A boost supplied by another source is not ours to overwrite or remove.
+	if (present && !owned) return;
+	float now = GetGameTime();
+	if (owned && now < tf2_players[client].harvesterCritVisualRefreshAt) return;
+	TF2_AddCondition(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION, weapon);
+	tf2_players[client].harvesterCritBoostApplied = true;
+	tf2_players[client].harvesterCritVisualRefreshAt = now + 0.10;
+}
+
+void Harvester_SyncCritBoost(int client)
+{
+	if (!tf2_players[client].harvesterRevengeReady && !tf2_players[client].harvesterCritBoostApplied) return;
+	if (!IsPlayerAlive(client) || !Harvester_HasRevengeCrit(client))
+	{
+		Harvester_ClearRevengeCrit(client);
+		return;
+	}
+	Harvester_SetCritBoost(client, GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon")
+		== EntRefToEntIndex(tf2_players[client].harvesterRevengeWeaponRef));
 }
 
 static void Harvester_SetRevengeCrit(int client)
@@ -255,18 +272,15 @@ static void Harvester_SetRevengeCrit(int client)
 	if (!Harvester_IsWeapon(weapon)) return;
 	tf2_players[client].harvesterRevengeReady = true;
 	tf2_players[client].harvesterRevengeWeaponRef = EntIndexToEntRef(weapon);
-	tf2_players[client].harvesterRevengeGeneration++;
-	int activeWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-	Harvester_SetCritBoost(client, Harvester_IsWeapon(activeWeapon));
+	Harvester_SyncCritBoost(client);
 }
 
 static void Harvester_ClearRevengeCrit(int client)
 {
-	tf2_players[client].harvesterCritConsumePending = false;
+	// Retain the weapon reference until the condition's ownership is checked.
+	Harvester_SetCritBoost(client, false);
 	tf2_players[client].harvesterRevengeReady = false;
 	tf2_players[client].harvesterRevengeWeaponRef = INVALID_ENT_REFERENCE;
-	tf2_players[client].harvesterRevengeGeneration++;
-	Harvester_SetCritBoost(client, false);
 }
 
 bool Harvester_HasRevengeCrit(int client)
@@ -277,43 +291,21 @@ bool Harvester_HasRevengeCrit(int client)
 		&& GetPlayerWeaponSlot(client, TFWeaponSlot_Melee) == weapon && Harvester_IsWeapon(weapon);
 }
 
-bool Harvester_ApplyRevengeCrit(int attacker, int victim, int weapon, int inflictor)
+bool Harvester_ShouldCritWeapon(int client, int weapon)
 {
-	if (!Harvester_HasRevengeCrit(attacker) || inflictor != attacker
-		|| weapon != EntRefToEntIndex(tf2_players[attacker].harvesterRevengeWeaponRef)) return false;
-	// Charge state belongs to this weapon, not TF2's shared revenge counter or
-	// a transient crit-glow condition that deploying another weapon can change.
-	tf2_players[attacker].harvesterCritConsumePending = true;
-	tf2_players[attacker].harvesterCritVictimUserId = GetClientUserId(victim);
-	tf2_players[attacker].harvesterCritAttemptTick = GetGameTickCount();
-	DataPack attempt = new DataPack();
-	attempt.WriteCell(GetClientUserId(attacker));
-	attempt.WriteCell(tf2_players[attacker].harvesterRevengeGeneration);
-	attempt.WriteCell(GetGameTickCount());
-	RequestFrame(Harvester_ClearMissedAttempt, attempt);
-	return true;
+	return Harvester_HasRevengeCrit(client)
+		&& weapon == EntRefToEntIndex(tf2_players[client].harvesterRevengeWeaponRef);
 }
 
-public void Harvester_ClearMissedAttempt(any data)
+bool Harvester_ConsumeOnEnemyHit(int attacker, int victim, int weapon, int inflictor, int damageType)
 {
-	DataPack attempt = view_as<DataPack>(data);attempt.Reset();
-	int client = GetClientOfUserId(attempt.ReadCell());
-	int generation = attempt.ReadCell(), tick = attempt.ReadCell();delete attempt;
-	if (client > 0 && tf2_players[client].harvesterRevengeGeneration == generation
-		&& tf2_players[client].harvesterCritAttemptTick == tick)
-		tf2_players[client].harvesterCritConsumePending = false;
-}
-
-public void Harvester_OnConfirmedHit(Event event, const char[] name, bool dontBroadcast)
-{
-	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	if (attacker <= 0 || !Harvester_HasRevengeCrit(attacker)
-		|| !tf2_players[attacker].harvesterCritConsumePending || event.GetInt("damageamount") <= 0
-		|| event.GetInt("userid") != tf2_players[attacker].harvesterCritVictimUserId
-		|| GetGameTickCount() != tf2_players[attacker].harvesterCritAttemptTick) return;
-	int weapon = EntRefToEntIndex(tf2_players[attacker].harvesterRevengeWeaponRef);
-	if (event.GetInt("weaponid") != TF2Util_GetWeaponID(weapon)) return;
+	if (!Weapons_IsClientInGame(attacker) || !Weapons_IsClientInGame(victim)
+		|| attacker == victim || GetClientTeam(attacker) <= 1 || GetClientTeam(victim) <= 1
+		|| GetClientTeam(attacker) == GetClientTeam(victim) || inflictor != attacker
+		|| !(damageType & DMG_CLUB) || !Harvester_ShouldCritWeapon(attacker, weapon)) return false;
+	// The damage hook proves a melee contact. Consume here, once, instead of
+	// matching a later player_hurt event against a transient active-weapon ID.
 	Harvester_ClearRevengeCrit(attacker);
 	Harvester_ShowHealHint(attacker);
+	return true;
 }
-

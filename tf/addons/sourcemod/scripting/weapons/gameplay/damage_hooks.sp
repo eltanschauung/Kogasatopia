@@ -56,12 +56,6 @@ Action WeaponsProfiled_TF2_OnTakeDamage(
 		return Plugin_Continue;
 	}
 
-	if (Harvester_ApplyRevengeCrit(attacker, victim, weapon, inflictor))
-	{
-		critType = CritType_Crit;
-		return Plugin_Changed;
-	}
-
 	if (!HasTakeMinicritsProjectileAirborne(victim)
 		|| (GetEntityFlags(victim) & FL_ONGROUND))
 	{
@@ -102,6 +96,11 @@ Action WeaponsProfiled_OnTakeDamage(int client, int &attacker, int &inflictor, f
 	}
 
 	bool damageChanged = false;
+	if (damage > 0.0 && Harvester_ConsumeOnEnemyHit(attacker, client, weapon, inflictor, damagetype))
+	{
+		damagetype |= DMG_CRIT;
+		damageChanged = true;
+	}
 	if (inflictor > MaxClients && IsValidEntity(inflictor) && (damagetype & DMG_BULLET))
 	{
 		char classname[32];
@@ -233,10 +232,11 @@ Action WeaponsProfiled_OnTakeDamage(int client, int &attacker, int &inflictor, f
 		} else if (damagecustom == 0) {
 			damage = 35.00;
 			return Plugin_Changed;
-		} else if (damagecustom == 42) {
-			damagetype|=TF_WEAPON_GRENADE_DEMOMAN;
+		} else if (damagecustom == TF_CUSTOM_STICKBOMB_EXPLOSION) {
+			damagetype |= DMG_BLAST;
 			if (TF2_IsPlayerInCondition(attacker, TFCond_BlastJumping)) {
-				damage = 175.00;
+				// Direct contact already dealt 35 melee damage: 35 + 140 = 175.
+				damage = 140.00;
 				damagetype|=DMG_CRIT;
 				return Plugin_Changed;
 			} else {
