@@ -40,6 +40,8 @@ public void OnPluginStart()
     Filters_RegisterCommands();
     MuteCheck_Initialize();
     TidyChat_Initialize();
+    HookEvent("player_connect", Filters_EventPlayerConnect, EventHookMode_Pre);
+    HookEvent("player_disconnect", Filters_EventPlayerDisconnect, EventHookMode_Pre);
     RefreshHostAddress();
     Filters_SQLConnect();
     Filters_StartTimers();
@@ -52,10 +54,6 @@ static void Filters_EnsureCollections()
     if (g_WebNameColors == null)
     {
         g_WebNameColors = new StringMap();
-    }
-    if (g_ConnectQueue == null)
-    {
-        g_ConnectQueue = new ArrayList(sizeof(ConnectEvent));
     }
     if (g_PrenameIdRules == null)
     {

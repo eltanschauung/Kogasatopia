@@ -457,7 +457,6 @@ public void OnClientDisconnect(int client)
         g_VoiceBlocked[client][i] = false;
         g_VoiceBlocked[i][client] = false;
     }
-    Filters_AnnouncePlayerEvent(client, false);
 }
 
 public void OnPluginEnd()
@@ -481,14 +480,7 @@ public void OnPluginEnd()
         }
     }
 
-    g_ConnectQueueTimer = null;
     g_hFiltersDbReconnectTimer = null;
-
-    if (g_ConnectQueue != null)
-    {
-        delete g_ConnectQueue;
-        g_ConnectQueue = null;
-    }
 
     if (g_WebNameColors != null)
     {

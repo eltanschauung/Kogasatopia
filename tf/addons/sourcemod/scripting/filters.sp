@@ -36,7 +36,6 @@
 #define FILTERS_BLACKLIST_DISABLE_SECONDS 60
 #define FILTERS_OUTBOX_POLL_INTERVAL 2.0
 #define FILTERS_MUTE_CHECK_INTERVAL 1.0
-#define FILTERS_CONNECT_QUEUE_DELAY 3.0
 #define FILTERS_BLACKLIST_CHAT_LIMIT 5
 #define FILTERS_BLACKLIST_CHAT_WINDOW_SECONDS 180
 #define FILTERS_DEFAULT_DB_CONFIG "default"
@@ -164,8 +163,7 @@ int g_ForcedStatusCount = 0;
 char g_AllowedCommands[MAX_COMMANDS][MAX_WORD_LENGTH];
 int g_AllowedCommandsCount = 0;
 StringMap g_WebNameColors = null;
-ArrayList g_ConnectQueue = null;
-Handle g_ConnectQueueTimer = null;
+int g_iPendingConnectUserId[MAXPLAYERS + 1];
 Handle g_hPollOutboxTimer = null;
 Handle g_hMuteDeafenTimer = null;
 int g_iOutboxTimerGeneration = 0;
@@ -180,12 +178,6 @@ bool g_DisguiseActive[MAXPLAYERS + 1];
 bool g_DisguiseChatInProgress[MAXPLAYERS + 1];
 char g_DisguiseTargetSteamId64[MAXPLAYERS + 1][32];
 char g_DisguiseDisplayName[MAXPLAYERS + 1][256];
-
-enum struct ConnectEvent
-{
-    char name[MAX_NAME_LENGTH];
-    bool connected;
-}
 
 char g_sHostIp[64];
 char g_sPublicHostIp[64];

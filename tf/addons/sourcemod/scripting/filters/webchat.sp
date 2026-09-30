@@ -498,59 +498,32 @@ void Filters_InsertSystemMessage(bool webchatOnly, bool alertFlag, const char[] 
     }
 }
 
-void Filters_ResetConnectQueue()
+public void Filters_EventPlayerConnect(Event event, const char[] name, bool dontBroadcast)
 {
-    // A map-scoped timer can already have been closed at a map boundary.
-    // Retire by ownership; an older live timer will stop on its next callback.
-    g_ConnectQueueTimer = null;
-    if (g_ConnectQueue != null) g_ConnectQueue.Clear();
+    // Engine events describe real connections; SourceMod forwards also run on map changes.
+    int client = event.GetInt("index") + 1;
+    if (client > 0 && client <= MaxClients)
+        g_iPendingConnectUserId[client] = event.GetInt("userid");
 }
 
-void Filters_AnnouncePlayerEvent(int client, bool connected)
+public void Filters_EventPlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
 {
-    if (Filters_IsChatDatabaseImmune(client)) return;
-    if (client <= 0 || client > MaxClients || !IsClientInGame(client) || IsFakeClient(client)
-        || g_ConnectQueue == null) return;
-    ConnectEvent event;
-    GetClientName(client, event.name, sizeof(event.name));
-    event.connected = connected;
-    g_ConnectQueue.PushArray(event);
-    if (g_ConnectQueueTimer == null)
-        g_ConnectQueueTimer = CreateTimer(FILTERS_CONNECT_QUEUE_DELAY, Timer_ProcessConnectQueue,
-            g_iOutboxTimerGeneration, TIMER_FLAG_NO_MAPCHANGE);
-}
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client <= 0 || client > MaxClients) return;
+    g_iPendingConnectUserId[client] = 0;
+    if (!Filters_IsRealClientInGame(client) || Filters_IsChatDatabaseImmune(client)) return;
 
-public Action Timer_ProcessConnectQueue(Handle timer, any generation)
-{
-    if (timer != g_ConnectQueueTimer) return Plugin_Stop;
-    g_ConnectQueueTimer = null;
-    if (g_ConnectQueue == null) return Plugin_Stop;
-    ArrayList pending = g_ConnectQueue;
-    g_ConnectQueue = new ArrayList(sizeof(ConnectEvent));
-    int count = pending.Length;
-    if (generation != g_iOutboxTimerGeneration || count > 5)
-    {
-        Filters_LogDebug("Dropped %d connection events due to spam/map change", count);
-        delete pending;
-        return Plugin_Stop;
-    }
-    for (int i = 0; i < count && generation == g_iOutboxTimerGeneration; i++)
-    {
-        ConnectEvent event;
-        pending.GetArray(i, event);
-        if (event.connected) Filters_AnnouncePlayerJoin(event.name);
-        else Filters_AnnouncePlayerLeave(event.name);
-    }
-    // New events may have arrived synchronously during a broadcast. They live
-    // in the new queue, not the snapshot being drained here.
-    delete pending;
-    return Plugin_Stop;
+    char playerName[MAX_NAME_LENGTH];
+    GetClientName(client, playerName, sizeof(playerName));
+    Filters_AnnouncePlayerLeave(playerName);
 }
 
 void Filters_AnnounceClientJoin(int client)
 {
-    if (Filters_IsChatDatabaseImmune(client)) return;
     if (client <= 0 || client > MaxClients || !IsClientInGame(client) || IsFakeClient(client)) return;
+    if (g_iPendingConnectUserId[client] != GetClientUserId(client)) return;
+    g_iPendingConnectUserId[client] = 0;
+    if (Filters_IsChatDatabaseImmune(client)) return;
     char steam2[32], steam64[32], prename[PRENAME_MAX_RENAME];
     Prename_GetClientIds(client, steam2, sizeof(steam2), steam64, sizeof(steam64));
     if (Prename_TryGetIdRule(steam64, steam2, prename, sizeof(prename)))

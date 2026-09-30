@@ -16,7 +16,6 @@ void Filters_StopOutboxTimer()
     g_iOutboxTimerGeneration++;
     g_hPollOutboxTimer = null;
     Filters_AbandonOutboxBatch();
-    Filters_ResetConnectQueue();
 }
 
 static bool Filters_CanCheckMutedClients()
