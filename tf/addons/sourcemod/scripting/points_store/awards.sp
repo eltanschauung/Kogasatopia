@@ -3,9 +3,12 @@ void PlayBonusPointsSound(int client, bool force)
     SaySounds_TryPlayCommand(client, BP_SOUND_COMMAND, force);
 }
 
-void PlayWelfareSound()
+void PlayWelfareSound(int amount)
 {
-    SaySounds_TryPlayCommand(0, BP_WELFARE_SOUND_COMMAND);
+    if (amount == BP_WELFARE_MAX)
+        SaySounds_TryPlayCommand(0, "firework");
+    else
+        SaySounds_TryPlayCommand(0, BP_WELFARE_SOUND_COMMAND);
 }
 
 void PlayLevelUpSound(int client)
@@ -670,7 +673,7 @@ void PrintBonusPointsDelta(int client, int points, const char[] type, int target
 
     if (StrEqual(type, "medic_high_uber_kill", false))
     {
-        CPrintToChat(client, "%s {limegreen}%s%i{default} for {gold}Medic high ÜberCharge kill (%d%%){default}%s", prefix, sign, points, target, perMapSuffix);
+        CPrintToChat(client, "%s {limegreen}%s%i{default} for {gold}Medic high ÃœberCharge kill (%d%%){default}%s", prefix, sign, points, target, perMapSuffix);
         return;
     }
 

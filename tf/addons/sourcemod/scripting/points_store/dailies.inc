@@ -140,6 +140,49 @@ void PrintDailyClassGroup(int client, int classId)
     }
 }
 
+void PrintDailyInProgress(int client)
+{
+    int entries[sizeof(g_DailyGemTypes)];
+    float completion[sizeof(g_DailyGemTypes)];
+    int remaining[sizeof(g_DailyGemTypes)];
+    int count;
+    for (int i = 0; i < sizeof(g_DailyGemTypes); i++)
+    {
+        RewardDefinition reward;
+        if (!GetRewardDefinition(g_DailyGemTypes[i], reward)
+            || !RewardMatchesClass(reward, DAILY_CLASS_ALL) || reward.perMapLimit <= 0)
+            continue;
+        int used = GetPerMapAwardCount(client, g_DailyGemTypes[i]);
+        if (used <= 0 || used >= reward.perMapLimit)
+            continue;
+        float progress = float(used) / float(reward.perMapLimit);
+        int left = reward.perMapLimit - used;
+        int position = count;
+        while (position > 0 && (completion[position - 1] < progress
+            || (completion[position - 1] == progress && remaining[position - 1] > left)))
+        {
+            entries[position] = entries[position - 1];
+            completion[position] = completion[position - 1];
+            remaining[position] = remaining[position - 1];
+            position--;
+        }
+        entries[position] = i;
+        completion[position] = progress;
+        remaining[position] = left;
+        count++;
+    }
+    CPrintToChat(client, "{gold} ----- [{green}In Progress{gold}] -----");
+    for (int i = 0; i < count; i++)
+    {
+        RewardDefinition reward;
+        GetRewardDefinition(g_DailyGemTypes[entries[i]], reward);
+        CPrintToChat(client, "{default}%s {gold}(%d/%d){default} {limegreen}+%d{default}",
+            reward.longName, reward.perMapLimit - remaining[i], reward.perMapLimit, reward.amount);
+    }
+    if (count == 0)
+        CPrintToChat(client, "{default}No partially completed all-class limits.");
+}
+
 public Action Command_Dailies(int client, int args)
 {
     if (!Client_IsHumanInGame(client))
@@ -152,6 +195,7 @@ public Action Command_Dailies(int client, int args)
         return Plugin_Handled;
     }
 
+    PrintDailyInProgress(client);
     int currentClass = view_as<int>(TF2_GetPlayerClass(client));
     int classOrder[] =
     {

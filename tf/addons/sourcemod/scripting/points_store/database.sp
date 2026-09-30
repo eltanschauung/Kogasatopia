@@ -314,6 +314,7 @@ public void SQLTxn_OnEconomyRowsFailure(Database db, any data, int numQueries, c
 void FinishSchemaReady()
 {
     g_DatabaseReady = true;
+    CurrencyLeaderboard_RefreshIfRequested();
     EnsureIdempotentAwardsSchema();
     EnsurePerMapAwardsSchema();
     EnsureBountySchema();

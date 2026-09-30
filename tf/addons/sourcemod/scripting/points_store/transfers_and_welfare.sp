@@ -338,7 +338,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
         return;
     }
 
-    PlayWelfareSound();
+    PlayWelfareSound(amount);
     LogEconomyEvent("welfare_pool_debit", client, amount, "welfare", 0, g_WelfarePoolBalance, g_CumulativeSpentBalance);
 
     char displayName[256];

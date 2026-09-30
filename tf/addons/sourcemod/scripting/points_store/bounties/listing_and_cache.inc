@@ -12,7 +12,7 @@ public Action Command_ShowBounties(int client, int args)
 
     char query[1024];
     FormatEx(query, sizeof(query),
-        "SELECT target_steamid64, MAX(target_name), SUM(amount + bonus_amount) AS total_amount "
+        "SELECT target_steamid64, MAX(target_name), SUM(amount + bonus_amount) AS total_amount, MIN(expires_at) "
         ... "FROM %s WHERE status = 'active' AND expires_at > %d "
         ... "GROUP BY target_steamid64 ORDER BY total_amount DESC, MAX(target_name) ASC LIMIT 100",
         BOUNTY_TABLE,
@@ -48,12 +48,18 @@ public void SQL_OnBountyListLoaded(Database db, DBResultSet rows, const char[] e
         rows.FetchString(0, steamId, sizeof(steamId));
         rows.FetchString(1, name, sizeof(name));
         int amount = rows.FetchInt(2);
+        // Stacked bounties can expire separately: show the next expiry, when
+        // the displayed total will change, instead of overstating its lifetime.
+        int seconds = rows.FetchInt(3) - GetTime();
+        if (seconds <= 0)
+            continue;
         int target = Kogasa_FindClientBySteamId64(steamId);
         if (target > 0)
         {
             GetClientName(target, name, sizeof(name));
         }
-        FormatEx(display, sizeof(display), "%s (%d %s)", name, amount, currencyLong);
+        int minutes = (seconds + 59) / 60;
+        FormatEx(display, sizeof(display), "%s (%s %d) (%dm)", name, currencyLong, amount, minutes);
         menu.AddItem(steamId, display, ITEMDRAW_DISABLED);
         count++;
     }

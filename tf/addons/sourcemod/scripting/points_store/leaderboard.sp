@@ -27,131 +27,102 @@ void NormalizeLeaderboardColorTag(char[] colorTag, int maxlen)
     }
 }
 
+#define CURRENCY_LEADERBOARD_LIMIT 50
+static char g_CurrencyLeaderboardNames[CURRENCY_LEADERBOARD_LIMIT][128];
+static char g_CurrencyLeaderboardColors[CURRENCY_LEADERBOARD_LIMIT][32];
+static int g_CurrencyLeaderboardBalances[CURRENCY_LEADERBOARD_LIMIT];
+static int g_CurrencyLeaderboardRows;
+static int g_CurrencyLeaderboardGeneration;
+static bool g_CurrencyLeaderboardReady;
+static bool g_CurrencyLeaderboardRefreshRequested;
+
+void CurrencyLeaderboard_OnMapStart()
+{
+    g_CurrencyLeaderboardGeneration++;
+    // Keep the last successful cache on quiet maps. This command never queries.
+    g_CurrencyLeaderboardRefreshRequested = GetClientCount(false) > 2;
+    CurrencyLeaderboard_RefreshIfRequested();
+}
+
+void CurrencyLeaderboard_RefreshIfRequested()
+{
+    if (!g_CurrencyLeaderboardRefreshRequested || !g_DatabaseReady || g_Database == null)
+        return;
+    g_CurrencyLeaderboardRefreshRequested = false;
+    char cacheJoin[128], nameJoin[128];
+    strcopy(cacheJoin, sizeof(cacheJoin), g_IsMySql
+        ? "BINARY pc.steamid = BINARY b.steamid64" : "pc.steamid = b.steamid64");
+    strcopy(nameJoin, sizeof(nameJoin), g_IsMySql
+        ? "BINARY fs.steamid64 = BINARY b.steamid64" : "fs.steamid64 = b.steamid64");
+    char query[1400];
+    FormatEx(query, sizeof(query),
+        "SELECT b.steamid64, b.balance, COALESCE(NULLIF(pr.newname,''), NULLIF(fs.last_name,''), b.steamid64), COALESCE(NULLIF(pc.name_color,''), 'gold') "
+        ... "FROM %s b LEFT JOIN whaletracker_points_cache pc ON %s "
+        ... "LEFT JOIN prename_rules pr ON pr.pattern = b.steamid64 "
+        ... "LEFT JOIN filters_steam_names fs ON %s "
+        ... "WHERE b.balance > 0 ORDER BY b.balance DESC, b.steamid64 ASC LIMIT %d",
+        BP_BALANCE_TABLE, cacheJoin, nameJoin, CURRENCY_LEADERBOARD_LIMIT);
+    g_Database.Query(PointsStore_CacheCurrencyLeaderboard, query, g_CurrencyLeaderboardGeneration);
+}
+
+public void PointsStore_CacheCurrencyLeaderboard(Database db, DBResultSet results, const char[] error, any generation)
+{
+    if (generation != g_CurrencyLeaderboardGeneration)
+        return;
+    if (error[0] != '\0' || results == null)
+    {
+        LogError("[points_store] Currency leaderboard refresh failed: %s", error);
+        return; // A failed refresh must not erase the previous successful cache.
+    }
+    g_CurrencyLeaderboardRows = 0;
+    while (g_CurrencyLeaderboardRows < CURRENCY_LEADERBOARD_LIMIT && results.FetchRow())
+    {
+        int row = g_CurrencyLeaderboardRows++;
+        g_CurrencyLeaderboardBalances[row] = results.FetchInt(1);
+        results.FetchString(2, g_CurrencyLeaderboardNames[row], sizeof(g_CurrencyLeaderboardNames[]));
+        results.FetchString(3, g_CurrencyLeaderboardColors[row], sizeof(g_CurrencyLeaderboardColors[]));
+        TrimString(g_CurrencyLeaderboardNames[row]);
+        NormalizeLeaderboardColorTag(g_CurrencyLeaderboardColors[row], sizeof(g_CurrencyLeaderboardColors[]));
+        if (!g_CurrencyLeaderboardNames[row][0])
+            results.FetchString(0, g_CurrencyLeaderboardNames[row], sizeof(g_CurrencyLeaderboardNames[]));
+    }
+    g_CurrencyLeaderboardReady = true;
+}
+
 public Action Command_ShowCurrencyLeaderboard(int client, int args)
 {
     if (!Client_IsHumanInGame(client))
+        return Plugin_Handled;
+    if (!g_CurrencyLeaderboardReady)
     {
+        CPrintToChat(client, "%s Leaderboard cache is not ready; it refreshes at map start with more than two connected clients.", g_CurrencyPrefix);
         return Plugin_Handled;
     }
-
-    char prefix[96];
-    GetCurrencyPrefix(prefix, sizeof(prefix));
-
-    if (!g_DatabaseReady || g_Database == null)
-    {
-        CPrintToChat(client, "%s Database is not ready.", prefix);
-        return Plugin_Handled;
-    }
-
     int page = 1;
     if (args >= 1)
     {
-        char arg[16];
-        GetCmdArg(1, arg, sizeof(arg));
-        int parsed = StringToInt(arg);
-        if (parsed > 0)
-        {
-            page = parsed;
-        }
+        char argument[16];
+        GetCmdArg(1, argument, sizeof(argument));
+        page = StringToInt(argument);
     }
-
-    int offset = (page - 1) * BP_LEADERBOARD_PAGE_SIZE;
-
-    char currencyLong[BP_CURRENCY_LONG_MAX];
-    GetCurrencyLongLabel(currencyLong, sizeof(currencyLong));
-    CPrintToChat(client, "{green}[Store]{default} %s leaderboard will print momentarily...", currencyLong);
-
-    DataPack pack = new DataPack();
-    pack.WriteCell(GetClientUserId(client));
-    pack.WriteCell(page);
-
-    char joinCondition[128];
-    if (g_IsMySql)
+    int pages = (CURRENCY_LEADERBOARD_LIMIT + BP_LEADERBOARD_PAGE_SIZE - 1) / BP_LEADERBOARD_PAGE_SIZE;
+    if (page < 1 || page > pages)
     {
-        strcopy(joinCondition, sizeof(joinCondition), "BINARY pc.steamid = BINARY b.steamid64");
+        CPrintToChat(client, "%s Use !gl <1-%d>; only the top 50 are listed.", g_CurrencyPrefix, pages);
+        return Plugin_Handled;
     }
-    else
-    {
-        strcopy(joinCondition, sizeof(joinCondition), "pc.steamid = b.steamid64");
-    }
-
-    char query[1400];
-    Format(query, sizeof(query),
-        "SELECT b.steamid64, b.balance, COALESCE(NULLIF(pr.newname,''), NULLIF(fs.last_name,''), b.steamid64), COALESCE(NULLIF(pc.name_color,''), 'gold') "
-        ... "FROM %s b "
-        ... "LEFT JOIN whaletracker_points_cache pc ON %s "
-        ... "LEFT JOIN prename_rules pr ON pr.pattern = b.steamid64 "
-        ... "LEFT JOIN filters_steam_names fs ON fs.steamid64 = b.steamid64 COLLATE utf8mb4_uca1400_ai_ci "
-        ... "WHERE b.balance > 0 "
-        ... "ORDER BY b.balance DESC, b.steamid64 ASC "
-        ... "LIMIT %d OFFSET %d",
-        BP_BALANCE_TABLE,
-        joinCondition,
-        BP_LEADERBOARD_PAGE_SIZE,
-        offset);
-    g_Database.Query(PointsStore_ShowCurrencyLeaderboardCallback, query, pack);
-    return Plugin_Handled;
-}
-
-public void PointsStore_ShowCurrencyLeaderboardCallback(Database db, DBResultSet results, const char[] error, any data)
-{
-    DataPack pack = view_as<DataPack>(data);
-    pack.Reset();
-    int client = GetClientOfUserId(pack.ReadCell());
-    int page = pack.ReadCell();
-    delete pack;
-
-    if (!Client_IsHumanInGame(client))
-    {
-        return;
-    }
-
-    char prefix[96];
-    GetCurrencyPrefix(prefix, sizeof(prefix));
-
-    if (error[0] != '\0')
-    {
-        CPrintToChat(client, "%s Failed to load currency leaderboard.", prefix);
-        LogError("[points_store] Failed to load currency leaderboard: %s", error);
-        return;
-    }
-
+    int start = (page - 1) * BP_LEADERBOARD_PAGE_SIZE;
+    int end = start + BP_LEADERBOARD_PAGE_SIZE;
+    if (end > g_CurrencyLeaderboardRows)
+        end = g_CurrencyLeaderboardRows;
     char currencyColor[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(currencyColor, sizeof(currencyColor));
-
-    int rows = 0;
-    while (results != null && results.FetchRow())
-    {
-        int rank = ((page - 1) * BP_LEADERBOARD_PAGE_SIZE) + rows + 1;
-        int balance = results.FetchInt(1);
-
-        char displayName[128];
-        char colorTag[32];
-        results.FetchString(2, displayName, sizeof(displayName));
-        results.FetchString(3, colorTag, sizeof(colorTag));
-        TrimString(displayName);
-        NormalizeLeaderboardColorTag(colorTag, sizeof(colorTag));
-
-        if (displayName[0] == '\0')
-        {
-            results.FetchString(0, displayName, sizeof(displayName));
-            TrimString(displayName);
-        }
-        if (displayName[0] == '\0')
-        {
-            strcopy(displayName, sizeof(displayName), "Unknown");
-        }
-
-        rows++;
-        CPrintToChat(client, "#%d {%s}%s{default} %s%d", rank, colorTag, displayName, currencyColor, balance);
-    }
-
-    if (rows == 0)
-    {
-        CPrintToChat(client, "%s No currency leaderboard entries on page %d.", prefix, page);
-        return;
-    }
-
-    CPrintToChat(client, "Use !%scurrencyranks %d{default} to view the next 10 ranks!", currencyColor, page + 1);
+    for (int row = start; row < end; row++)
+        CPrintToChat(client, "#%d {%s}%s{default} %s%d", row + 1,
+            g_CurrencyLeaderboardColors[row], g_CurrencyLeaderboardNames[row], currencyColor, g_CurrencyLeaderboardBalances[row]);
+    if (start >= end)
+        CPrintToChat(client, "%s No cached leaderboard entries on page %d.", g_CurrencyPrefix, page);
+    else if (end < g_CurrencyLeaderboardRows && page < pages)
+        CPrintToChat(client, "{default}Use {gold}!gl %d{default} for the next page (top 50).", page + 1);
+    return Plugin_Handled;
 }
-
