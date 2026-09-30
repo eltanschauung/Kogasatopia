@@ -195,7 +195,6 @@ public Action Command_Dailies(int client, int args)
         return Plugin_Handled;
     }
 
-    PrintDailyInProgress(client);
     int currentClass = view_as<int>(TF2_GetPlayerClass(client));
     int classOrder[] =
     {
@@ -238,6 +237,7 @@ public Action Command_Dailies(int client, int args)
     }
 
     PrintDailyClassGroup(client, DAILY_CLASS_ALL);
+    PrintDailyInProgress(client);
     if (currentClass > 0)
     {
         PrintDailyClassGroup(client, currentClass);
