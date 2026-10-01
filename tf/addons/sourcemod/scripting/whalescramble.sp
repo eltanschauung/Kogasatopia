@@ -45,7 +45,7 @@ native int FilterAlerts_MarkAutobalance(int client);
 native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 native bool Announcers_IsGroupEnabled(int client, const char[] groupName);
 
-#define PLUGIN_VERSION "5.3"
+#define PLUGIN_VERSION "5.4"
 
 // DGM state and policy.
 #define DGM_MAX_CONTROL_POINTS 8
@@ -78,6 +78,9 @@ ConVar g_cvRespawnTime;
 ConVar g_cvPopulationConfigs;
 ConVar g_cvPopulationRespawns;
 ConVar g_cvHalveRespawnWaves;
+bool g_bDgmPreserveInitialMapSettings;
+bool g_bDgmSettingRespawnState;
+float g_flDgmConfiguredRespawnTime;
 ConVar g_cvLowPopThreshold;
 ConVar g_cvHeavyInstantRespawnImmunity;
 bool g_bSymmetrical;
@@ -205,6 +208,7 @@ public Plugin myinfo =
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 {
+    g_bDgmPreserveInitialMapSettings = late;
     if (FindPluginByFile("afkmanager.smx") != null
         || FindPluginByFile("spec-when-full.smx") != null)
     {

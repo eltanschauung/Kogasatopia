@@ -4,6 +4,12 @@
     {
         "Signatures"
         {
+            "CTFGameRules::GetRespawnWaveMaxLength"
+            {
+                "library" "server"
+                "linux" "@_ZN12CTFGameRules23GetRespawnWaveMaxLengthEib"
+                "linux64" "@_ZN12CTFGameRules23GetRespawnWaveMaxLengthEib"
+            }
             "CTeamplayRoundBasedRules::SetTeamRespawnWaveTime"
             {
                 "library" "server"

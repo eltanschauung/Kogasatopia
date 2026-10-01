@@ -1,8 +1,12 @@
-// Map-authored waves remain the baseline; DGM owns only the applied multiplier.
+// Scale TF2's final wave calculation, never the map's stored/original settings.
+DynamicDetour g_hNativeWaveLength;
 DynamicDetour g_hNativeWaveSet;
 DynamicDetour g_hNativeWaveAdd;
 DynamicDetour g_hNativeWaveRound;
-bool g_bNativeWaveSetHooked;
+Handle g_hNativeWaveLengthCall;
+bool g_bNativeWaveLengthHooked;
+bool g_bNativeWaveSetPreHooked;
+bool g_bNativeWaveSetPostHooked;
 bool g_bNativeWaveAddPreHooked;
 bool g_bNativeWaveAddPostHooked;
 bool g_bNativeWaveRoundPreHooked;
@@ -11,11 +15,11 @@ bool g_bNativeWavesAvailable;
 bool g_bNativeWavesMapReady;
 bool g_bNativeWavesCompatible;
 bool g_bNativeWavesActive;
-bool g_bNativeWavesOwnInput;
+bool g_bNativeWavesMeasureNormal;
 bool g_bNativeWavesApplyQueued;
 int g_iNativeWavesMapGeneration;
 int g_iNativeWavesRoundDepth;
-float g_flNativeWaveBaseline[4];
+float g_flNativeWaveInterval[4];
 
 bool DGM_NativeWavesActive()
 {
@@ -31,16 +35,30 @@ void DGM_NativeWavesInitialize()
         return;
     }
 
+    Address length = data.GetMemSig("CTFGameRules::GetRespawnWaveMaxLength");
     Address setWave = data.GetMemSig("CTeamplayRoundBasedRules::SetTeamRespawnWaveTime");
     Address addWave = data.GetMemSig("CTeamplayRoundBasedRules::AddTeamRespawnWaveTime");
     Address round = data.GetMemSig("CTFGameRules::RoundRespawn");
+    StartPrepSDKCall(SDKCall_GameRules);
+    bool prepared = PrepSDKCall_SetFromConf(data, SDKConf_Signature,
+        "CTFGameRules::GetRespawnWaveMaxLength");
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+    PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+    PrepSDKCall_SetReturnInfo(SDKType_Float, SDKPass_Plain);
+    g_hNativeWaveLengthCall = EndPrepSDKCall();
     delete data;
-    if (setWave == Address_Null || addWave == Address_Null || round == Address_Null)
+    if (!prepared || g_hNativeWaveLengthCall == null || length == Address_Null
+        || setWave == Address_Null || addWave == Address_Null || round == Address_Null)
     {
+        DGM_NativeWavesShutdown();
         LogError("[DGM] Native wave signatures unavailable; using legacy respawn handling.");
         return;
     }
 
+    g_hNativeWaveLength = new DynamicDetour(length, CallConv_THISCALL,
+        ReturnType_Float, ThisPointer_Address);
+    g_hNativeWaveLength.AddParam(HookParamType_Int);
+    g_hNativeWaveLength.AddParam(HookParamType_Bool);
     g_hNativeWaveSet = new DynamicDetour(setWave, CallConv_THISCALL,
         ReturnType_Void, ThisPointer_Address);
     g_hNativeWaveSet.AddParam(HookParamType_Int);
@@ -52,14 +70,17 @@ void DGM_NativeWavesInitialize()
     g_hNativeWaveRound = new DynamicDetour(round, CallConv_THISCALL,
         ReturnType_Void, ThisPointer_Address);
 
-    g_bNativeWaveSetHooked = g_hNativeWaveSet.Enable(Hook_Post, DGM_NativeWaveSetPost);
-    g_bNativeWaveAddPreHooked = g_hNativeWaveAdd.Enable(Hook_Pre, DGM_NativeWaveAddPre);
-    g_bNativeWaveAddPostHooked = g_hNativeWaveAdd.Enable(Hook_Post, DGM_NativeWaveAddPost);
+    g_bNativeWaveLengthHooked = g_hNativeWaveLength.Enable(Hook_Post, DGM_NativeWaveLengthPost);
+    g_bNativeWaveSetPreHooked = g_hNativeWaveSet.Enable(Hook_Pre, DGM_NativeWaveWritePre);
+    g_bNativeWaveSetPostHooked = g_hNativeWaveSet.Enable(Hook_Post, DGM_NativeWaveWritePost);
+    g_bNativeWaveAddPreHooked = g_hNativeWaveAdd.Enable(Hook_Pre, DGM_NativeWaveWritePre);
+    g_bNativeWaveAddPostHooked = g_hNativeWaveAdd.Enable(Hook_Post, DGM_NativeWaveWritePost);
     g_bNativeWaveRoundPreHooked = g_hNativeWaveRound.Enable(Hook_Pre, DGM_NativeWaveRoundPre);
     g_bNativeWaveRoundPostHooked = g_hNativeWaveRound.Enable(Hook_Post, DGM_NativeWaveRoundPost);
-    g_bNativeWavesAvailable = g_bNativeWaveSetHooked && g_bNativeWaveAddPreHooked
-        && g_bNativeWaveAddPostHooked && g_bNativeWaveRoundPreHooked
-        && g_bNativeWaveRoundPostHooked;
+    g_bNativeWavesAvailable = g_bNativeWaveLengthHooked
+        && g_bNativeWaveSetPreHooked && g_bNativeWaveSetPostHooked
+        && g_bNativeWaveAddPreHooked && g_bNativeWaveAddPostHooked
+        && g_bNativeWaveRoundPreHooked && g_bNativeWaveRoundPostHooked;
     if (!g_bNativeWavesAvailable)
     {
         DGM_NativeWavesShutdown();
@@ -74,21 +95,29 @@ void DGM_NativeWavesShutdown()
 {
     DGM_NativeWavesRestore();
     DGM_NativeWavesInvalidateMap();
-    if (g_bNativeWaveSetHooked)
-        g_hNativeWaveSet.Disable(Hook_Post, DGM_NativeWaveSetPost);
+    if (g_bNativeWaveLengthHooked)
+        g_hNativeWaveLength.Disable(Hook_Post, DGM_NativeWaveLengthPost);
+    if (g_bNativeWaveSetPreHooked)
+        g_hNativeWaveSet.Disable(Hook_Pre, DGM_NativeWaveWritePre);
+    if (g_bNativeWaveSetPostHooked)
+        g_hNativeWaveSet.Disable(Hook_Post, DGM_NativeWaveWritePost);
     if (g_bNativeWaveAddPreHooked)
-        g_hNativeWaveAdd.Disable(Hook_Pre, DGM_NativeWaveAddPre);
+        g_hNativeWaveAdd.Disable(Hook_Pre, DGM_NativeWaveWritePre);
     if (g_bNativeWaveAddPostHooked)
-        g_hNativeWaveAdd.Disable(Hook_Post, DGM_NativeWaveAddPost);
+        g_hNativeWaveAdd.Disable(Hook_Post, DGM_NativeWaveWritePost);
     if (g_bNativeWaveRoundPreHooked)
         g_hNativeWaveRound.Disable(Hook_Pre, DGM_NativeWaveRoundPre);
     if (g_bNativeWaveRoundPostHooked)
         g_hNativeWaveRound.Disable(Hook_Post, DGM_NativeWaveRoundPost);
+    delete g_hNativeWaveLength;
     delete g_hNativeWaveSet;
     delete g_hNativeWaveAdd;
     delete g_hNativeWaveRound;
+    delete g_hNativeWaveLengthCall;
     g_bNativeWavesAvailable = false;
-    g_bNativeWaveSetHooked = false;
+    g_bNativeWaveLengthHooked = false;
+    g_bNativeWaveSetPreHooked = false;
+    g_bNativeWaveSetPostHooked = false;
     g_bNativeWaveAddPreHooked = false;
     g_bNativeWaveAddPostHooked = false;
     g_bNativeWaveRoundPreHooked = false;
@@ -103,10 +132,13 @@ void DGM_NativeWavesInvalidateMap()
     g_bNativeWavesCompatible = false;
     g_bNativeWavesApplyQueued = false;
     g_iNativeWavesRoundDepth = 0;
+    g_flNativeWaveInterval[2] = 0.0;
+    g_flNativeWaveInterval[3] = 0.0;
 }
 
 void DGM_NativeWavesOnMapStart()
 {
+    DGM_NativeWavesInvalidateMap();
     DGM_NativeWavesScanMap();
     g_bNativeWavesMapReady = true;
     DGM_NativeWavesQueueApply();
@@ -114,19 +146,12 @@ void DGM_NativeWavesOnMapStart()
 
 void DGM_NativeWavesScanMap()
 {
-    StringMap targets = new StringMap();
     bool excluded;
     for (int i = 0; i < EntityLump.Length(); i++)
     {
         EntityLumpEntry entry = EntityLump.Get(i);
-        char classname[64], target[128];
+        char classname[64];
         entry.GetNextKey("classname", classname, sizeof(classname));
-        if (StrEqual(classname, "tf_gamerules"))
-        {
-            entry.GetNextKey("targetname", target, sizeof(target));
-            if (target[0])
-                targets.SetValue(target, 1);
-        }
         if (StrEqual(classname, "tf_logic_arena")
             || StrEqual(classname, "tf_logic_mann_vs_machine")
             || StrEqual(classname, "tf_logic_robot_destruction")
@@ -134,45 +159,41 @@ void DGM_NativeWavesScanMap()
             excluded = true;
         delete entry;
     }
-
-    bool red, blue;
-    for (int i = 0; !excluded && i < EntityLump.Length(); i++)
-    {
-        EntityLumpEntry entry = EntityLump.Get(i);
-        for (int j = 0; j < entry.Length; j++)
-        {
-            char key[128], output[1024], fields[5][128];
-            entry.Get(j, key, sizeof(key), output, sizeof(output));
-            if (StrContains(key, "On", false) != 0)
-                continue;
-            ReplaceString(output, sizeof(output), "\x1B", ",");
-            if (ExplodeString(output, ",", fields, sizeof(fields), sizeof(fields[])) != 5)
-                continue;
-            int unused;
-            if (!targets.GetValue(fields[0], unused))
-                continue;
-            if (StrEqual(fields[1], "SetRedTeamRespawnWaveTime", false))
-                red = true;
-            if (StrEqual(fields[1], "SetBlueTeamRespawnWaveTime", false))
-                blue = true;
-        }
-        delete entry;
-    }
-    delete targets;
-    g_bNativeWavesCompatible = !excluded && red && blue;
+    // -1 team settings are valid: TF2 resolves its own default wave in GetRespawnWaveMaxLength.
+    g_bNativeWavesCompatible = !excluded;
 }
 
-static bool DGM_NativeWavesSend(int team, float value)
+static float DGM_NativeWaveLength(int team, bool scaled = true, bool normal = false)
 {
-    int rules = FindEntityByClassname(-1, "tf_gamerules");
-    if (rules == -1)
-        return false;
-    g_bNativeWavesOwnInput = true;
-    SetVariantFloat(value);
-    bool success = AcceptEntityInput(rules, team == 2
-        ? "SetRedTeamRespawnWaveTime" : "SetBlueTeamRespawnWaveTime");
-    g_bNativeWavesOwnInput = false;
-    return success;
+    if (g_hNativeWaveLengthCall == null)
+        return 0.0;
+    g_bNativeWavesMeasureNormal = normal;
+    float length = SDKCall(g_hNativeWaveLengthCall, team, scaled);
+    g_bNativeWavesMeasureNormal = false;
+    return length;
+}
+
+static void DGM_NativeWavesReschedule()
+{
+    if (!g_bNativeWavesMapReady || FindEntityByClassname(-1, "tf_gamerules") == -1)
+        return;
+    float now = GetGameTime();
+    for (int team = 2; team <= 3; team++)
+    {
+        float oldLength = g_flNativeWaveInterval[team];
+        float length = DGM_NativeWaveLength(team);
+        float next = GameRules_GetPropFloat("m_flNextRespawnWave", team);
+        if (oldLength > 0.0 && length > 0.0 && next > now
+            && FloatAbs(oldLength - length) > 0.001)
+        {
+            // Preserve wave phase instead of leaving a full-length wave queued after toggling.
+            float remaining = next - now;
+            if (remaining > oldLength)
+                remaining = oldLength;
+            GameRules_SetPropFloat("m_flNextRespawnWave", now + remaining * length / oldLength, team);
+        }
+        g_flNativeWaveInterval[team] = length;
+    }
 }
 
 void DGM_NativeWavesRestore()
@@ -180,27 +201,7 @@ void DGM_NativeWavesRestore()
     if (!g_bNativeWavesActive)
         return;
     g_bNativeWavesActive = false;
-    if (g_bNativeWavesMapReady)
-    {
-        DGM_NativeWavesSend(2, g_flNativeWaveBaseline[2]);
-        DGM_NativeWavesSend(3, g_flNativeWaveBaseline[3]);
-    }
-    LogMessage("[DGM] Restored native waves: RED %.3f, BLU %.3f.",
-        g_flNativeWaveBaseline[2], g_flNativeWaveBaseline[3]);
-}
-
-static bool DGM_NativeWavesApply()
-{
-    bool red = DGM_NativeWavesSend(2, g_flNativeWaveBaseline[2] * 0.5);
-    bool blue = DGM_NativeWavesSend(3, g_flNativeWaveBaseline[3] * 0.5);
-    if (!red || !blue)
-    {
-        DGM_NativeWavesRestore();
-        g_bNativeWavesCompatible = false;
-        LogError("[DGM] Native wave inputs failed; reverting to legacy respawn handling.");
-        return false;
-    }
-    return true;
+    DGM_NativeWavesReschedule();
 }
 
 void DGM_NativeWavesSync()
@@ -208,39 +209,26 @@ void DGM_NativeWavesSync()
     bool requested = g_cvHalveRespawnWaves.BoolValue
         && !DGM_AreRespawnTimesForcedOn() && !g_InternalOverride
         && !DGM_ShouldDisableInstantRespawn();
-    if (!requested)
-    {
-        DGM_NativeWavesRestore();
-        DGM_RefreshRespawnVisualState();
-        return;
-    }
-
-    if (!g_bNativeWavesActive && g_bNativeWavesAvailable
+    bool active = requested && g_bNativeWavesAvailable
         && g_bNativeWavesMapReady && g_bNativeWavesCompatible
-        && FindEntityByClassname(-1, "tf_gamerules") != -1
-        && g_iNativeWavesRoundDepth == 0)
+        && FindEntityByClassname(-1, "tf_gamerules") != -1;
+    if (active != g_bNativeWavesActive)
     {
-        float red = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 2);
-        float blue = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 3);
-        // -1 means the map has not supplied a team wave; never invent a baseline.
-        if (red >= 0.0 && blue >= 0.0)
-        {
-            g_flNativeWaveBaseline[2] = red;
-            g_flNativeWaveBaseline[3] = blue;
-            g_bNativeWavesActive = true;
-            DGM_ClearAllRespawnTimers();
-            if (DGM_NativeWavesApply())
-                LogMessage("[DGM] Halved native waves: RED %.3f -> %.3f, BLU %.3f -> %.3f.",
-                    red, red * 0.5, blue, blue * 0.5);
-        }
+        // Snapshot the actual old interval before changing which calculation TF2 receives.
+        for (int team = 2; team <= 3; team++)
+            g_flNativeWaveInterval[team] = DGM_NativeWaveLength(team);
+        g_bNativeWavesActive = active;
+        DGM_ClearAllRespawnTimers();
+        LogMessage("[DGM] Native respawn waves: %s (map settings and death/freezecam unchanged).",
+            active ? "halved" : "normal/fallback");
     }
+    DGM_NativeWavesReschedule();
     DGM_RefreshRespawnVisualState();
 }
 
 void DGM_NativeWavesQueueApply()
 {
-    if (!g_bNativeWavesAvailable || !g_bNativeWavesMapReady
-        || g_bNativeWavesApplyQueued)
+    if (!g_bNativeWavesAvailable || !g_bNativeWavesMapReady || g_bNativeWavesApplyQueued)
         return;
     g_bNativeWavesApplyQueued = true;
     RequestFrame(DGM_NativeWavesFrameApply, g_iNativeWavesMapGeneration);
@@ -251,62 +239,46 @@ public void DGM_NativeWavesFrameApply(int generation)
     if (generation != g_iNativeWavesMapGeneration)
         return;
     g_bNativeWavesApplyQueued = false;
-    if (g_iNativeWavesRoundDepth != 0)
-        return;
-
-    bool wasActive = g_bNativeWavesActive;
-    DGM_NativeWavesSync();
-    if (wasActive && g_bNativeWavesActive)
-    {
-        DGM_NativeWavesApply();
-        DGM_RefreshRespawnVisualState();
-    }
+    if (g_iNativeWavesRoundDepth == 0)
+        DGM_NativeWavesSync();
 }
 
-public void DGM_ConVarChangeNativeWaves(ConVar convar,
-    const char[] oldValue, const char[] newValue)
+public void DGM_ConVarChangeNativeWaves(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     DGM_ClearAllRespawnTimers();
     DGM_NativeWavesSync();
 }
 
-public MRESReturn DGM_NativeWaveSetPost(Address rules, DHookParam params)
+public MRESReturn DGM_NativeWaveLengthPost(Address rules, DHookReturn ret, DHookParam params)
 {
     int team = params.Get(1);
-    if (g_bNativeWavesOwnInput || !g_bNativeWavesMapReady
+    if (!g_bNativeWavesActive || g_bNativeWavesMeasureNormal
         || (team != 2 && team != 3))
         return MRES_Ignored;
-    if (g_bNativeWavesActive && g_iNativeWavesRoundDepth == 0)
-        g_flNativeWaveBaseline[team] = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", team);
-    if (g_cvHalveRespawnWaves.BoolValue)
-        DGM_NativeWavesQueueApply();
-    return MRES_Ignored;
+    float length = ret.Value;
+    if (length <= 0.0)
+        return MRES_Ignored;
+    ret.Value = length * 0.5;
+    return MRES_Override;
 }
 
-public MRESReturn DGM_NativeWaveAddPre(Address rules, DHookParam params)
+public MRESReturn DGM_NativeWaveWritePre(Address rules, DHookParam params)
 {
     int team = params.Get(1);
-    if (!g_bNativeWavesOwnInput && g_bNativeWavesActive
-        && g_iNativeWavesRoundDepth == 0 && (team == 2 || team == 3))
+    if (g_bNativeWavesActive && g_iNativeWavesRoundDepth == 0
+        && (team == 2 || team == 3) && !g_bNativeWavesApplyQueued)
     {
-        // Native Add sees the unscaled baseline, including multiple writes in one tick.
-        float delta = params.Get(2);
-        float current = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", team);
-        params.Set(2, g_flNativeWaveBaseline[team] + delta - current);
-        return MRES_ChangedHandled;
+        // Cache once before a batch of Set/Add inputs; never rewrite the input or its original value.
+        for (int t = 2; t <= 3; t++)
+            g_flNativeWaveInterval[t] = DGM_NativeWaveLength(t);
     }
     return MRES_Ignored;
 }
 
-public MRESReturn DGM_NativeWaveAddPost(Address rules, DHookParam params)
+public MRESReturn DGM_NativeWaveWritePost(Address rules, DHookParam params)
 {
-    int team = params.Get(1);
-    if (!g_bNativeWavesOwnInput && g_bNativeWavesActive
-        && g_iNativeWavesRoundDepth == 0 && (team == 2 || team == 3))
-    {
-        g_flNativeWaveBaseline[team] = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", team);
+    if (g_bNativeWavesActive)
         DGM_NativeWavesQueueApply();
-    }
     return MRES_Ignored;
 }
 
@@ -322,17 +294,9 @@ public MRESReturn DGM_NativeWaveRoundPost(Address rules)
     if (!g_bNativeWavesMapReady || g_iNativeWavesRoundDepth == 0)
         return MRES_Ignored;
     g_iNativeWavesRoundDepth--;
-    // RoundRespawn can run before the round-start event (or without one).
-    // Keep the admin's selected mode, not round-win's temporary timer suppression.
     if (g_cvHalveRespawnWaves.BoolValue && g_iNativeWavesRoundDepth == 0)
         g_InternalOverride = DGM_AreRespawnTimesForcedOn();
-    if (g_bNativeWavesActive && g_iNativeWavesRoundDepth == 0)
-    {
-        g_flNativeWaveBaseline[2] = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 2);
-        g_flNativeWaveBaseline[3] = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 3);
-    }
-    if (g_cvHalveRespawnWaves.BoolValue)
-        DGM_NativeWavesQueueApply();
+    DGM_NativeWavesQueueApply();
     return MRES_Ignored;
 }
 
@@ -340,19 +304,20 @@ void DGM_ReplyNativeWaveState(int client)
 {
     if (!g_cvHalveRespawnWaves.BoolValue)
         return;
-    char state[32] = "legacy fallback";
-    if (DGM_AreRespawnTimesForcedOn())
-        strcopy(state, sizeof(state), "normal");
-    else if (g_bNativeWavesActive)
-        strcopy(state, sizeof(state), "halved");
     if (!g_bNativeWavesMapReady || FindEntityByClassname(-1, "tf_gamerules") == -1)
     {
         ReplyToCommand(client, "[Respawn] Native waves: unavailable");
         return;
     }
-    float red = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 2);
-    float blue = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 3);
-    ReplyToCommand(client, "[Respawn] Native waves: %s | RED %.3f / BLU %.3f | normal %.3f / %.3f",
-        state, red, blue, g_bNativeWavesActive ? g_flNativeWaveBaseline[2] : red,
-        g_bNativeWavesActive ? g_flNativeWaveBaseline[3] : blue);
+    char state[32] = "legacy fallback";
+    if (DGM_AreRespawnTimesForcedOn())
+        strcopy(state, sizeof(state), "normal");
+    else if (g_bNativeWavesActive)
+        strcopy(state, sizeof(state), "halved");
+    ReplyToCommand(client, "[Respawn] Native waves: %s | effective RED %.3f / BLU %.3f | normal %.3f / %.3f",
+        state, DGM_NativeWaveLength(2), DGM_NativeWaveLength(3),
+        DGM_NativeWaveLength(2, true, true), DGM_NativeWaveLength(3, true, true));
+    ReplyToCommand(client, "[Respawn] Map settings RED %.3f / BLU %.3f (-1 = native default); death/freezecam unchanged.",
+        GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 2),
+        GameRules_GetPropFloat("m_TeamRespawnWaveTimes", 3));
 }

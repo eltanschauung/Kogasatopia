@@ -54,6 +54,18 @@ void DGM_SetSetupActive(bool setupActive)
         ServerCommand("exec d_endsetup.cfg");
         ServerExecute();
 
+        if (!g_bRespawnAdminTouchedThisMap && !DGM_ShouldDisableInstantRespawn())
+        {
+            // Setup is temporary; restore this map's config before applying population policy.
+            g_bDgmSettingRespawnState = true;
+            g_cvRespawnTime.SetFloat(g_flDgmConfiguredRespawnTime);
+            g_bDgmSettingRespawnState = false;
+            g_InternalOverride = DGM_AreRespawnTimesForcedOn();
+            DGM_ClearAllRespawnTimers();
+            DGM_NativeWavesSync();
+            DGM_AdjustRespawnByPlayerCount(0);
+        }
+
         if (g_hSetupStateTimer != INVALID_HANDLE)
         {
             KillTimer(g_hSetupStateTimer);

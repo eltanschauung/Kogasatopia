@@ -3,9 +3,10 @@ void DGM_OnPluginStart()
 
     // The respawn time
     g_cvRespawnTime = CreateConVar("respawn_time", "3.0", "Respawn time length", _, true, 0.0, true, 30.0);
+    g_flDgmConfiguredRespawnTime = g_cvRespawnTime.FloatValue;
     g_cvPopulationRespawns = CreateConVar("dgm_population_respawns", "1", "Allow playercount changes to adjust respawn times.", _, true, 0.0, true, 1.0);
     g_cvHalveRespawnWaves = CreateConVar("dgm_halve_respawn_waves", "0",
-        "Use half the map-authored respawn waves when reduced respawns are requested; unsupported maps retain DGM timers.",
+        "Halve TF2's calculated respawn waves when reduced respawns are requested; preserve death/freezecam.",
         _, true, 0.0, true, 1.0);
     g_cvHalveRespawnWaves.AddChangeHook(DGM_ConVarChangeNativeWaves);
     g_cvLowPopThreshold = CreateConVar("dgm_lowpop_threshhold", "10", "Connected human count below which respawn times are disabled.", _, true, 0.0, true, 100.0);
@@ -125,6 +126,15 @@ void DGM_OnPluginEnd()
 
 void DGM_OnMapStart()
 {
+    // Admin/previous-mode settings must not leak into the next map before configs execute.
+    if (!g_bDgmPreserveInitialMapSettings)
+    {
+        g_flDgmConfiguredRespawnTime = DGM_RESPAWN_DISABLED_TIME;
+        g_cvRespawnTime.SetFloat(DGM_RESPAWN_DISABLED_TIME);
+        g_cvTimeOverride.RestoreDefault();
+    }
+    g_bDgmPreserveInitialMapSettings = false;
+    g_InternalOverride = DGM_AreRespawnTimesForcedOn();
     DGM_NativeWavesOnMapStart();
     DGM_RestoreSetupUpgradeMetal();
     g_bGameRulesReady = false;
@@ -165,6 +175,8 @@ public void ConVarChange_RespawnSetting(ConVar convar, const char[] oldValue, co
 {
     if (convar == g_cvRespawnTime && !StrEqual(oldValue, newValue))
     {
+        if (!g_bDgmSettingRespawnState && !g_bRespawnAdminTouchedThisMap)
+            g_flDgmConfiguredRespawnTime = convar.FloatValue;
         g_InternalOverride = DGM_AreRespawnTimesForcedOn();
         DGM_ClearAllRespawnTimers();
         DGM_NativeWavesSync();

@@ -52,7 +52,9 @@ void DGM_SetRespawnTimesEnabled(bool enabled)
 
     if (FloatCompare(g_cvRespawnTime.FloatValue, targetTime) != 0)
     {
+        g_bDgmSettingRespawnState = true;
         g_cvRespawnTime.SetFloat(targetTime);
+        g_bDgmSettingRespawnState = false;
     }
     else
     {

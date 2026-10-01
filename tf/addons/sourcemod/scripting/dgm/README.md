@@ -1,40 +1,71 @@
 # Respawn Modes
 
 `dgm_halve_respawn_waves` defaults to `0`; server.cfg enables it with `1`.
-It changes the implementation of DGM's reduced-respawn state, not the existing
-population/setup/admin policy that selects that state.
+It changes how DGM's reduced-respawn state works, not the existing
+population/setup/admin policies which select that state.
 
-- Normal state: `respawn_time 30`; sm_respawn restores the latest map-authored
-  team waves and cancels DGM forced-respawn timers.
-- Reduced state, compatible map: half each team's native map-authored wave;
-  DGM forced-respawn timers are suppressed and mp_disable_respawn_times is 0.
-- Reduced state, unsupported/uninitialized map: existing DGM timer fallback.
-- Mode disabled: restore native baselines and retain the legacy implementation.
+- Normal state: `respawn_time 30`; TF2's original wave calculation is unchanged.
+- Reduced state, compatible map: halve TF2's final wave length, after its native
+  population scaling and minimum interval. No DGM forced-respawn timers run.
+- Unsupported map or unavailable native hooks: retain the legacy timer fallback.
+- Mode disabled: stop scaling and retain the legacy implementation.
 
-Compatibility requires real map outputs targeting named tf_gamerules entities,
-Set inputs for both teams, and initialized nonnegative team wave values.
-Arena, MvM, Robot Destruction, per-player respawn overrides, and small-format
-gamemodes are excluded. Maps that initialize their waves on the first capture
-remain on the fallback until both values are known.
+The `respawn_time` value is a policy selector in native mode, not an actual
+death-to-spawn delay. `sm_st` reports the effective native interval and the
+unmodified normal interval for each team. A team setting of `-1` is valid:
+TF2 resolves its own default, so Harvest works before its first capture.
 
-native_respawn_waves.sp observes native Set/Add calls and RoundRespawn, preserving
-an unmodified baseline. Add operations are rebased against that baseline;
-coalesced next-frame entity inputs apply the multiplier. Own-input and map
-generation guards prevent recursive hooks, compounded halving, and stale work.
-RoundRespawn also clears round-win's temporary suppression without clearing
-the admin's selected normal/reduced state. Unload and mode-off restore baselines.
+## Engine Ownership
 
-This halves configured waves, not the complete death/freeze-camera delay.
-TF2 population scaling and its five-second floor can make the effective interval
-reduction differ from 50%. Already queued waves are not forcibly rescheduled.
+A post-detour on `CTFGameRules::GetRespawnWaveMaxLength(int, bool)` multiplies
+positive return values by 0.5. Both scaled wave scheduling and the unscaled
+minimum wait use this function. TF2's separate death/freezecam delay is preserved.
+For example, a default unscaled wave of 10 becomes 5; a population-scaled interval
+of 5 becomes 2.5, rather than being stuck at the stock five-second floor.
+The wait still varies with the player's death time relative to the team wave.
 
-sm_st reports native ownership, applied values, and normal baselines for diagnosis.
-Linux and linux64 signatures were verified against TF2 build 10828683; hook
-initialization failure logs an error and falls back instead of failing the host.
+TF2's player resource computes and networks `m_flNextRespawnTime` using the same
+server calculation, so the spectator countdown agrees with native spawning.
+No fake HUD countdown, player death-time rewrite, or plugin respawn timer is needed.
 
-Deployment verification uses a temporary external test plugin, not a shipped
-dependency. It invokes the real sm_respawn command and checks normal restoration,
-capture-style Set/Add changes, same-tick writes, repeated native resets, convar
-off/on, pending-work cancellation, and round-end/reset transitions.
-On 2026-09-30 all 19 automated live state checks passed. Additional Badwater
-capture-output, armed reload, normal-restoration, and 2Fort fallback checks passed.
+Map inputs and original team settings are never modified. Captures, same-tick
+Set/Add inputs and native round resets therefore retain normal Valve semantics.
+Set/Add observation coalesces pending wave rescheduling to the next frame.
+Toggling modes proportionally adjusts the remaining queued team wave so an
+old full-length interval cannot remain queued in reduced mode. Mode-off and
+unload restore normal calculation without reconstructing map baselines.
+
+Arena, MvM, Robot Destruction, per-player respawn override maps and small-format
+gamemodes remain excluded. Normal PvP maps do not need explicit Set inputs.
+Initialization failure logs an error and uses the existing fallback.
+Signatures were verified against the installed Linux TF2 build 10828683.
+
+New maps reset the policy selector to normal before their configs apply;
+late plugin reloads preserve the current map's selected mode.
+Population and setup policies may subsequently select reduced respawns.
+Setup changes are temporary: setup end restores the configured map policy,
+then applies population rules if enabled. Internal toggles do not overwrite
+the cached map setting; admin changes remain authoritative for that map.
+
+## Validation
+
+Validated on the installed TF2 server using an uncommitted bot-only probe:
+
+- Harvest: 13 state checks, including unset defaults, Set/Add inputs, round
+  resets, mode toggles and restoring normal waves; no failures.
+- Harvest before capture: native spawning with raw team settings still `-1`.
+  At eight players per team, HUD predicted 14.144 seconds and spawn took
+  14.174 seconds, including the unchanged 6.4-second camera sequence.
+- Manjuu: raw team settings remained 6/6; HUD predicted 9.954 seconds and
+  spawn took 9.974 seconds at low population.
+- Badwater: setup selected reduced waves and setup end restored configured
+  `respawn_time 30`; capture inputs and normal/reduced toggles retained
+  the map's native wave values.
+- Harvest to Badwater: map configs restored the payload policy to 30.
+
+Five to ten seconds describes the wave portion for a normal unscaled wave
+of ten, not the full death-to-spawn delay. Map-specific waves and population
+scaling still apply, and the full death/freezecam sequence is not shortened.
+
+Engine reference: [wave scheduling and minimum spawn wait](https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/game/shared/teamplayroundbased_gamerules.cpp),
+[networked player respawn times](https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/game/server/tf/tf_player_resource.cpp).
