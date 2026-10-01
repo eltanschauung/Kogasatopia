@@ -177,8 +177,7 @@ public Action Command_RespawnToggle(int client, int args)
 
     g_bRespawnAdminTouchedThisMap = true;
     DGM_SetRespawnTimesEnabled(!DGM_AreRespawnTimesForcedOn());
-    if (!g_cvHalveRespawnWaves.BoolValue || !DGM_AreRespawnTimesForcedOn())
-        DGM_RespawnDeadClients();
+    DGM_RespawnDeadClients();
     DGM_ClearAllRespawnReminderTimers();
     if (!g_InternalOverride && client > 0 && IsClientInGame(client))
     {
