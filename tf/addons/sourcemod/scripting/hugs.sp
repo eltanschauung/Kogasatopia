@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <public_activity>
 #include <oblivion>
+#include <oblivion_messages>
 #include <clientprefs>
 #include <dbi>
 #include <sdktools>
@@ -36,7 +37,7 @@ public Plugin myinfo =
     name = "hugs",
     author = "Your Name",
     description = "Allows players to hug/rape each other, track hugs/rapes, check stats, and view last huggers/rapists",
-    version = "1.5",
+    version = "1.5.1",
     url = "https://example.com"
 };
 

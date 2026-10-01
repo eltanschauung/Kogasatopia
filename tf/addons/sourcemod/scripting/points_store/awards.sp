@@ -38,7 +38,7 @@ void AnnounceBonusPointsMilestone(int client, int balance)
     GetCurrencyLongLabel(currencyLong, sizeof(currencyLong));
     BuildPurchaseDisplayName(client, displayName, sizeof(displayName));
 
-    CPrintToChatAllEx(client, "%s %s{default} now has %s%d %s{default}!", prefix, displayName, colorTag, balance, currencyLong);
+    Oblivion_ChatAllEx(client, "%s %s{default} now has %s%d %s{default}!", prefix, displayName, colorTag, balance, currencyLong);
     PlayLevelUpSound(client);
 }
 
@@ -673,7 +673,7 @@ void PrintBonusPointsDelta(int client, int points, const char[] type, int target
 
     if (StrEqual(type, "medic_high_uber_kill", false))
     {
-        CPrintToChat(client, "%s {limegreen}%s%i{default} for {gold}Medic high ÃœberCharge kill (%d%%){default}%s", prefix, sign, points, target, perMapSuffix);
+        CPrintToChat(client, "%s {limegreen}%s%i{default} for {gold}Medic high ÜberCharge kill (%d%%){default}%s", prefix, sign, points, target, perMapSuffix);
         return;
     }
 

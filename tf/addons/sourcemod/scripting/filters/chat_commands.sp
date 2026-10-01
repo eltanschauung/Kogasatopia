@@ -311,6 +311,11 @@ void BuildDeathPrefix(int client, char[] deadPrefix, int length)
 {
     if (!IsPlayerAlive(client))
     {
+        if (GetClientTeam(client) == 1)
+        {
+            strcopy(deadPrefix, length, "{grey}*SPEC*{default} ");
+            return;
+        }
         Format(deadPrefix, length, "*DIDDY* ");
         return;
     }

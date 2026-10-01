@@ -345,7 +345,7 @@ public void SQL_OnPurchaseInserted(Database db, DBResultSet results, const char[
         client = GetClientFromSerial(serial);
         if (Client_IsHumanInGame(client))
         {
-            CPrintToChatAllEx(client, "%s[!shop]{default} %s bought {gold}%s{default} for %d %s%s{default}",
+            Oblivion_ChatAllEx(client, "%s[!shop]{default} %s bought {gold}%s{default} for %d %s%s{default}",
                 colorTag, displayName, itemName, price, colorTag, currencyShort);
             PlayPurchaseSound(price);
         }

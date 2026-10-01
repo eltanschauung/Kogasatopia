@@ -93,6 +93,7 @@ Handle g_hSpecQueueReconcileTimer;
 Handle g_hSpecQueuePendingTimers[MAXPLAYERS + 1];
 float g_flSpecQueueActivityBaseline[MAXPLAYERS + 1];
 float g_flSpecQueueImmuneUntil[MAXPLAYERS + 1];
+int g_iSpecQueueTeamGeneration[MAXPLAYERS + 1];
 
 void SpecQueue_Init() {
     LoadTranslations("spec-when-full.phrases.txt");
@@ -233,6 +234,7 @@ void SpecQueue_OnPlayerTeam(int client, int oldTeam, int newTeam) {
     SpecQueue_UpdateQueueSuspension();
     int userId = GetClientUserId(client);
     if (oldTeam != newTeam) {
+        g_iSpecQueueTeamGeneration[client]++;
         g_flSpecQueueActivityBaseline[client] = GetEngineTime();
     }
     if (!SpecQueue_IsPluginOperational()) {
@@ -247,6 +249,13 @@ void SpecQueue_OnPlayerTeam(int client, int oldTeam, int newTeam) {
         RequestFrame(SpecQueue_Frame_ConfirmPendingJoin, userId);
         if (!wasPlaying) {
             RequestFrame(SpecQueue_Frame_EnforcePlayingCapacity, userId);
+            if (oldTeam == view_as<int>(TFTeam_Spectator)) {
+                DataPack pack;
+                CreateDataTimer(0.2, SpecQueue_DeferredRespawn, pack, TIMER_FLAG_NO_MAPCHANGE);
+                pack.WriteCell(userId);
+                pack.WriteCell(newTeam);
+                pack.WriteCell(g_iSpecQueueTeamGeneration[client]);
+            }
         }
         if (promotionConfirmed) {
             SpecQueue_LogPopulationSnapshot("promotion_confirmed", client, oldTeam, newTeam, userId, "team_change");
@@ -262,6 +271,21 @@ void SpecQueue_OnPlayerTeam(int client, int oldTeam, int newTeam) {
     }
     SpecQueue_SchedulePlayerChangeChecks();
     SpecQueue_LogPopulationSnapshot("team_change", client, oldTeam, newTeam);
+}
+
+public Action SpecQueue_DeferredRespawn(Handle timer, DataPack pack) {
+    pack.Reset();
+    int client = GetClientOfUserId(pack.ReadCell());
+    int team = pack.ReadCell(), generation = pack.ReadCell();
+    if (client > 0 && IsClientInGame(client) && !IsFakeClient(client)
+        && SpecQueue_IsPluginEnabled() && g_iSpecQueueTeamGeneration[client] == generation
+        && GetClientTeam(client) == team && SpecQueue_IsPlayingTeam(team)
+        && !IsPlayerAlive(client)) {
+        // ForceRespawn resolves the desired class itself; the current class
+        // can still be unset during a spectator-to-team transition.
+        TF2_RespawnPlayer(client);
+    }
+    return Plugin_Stop;
 }
 
 void SpecQueue_LogPopulationSnapshot(

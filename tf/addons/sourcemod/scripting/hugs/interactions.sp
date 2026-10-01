@@ -84,13 +84,13 @@
 			GetClientName(target, targetNameDisplay, sizeof(targetNameDisplay));
 
 			// Send message to the recipient unless they are redlisted
-			if (!IsClientRedlisted(target) && !PublicActivity_IsPairExcluded(client, target))
+			if (!IsClientRedlisted(target))
 			{
 				PrintToChat(target, "\x01[SM] \x04%s \x01hugged you!", clientName);
 			}
 
 			// Send message to the sender
-			if (!PublicActivity_IsPairExcluded(client, target)) PrintToChat(client, "\x01[SM] You hugged \x04%s\x01!", targetNameDisplay);
+			if (!Oblivion_ShouldHide(client, target)) PrintToChat(client, "\x01[SM] You hugged \x04%s\x01!", targetNameDisplay);
 
 			// Update hug stats
 			// If it's a group target, we don't increment per target here
@@ -189,13 +189,13 @@
 			GetClientName(target, targetNameDisplay, sizeof(targetNameDisplay));
 
 			// Send message to the recipient unless they are redlisted
-			if (!IsClientRedlisted(target) && !PublicActivity_IsPairExcluded(client, target))
+			if (!IsClientRedlisted(target))
 			{
 				PrintToChat(target, "\x01[SM] \x04%s \x01fed you!", clientName);
 			}
 
 			// Send message to the sender
-			if (!PublicActivity_IsPairExcluded(client, target)) PrintToChat(client, "\x01[SM] You fed \x04%s\x01!", targetNameDisplay);
+			if (!Oblivion_ShouldHide(client, target)) PrintToChat(client, "\x01[SM] You fed \x04%s\x01!", targetNameDisplay);
 
 			// Update feed stats
 			// If it's a group target, we don't increment per target here
@@ -300,13 +300,13 @@
 			GetClientName(target, targetNameDisplay, sizeof(targetNameDisplay));
 
 			// Send message to the recipient unless they are redlisted
-			if (!IsClientRedlisted(target) && !PublicActivity_IsPairExcluded(client, target))
+			if (!IsClientRedlisted(target))
 			{
 				PrintToChat(target, "\x01[SM] \x04%s \x01raped you!", clientName);
 			}
 
 			// Send message to the sender
-			if (!PublicActivity_IsPairExcluded(client, target)) PrintToChat(client, "\x01[SM] You raped \x04%s\x01!", targetNameDisplay);
+			if (!Oblivion_ShouldHide(client, target)) PrintToChat(client, "\x01[SM] You raped \x04%s\x01!", targetNameDisplay);
 
 			// Update rape stats
 			// If it's a group target, we don't increment per target here
@@ -385,7 +385,7 @@
 
 		char rankStr[64];
 		GetRapeRank(count, rankStr, sizeof(rankStr));
-		if (!PublicActivity_IsExcluded(client)) PrintToChatAll("%s's rapes have reached a new rank: %s!", name, rankStr);
+		Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: %s!", name, rankStr);
 
 		return Plugin_Handled;
 	}

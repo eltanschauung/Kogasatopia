@@ -152,7 +152,10 @@ public Action Command_SendBonusPoints(int client, int args)
         return Plugin_Handled;
     }
 
-    PlayBonusPointsSound(0, true);
+    for (int viewer = 1; viewer <= MaxClients; viewer++)
+        if (Oblivion_MessageVisible(viewer, client, target)
+            && GetFeatureStatus(FeatureType_Native, "SaySounds_PlayCommandAs") == FeatureStatus_Available)
+            SaySounds_PlayCommandAs(client, viewer, BP_SOUND_COMMAND, true);
     LogTransferEvent("transfer_success", "ok", client, target, amount);
     StartSendBonusPointsCooldown(client);
 
@@ -165,7 +168,7 @@ public Action Command_SendBonusPoints(int client, int args)
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!Client_IsHumanInGame(i))
+        if (!Client_IsHumanInGame(i) || !Oblivion_MessageVisible(i, client, target))
         {
             continue;
         }
@@ -343,6 +346,6 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
 
     char displayName[256];
     BuildPurchaseDisplayName(client, displayName, sizeof(displayName));
-    CPrintToChatAllEx(client, "{default}%s collected %s%d %s{default} from {gold}!welfare{default}", displayName, colorTag, amount, currencyLong);
+    Oblivion_ChatAllEx(client, "{default}%s collected %s%d %s{default} from {gold}!welfare{default}", displayName, colorTag, amount, currencyLong);
 }
 

@@ -1,6 +1,5 @@
 	public void checkRapeChievements(int client)
 	{
-		if (PublicActivity_IsExcluded(client)) return;
 		if (!IsClientIndexValid(client) || !IsClientInGame(client))
 			return;
 
@@ -16,87 +15,87 @@
 		{
 			case 1:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Strange!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Strange!", name);
 			}
 			case 10:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Unremarkable!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Unremarkable!", name);
 			}
 			case 25:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Scarcely Lethal!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Scarcely Lethal!", name);
 			}
 			case 45:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Mildly Menacing!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Mildly Menacing!", name);
 			}
 			case 70:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Somewhat Threatening!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Somewhat Threatening!", name);
 			}
 			case 100:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Uncharitable!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Uncharitable!", name);
 			}
 			case 135:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Notably Dangerous!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Notably Dangerous!", name);
 			}
 			case 175:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Sufficiently Lethal!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Sufficiently Lethal!", name);
 			}
 			case 225:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Truly Feared!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Truly Feared!", name);
 			}
 			case 275:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Spectacularly Lethal!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Spectacularly Lethal!", name);
 			}
 			case 350:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Gore-Spattered!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Gore-Spattered!", name);
 			}
 			case 500:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Wicked Nasty!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Wicked Nasty!", name);
 			}
 			case 750:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Positively Inhumane!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Positively Inhumane!", name);
 			}
 			case 999:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Totally Ordinary!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Totally Ordinary!", name);
 			}
 			case 1000:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Face-Melting!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Face-Melting!", name);
 			}
 			case 1500:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Rage-Inducing!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Rage-Inducing!", name);
 			}
 			case 2500:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Server-Clearing!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Server-Clearing!", name);
 			}
 			case 5000:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Epic!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Epic!", name);
 			}
 			case 7500:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Legendary!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Legendary!", name);
 			}
 			case 7616:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Australian!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Australian!", name);
 			}
 			case 8500:
 			{
-				PrintToChatAll("%s's rapes have reached a new rank: Hale's Own!", name);
+				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Hale's Own!", name);
 			}
 		}
 

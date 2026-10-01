@@ -409,7 +409,7 @@ public void SQLTxn_OnLotteryTicketReplaced(Database db, any data, int numQueries
                 LogBonusPointsDelta(client, balanceDelta, balanceBefore, GetCachedBonusPoints(client), "lottery_ticket_replace", lotteryId, false, false, 1.0, true, 0, 0);
             }
 
-            CPrintToChatAllEx(client, "{default}%s changed his {gold}!lottery{default} ticket from %s%d %s{default} to %s%d %s{default}", displayName, colorTag, oldAmount, currencyLong, colorTag, amount, currencyLong);
+            Oblivion_ChatAllEx(client, "{default}%s changed his {gold}!lottery{default} ticket from %s%d %s{default} to %s%d %s{default}", displayName, colorTag, oldAmount, currencyLong, colorTag, amount, currencyLong);
             CPrintToChat(client, "%s[Lottery]{default} Your ticket: %s", colorTag, display);
         }
     }
@@ -490,7 +490,7 @@ public void SQL_OnLotteryTicketInserted(Database db, DBResultSet results, const 
             GetCurrencyLongLabel(currencyLong, sizeof(currencyLong));
             BuildLotteryTicketDisplay(ticket, display, sizeof(display));
 
-            CPrintToChatAllEx(client, "{default}%s bought a {gold}!lottery{default} ticket for %s%d %s{default}", displayName, colorTag, amount, currencyLong);
+            Oblivion_ChatAllEx(client, "{default}%s bought a {gold}!lottery{default} ticket for %s%d %s{default}", displayName, colorTag, amount, currencyLong);
             CPrintToChat(client, "%s[Lottery]{default} Your ticket: %s", colorTag, display);
         }
     }

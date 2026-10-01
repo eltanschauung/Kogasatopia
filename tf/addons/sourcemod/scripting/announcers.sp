@@ -109,7 +109,7 @@ public Plugin myinfo =
     name = "Announcers",
     author = "Kogasatopia",
     description = "Announcement handlers for shared gameplay events.",
-    version = "1.1.0",
+    version = "1.1.1",
     url = ""
 };
 
@@ -419,13 +419,17 @@ public int Native_PlayAirshot(Handle plugin, int numParams)
         return false;
     }
 
-    return Announcer_PlaySound(0, attacker, commandName);
+    bool played;
+    for (int viewer = 1; viewer <= MaxClients; viewer++)
+        if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, attacker)
+            && !Oblivion_ShouldHide(viewer, victim)) played = Announcer_PlaySound(viewer, attacker, commandName) || played;
+    return played;
 }
 
 public void Announcer_UberDeployed(Event event,const char[] name,bool dontBroadcast)
 {
     int medic=GetClientOfUserId(event.GetInt("userid")),patient=GetClientOfUserId(event.GetInt("targetid"));
-    if(!IsHumanAnnouncerClient(medic) || PublicActivity_IsExcluded(medic) || !Announcer_ShouldPlaySound(true))return;
+    if(!IsHumanAnnouncerClient(medic) || !Announcer_ShouldPlaySound(true))return;
     char commands[3][ANNOUNCER_MAX_COMMAND_NAME];
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)
         GetAnnouncerSoundCommand(g_UberSoundMaps[i],0,"",medic,commands[i],sizeof(commands[]));
@@ -569,7 +573,6 @@ public int MenuHandler_AnnouncerGroups(Menu menu, MenuAction action, int client,
 
 public void OnKillstreak(int client, int killstreak)
 {
-    if (PublicActivity_IsExcluded(client)) return;
     if (!IsValidAnnouncerClient(client))
     {
         return;
@@ -589,7 +592,6 @@ public void OnKillstreak(int client, int killstreak)
 
 public void OnKillstreakEnd(int attacker, int victim, int killstreak)
 {
-    if (PublicActivity_IsPairExcluded(attacker, victim)) return;
     if (!IsValidAnnouncerClient(victim))
     {
         return;
@@ -1241,7 +1243,7 @@ public SMCResult AnnouncerConfig_EnterSection(SMCParser parser, const char[] nam
         {
             g_ConfigMode = AnnouncerConfig_MedicDrops;
         }
-        else if (StrEqual(sectionName, "airshot") || StrEqual(sectionName, "airshot_kill"))
+        else if (StrEqual(sectionName, "airshot_kill"))
         {
             g_ConfigMode = AnnouncerConfig_Airshots;
         }

@@ -414,6 +414,7 @@ public void OnReflectKill(int attacker, int victim, bool directHit)
 
 public void OnJuggle(int attacker, int victim)
 {
+    if (!Client_IsHumanInGame(attacker) || TF2_GetPlayerClass(attacker) == TFClass_Scout) return;
 	AwardGameplayReward(attacker, "Juggle", 0);
 }
 

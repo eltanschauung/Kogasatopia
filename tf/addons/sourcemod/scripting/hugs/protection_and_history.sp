@@ -1,4 +1,4 @@
-bool g_HugsPrivateProtection[MAXPLAYERS + 1];
+char g_HugsProtectorSteam[MAXPLAYERS + 1][32], g_HugsProtectedSteam[MAXPLAYERS + 1][32];
 
 	public Action Command_RapeProtect(int client, int args)
 	{
@@ -35,14 +35,15 @@ bool g_HugsPrivateProtection[MAXPLAYERS + 1];
 			return Plugin_Handled;
 		}
 
-		g_HugsPrivateProtection[target] = PublicActivity_IsPairExcluded(client, target);
+		GetClientAuthId(client, AuthId_SteamID64, g_HugsProtectorSteam[target], sizeof(g_HugsProtectorSteam[]));
+        GetClientAuthId(target, AuthId_SteamID64, g_HugsProtectedSteam[target], sizeof(g_HugsProtectedSteam[]));
 		BuildHugsChatName(client, g_szRapeProtectorName[target], sizeof(g_szRapeProtectorName[]));
 		BuildHugsChatName(target, g_szRapeProtectedName[target], sizeof(g_szRapeProtectedName[]));
 		g_iRapeProtectorUserId[target] = GetClientUserId(client);
 		float duration = g_hRapeProtectionDuration.FloatValue;
 		g_hRapeProtectionTimer[target] = CreateTimer(duration, Timer_RapeProtectionExpired, GetClientSerial(target));
 
-		if (!g_HugsPrivateProtection[target]) CPrintToChatAllEx(client, "{green}[Hugs]{default} %s{default} is now protecting %s{default} from rape!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
+		Oblivion_ChatPairAllEx(client, target, "{green}[Hugs]{default} %s{default} is now protecting %s{default} from rape!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
 		return Plugin_Handled;
 	}
 
@@ -55,9 +56,9 @@ bool g_HugsPrivateProtection[MAXPLAYERS + 1];
 		}
 
 		g_hRapeProtectionTimer[target] = null;
-		if (IsHumanClientInGame(target) && !g_HugsPrivateProtection[target])
+		if (IsHumanClientInGame(target))
 		{
-			CPrintToChatAllEx(target, "{green}[Hugs]{default} %s{default}'s rape protection of %s{default} has now expired!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
+			Oblivion_ChatSteamAll(g_HugsProtectorSteam[target], g_HugsProtectedSteam[target], "{green}[Hugs]{default} %s{default}'s rape protection of %s{default} has now expired!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
 		}
 		g_iRapeProtectorUserId[target] = 0;
 		g_szRapeProtectorName[target][0] = '\0';

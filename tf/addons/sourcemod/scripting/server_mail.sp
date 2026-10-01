@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <clientprefs>
 #include <multicolors>
+#include <oblivion_messages>
 #undef REQUIRE_PLUGIN
 #include <filters_api>
 #include <hugs_api>
@@ -87,7 +88,7 @@ public Plugin myinfo =
     name = "server_mail",
     author = "Hombre",
     description = "Persistent player mail with optional currency attachments.",
-    version = "1.1.0",
+    version = "1.1.1",
     url = "https://kogasa.tf"
 };
 

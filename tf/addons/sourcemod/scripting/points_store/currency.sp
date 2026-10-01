@@ -34,6 +34,13 @@ void GetCurrencyLongLabel(char[] buffer, int maxlen)
     strcopy(buffer, maxlen, g_CurrencyLongLabel);
 }
 
+void GetCurrencyLongLabelForAmount(int amount, char[] buffer, int maxlen)
+{
+    GetCurrencyLongLabel(buffer, maxlen);
+    int len = strlen(buffer);
+    if (amount == 1 && len > 0 && buffer[len - 1] == 's') buffer[len - 1] = '\0';
+}
+
 void GetCurrencyColorTag(char[] buffer, int maxlen)
 {
     strcopy(buffer, maxlen, g_CurrencyColorTag);

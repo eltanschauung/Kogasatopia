@@ -72,7 +72,7 @@ public Plugin myinfo =
     name = "saysounds",
     author = "Hombre",
     description = "Chat-triggered say sounds with opt-out and volume features",
-    version = "2.1.0",
+    version = "2.1.1",
     url = "https://kogasa.tf"
 };
 

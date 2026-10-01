@@ -227,7 +227,7 @@ public void SQLTxn_OnBountiesSurvived(Database db, any data, int numQueries, DBR
             int target = Kogasa_FindClientBySteamId64(targetSteamId);
             for (int recipient = 1; recipient <= MaxClients; recipient++)
             {
-                if (Client_IsHumanInGame(recipient))
+                if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
                 {
                     CPrintToChatEx(recipient, target > 0 ? target : recipient,
                         "%s %s's bounty is now %s%d %s{default} and expires in {gold}%d minutes{default}!",
@@ -272,7 +272,7 @@ public void SQLTxn_OnBountiesSurvived(Database db, any data, int numQueries, DBR
             GetCurrencyShortLabelForAmount(payout, currencyName, sizeof(currencyName));
             for (int recipient = 1; recipient <= MaxClients; recipient++)
             {
-                if (Client_IsHumanInGame(recipient))
+                if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
                 {
                     CPrintToChatEx(recipient, target > 0 ? target : recipient,
                         "%s %s received %s%d %s{default} for surviving a bounty hunt!",

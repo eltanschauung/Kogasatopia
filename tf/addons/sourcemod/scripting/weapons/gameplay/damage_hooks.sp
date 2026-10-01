@@ -361,7 +361,7 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
         return Plugin_Continue;
 
     float pos[3];
-    GetClientAbsOrigin(victim, pos);  // was GetClientAbsAngles â€” wrong data
+    GetClientAbsOrigin(victim, pos);  // was GetClientAbsAngles — wrong data
     TF2_SetHealth(victim, buff);
     tf2_players[attacker].shockCharge = 0;
     ShockCharge_StartTimer(attacker);

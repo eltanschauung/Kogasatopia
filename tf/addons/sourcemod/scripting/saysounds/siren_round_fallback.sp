@@ -47,7 +47,7 @@ public void Event_SirenLivePhase(Event event, const char[] name, bool dontBroadc
     }
 
     g_bRoundActiveSirenQueued = true;
-    g_hRoundActiveSirenTimer = CreateTimer(ROUND_START_SIREN_ACTIVE_GRACE,
+    g_hRoundActiveSirenTimer = CreateTimer(ROUND_START_SIREN_ACTIVE_GRACE + 3.0,
         Timer_RoundActiveSiren, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 

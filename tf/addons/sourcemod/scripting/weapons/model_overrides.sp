@@ -38,6 +38,30 @@ int g_iLastArmModelRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 int g_iLastWorldModelRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 int g_iLastHiddenWorldWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 int g_iAppliedWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
+int g_iOverrideFlipWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
+bool g_bOverrideOriginalFlip[MAXPLAYERS + 1];
+
+void RestoreOverrideViewmodelFlip(int client) {
+    int weapon = EntRefToEntIndex(g_iOverrideFlipWeaponRef[client]);
+    if (weapon > MaxClients && IsValidEntity(weapon) && HasEntProp(weapon, Prop_Send, "m_bFlipViewModel"))
+        SetEntProp(weapon, Prop_Send, "m_bFlipViewModel", g_bOverrideOriginalFlip[client]);
+    g_iOverrideFlipWeaponRef[client] = INVALID_ENT_REFERENCE;
+}
+
+void ApplyOverrideViewmodelFlip(int client, int weapon) {
+    char classname[64];GetEntityClassname(weapon, classname, sizeof(classname));
+    if (!StrEqual(classname, "tf_weapon_compound_bow") || !HasEntProp(weapon, Prop_Send, "m_bFlipViewModel")) return;
+    char handedness[8];GetClientInfo(client, "cl_flipviewmodels", handedness, sizeof(handedness));
+    // Left-handed Huntsman already has an unmirrored parent; retain that path.
+    if (StringToInt(handedness) != 0) return;
+    // Huntsman's item definition mirrors its native viewmodel. Our attached
+    // tf_wearable_vm uses ordinary winding, so mirroring the parent bones
+    // reverses its faces. Override only the weapon's authored handedness bit;
+    // do not change the player's cl_flipviewmodels preference.
+    g_iOverrideFlipWeaponRef[client] = EntIndexToEntRef(weapon);
+    g_bOverrideOriginalFlip[client] = GetEntProp(weapon, Prop_Send, "m_bFlipViewModel") != 0;
+    SetEntProp(weapon, Prop_Send, "m_bFlipViewModel", false);
+}
 
 int g_iLastOffHandViewmodelRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 
@@ -420,6 +444,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			Weapons_MarkValidatedAttachedEntity(weaponvm, client, "viewmodel_wearable_vm", true, weapon);
 			
 			g_iLastViewmodelRef[client] = EntIndexToEntRef(weaponvm);
+			ApplyOverrideViewmodelFlip(client, weapon);
 			bitsActiveModels |= MODEL_VIEW_ACTIVE;
 		}
 	}
@@ -603,7 +628,8 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 				
 				g_iLastViewmodelRef[client] = EntIndexToEntRef(weaponvm);
 				
-				bitsActiveModels |= MODEL_VIEW_ACTIVE;
+				ApplyOverrideViewmodelFlip(client, weapon);
+			bitsActiveModels |= MODEL_VIEW_ACTIVE;
 			}
 		}
 	}
@@ -882,6 +908,7 @@ bool SetAttachedSapperModel(int sapper, const char[] worldmodel) {
  * Detaches any custom viewmodels on the client and displays the original viewmodel.
  */
 void DetachVMs(int client) {
+    if (client > 0 && client <= MaxClients) RestoreOverrideViewmodelFlip(client);
 	if (!Weapons_IsValidClient(client)) {
 		ResetClientModelRefs(client);
 		return;
@@ -949,6 +976,7 @@ int GetArmViewModel(int client, char[] buffer, int maxlen) {
 }
 
 void ResetClientModelRefs(int client) {
+    g_iOverrideFlipWeaponRef[client] = INVALID_ENT_REFERENCE;
 	g_iLastViewmodelRef[client] = INVALID_ENT_REFERENCE;
 	g_iLastArmModelRef[client] = INVALID_ENT_REFERENCE;
 	g_iLastWorldModelRef[client] = INVALID_ENT_REFERENCE;

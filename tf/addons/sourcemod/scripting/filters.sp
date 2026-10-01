@@ -199,7 +199,7 @@ public Plugin myinfo =
     name = "filters",
     author = "Hombre, Dr. McKay, AlliedModders LLC",
     description = "Chat management, filtering, web relay, and BaseComm controls",
-    version = "1.1.0",
+    version = "1.1.1",
     url = "https://kogasa.tf"
 };
 

@@ -207,7 +207,7 @@ public void SQL_OnRedeemAllLoaded(Database db, DBResultSet rows, const char[] er
     {
         char currencyColor[40];
         char currencyName[64];
-        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), totalGems);
         CPrintToChat(client,
             "%s Redeeming {gold}%d{default} mailed Gem attachment%s worth %s%d %s{default}.",
             MAIL_PREFIX,
@@ -281,7 +281,7 @@ public Action Command_Gift(int client, int args)
     {
         char currencyColor[40];
         char currencyName[64];
-        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), amount);
         CPrintToChat(client,
             "%s You need %s%d %s{default} to send that gift.",
             MAIL_PREFIX,
@@ -293,7 +293,7 @@ public Action Command_Gift(int client, int args)
 
     char currencyColor[40];
     char currencyName[64];
-    GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+    GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), amount);
     strcopy(g_MailPendingSearch[client], sizeof(g_MailPendingSearch[]), search);
     FormatEx(g_MailPendingContents[client], sizeof(g_MailPendingContents[]),
         "You received %d %s.", amount, currencyName);

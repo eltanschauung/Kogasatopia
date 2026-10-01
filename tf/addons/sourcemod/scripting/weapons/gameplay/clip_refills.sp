@@ -99,7 +99,14 @@ static bool ReloadWeaponClip(int weapon, int reloadAmount)
 
 void ReloadOnHit_OnDamage(int weapon)
 {
-	ReloadWeaponClip(weapon, TF2CustAttr_GetInt(weapon, ATTR_RELOAD_ON_HIT));
+	int amount = TF2CustAttr_GetInt(weapon, ATTR_RELOAD_ON_HIT);
+	if (amount <= 0) return;
+	// Hitscan damage can run before PrimaryAttack subtracts its shot. Defer
+	// the refill so a hit from a full clip still restores the fired round.
+	DataPack pack = new DataPack();
+	pack.WriteCell(EntIndexToEntRef(weapon));
+	pack.WriteCell(amount);
+	RequestFrame(RefillClipOnHit_ApplyFrame, pack);
 }
 
 void RefillClipOnHit_OnDamage(int weapon)
@@ -189,6 +196,34 @@ static bool RefillSecondaryClip(int attacker, int refillAmount)
 	return true;
 }
 
+static bool RefillHeavyLunchboxMeter(int client, int secondary, float fraction)
+{
+    if (TF2_GetPlayerClass(client) != TFClass_Heavy || !Weapons_IsValidWeaponEntity(secondary)
+        || !HasEntProp(client, Prop_Send, "m_flItemChargeMeter")) return false;
+    char classname[64];
+    GetEntityClassname(secondary, classname, sizeof(classname));
+    if (!StrEqual(classname, "tf_weapon_lunchbox")) return false;
+    float previous = GetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", WEAPON_SLOT_SECONDARY);
+    if (previous >= 100.0) return false;
+    float charge = previous + fraction * 100.0;
+    if (charge > 100.0) charge = 100.0;
+    SetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", charge, WEAPON_SLOT_SECONDARY);
+    if (charge >= 100.0)
+    {
+        // Direct netprop updates skip CTFLunchBox::OnResourceMeterFilled.
+        // Reproduce its single-ammo grant when the meter crosses full.
+        int ammoType = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+        if (ammoType >= 0 && ammoType < GetEntPropArraySize(client, Prop_Send, "m_iAmmo"))
+        {
+            int ammo = GetEntProp(client, Prop_Send, "m_iAmmo", _, ammoType);
+            int maximum = TF2Util_GetPlayerMaxAmmo(client, ammoType);
+            if (ammo < maximum) SetEntProp(client, Prop_Send, "m_iAmmo", ammo + 1, _, ammoType);
+        }
+    }
+    EmitSoundToClient(client, SOUND_SECONDARY_CLIP_REFILL);
+    return true;
+}
+
 static bool RefillSecondaryClipByPercentage(int attacker, float refillPercentage)
 {
     if (!Weapons_IsClientInGame(attacker) || refillPercentage <= 0.0)
@@ -197,6 +232,7 @@ static bool RefillSecondaryClipByPercentage(int attacker, float refillPercentage
     }
 
     int secondary = GetPlayerWeaponSlot(attacker, WEAPON_SLOT_SECONDARY);
+    if (RefillHeavyLunchboxMeter(attacker, secondary, refillPercentage)) return true;
     int maxClip = GetWeaponMaxClip(secondary);
     if (maxClip <= 0)
     {

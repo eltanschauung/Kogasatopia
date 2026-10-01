@@ -360,7 +360,7 @@ void BuildColoredMailName(int client, const char[] steamId, const char[] fallbac
     Format(output, maxlen, "%s%s", colorTag, fallbackName);
 }
 
-void GetCurrencyFormatting(char[] colorTag, int colorLen, char[] currencyName, int nameLen)
+void GetCurrencyFormatting(char[] colorTag, int colorLen, char[] currencyName, int nameLen, int amount = 0)
 {
     strcopy(colorTag, colorLen, "{cyan}");
     strcopy(currencyName, nameLen, "Gems");
@@ -383,5 +383,7 @@ void GetCurrencyFormatting(char[] colorTag, int colorLen, char[] currencyName, i
         currency.GetString(currencyName, nameLen);
         TrimString(currencyName);
     }
+    int len = strlen(currencyName);
+    if (amount == 1 && len > 0 && currencyName[len - 1] == 's') currencyName[len - 1] = '\0';
 }
 

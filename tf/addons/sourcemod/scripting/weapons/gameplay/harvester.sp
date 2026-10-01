@@ -249,7 +249,17 @@ void Harvester_SetCritBoost(int client, bool enabled)
 	if (present && !owned) return;
 	float now = GetGameTime();
 	if (owned && now < tf2_players[client].harvesterCritVisualRefreshAt) return;
-	TF2_AddCondition(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION, weapon);
+	if (owned)
+	{
+		TF2Util_SetPlayerConditionDuration(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION);
+	}
+	else
+	{
+		// TF2_AddCondition accepts player inflictors only. Set the entity
+		// provider through TF2 Utils after adding the condition successfully.
+		TF2_AddCondition(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION, client);
+		TF2Util_SetPlayerConditionProvider(client, HARVESTER_CRIT_VISUAL_CONDITION, weapon);
+	}
 	tf2_players[client].harvesterCritBoostApplied = true;
 	tf2_players[client].harvesterCritVisualRefreshAt = now + 0.10;
 }

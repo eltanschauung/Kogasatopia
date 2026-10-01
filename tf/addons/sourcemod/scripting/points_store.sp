@@ -6,6 +6,7 @@
 #include <tf2>
 #include <tf2_stocks>
 #include <multicolors>
+#include <oblivion_messages>
 #undef REQUIRE_PLUGIN
 #include <dgm_api>
 #include <filters_api>
@@ -131,7 +132,7 @@ public Plugin myinfo =
     name = "points_store",
     author = "Kogasa, Hombre",
     description = "Currency purchase receipts, shop UI, and ownership API.",
-    version = "1.1.0",
+    version = "1.1.1",
     url = "https://kogasa.tf"
 };
 

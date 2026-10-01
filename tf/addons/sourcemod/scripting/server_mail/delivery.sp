@@ -314,11 +314,11 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
         char currencyColor[40];
         char currencyName[64];
         BuildColoredMailName(receiver, receiverSteamId, receiverName, coloredReceiver, sizeof(coloredReceiver));
-        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), gems);
 
         if (IsMailClient(receiver))
         {
-            CPrintToChatAllEx(receiver,
+            Oblivion_ChatSteamAll(receiverSteamId, "",
                 "{cornflowerblue}[Mail] %s{default} received a Stimulus Check! (%s%d %s{default})",
                 coloredReceiver,
                 currencyColor,
@@ -327,7 +327,7 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
         }
         else
         {
-            CPrintToChatAll(
+            Oblivion_ChatSteamAll(receiverSteamId, "",
                 "{cornflowerblue}[Mail] %s{default} received a Stimulus Check! (%s%d %s{default})",
                 coloredReceiver,
                 currencyColor,
@@ -345,12 +345,12 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
         char currencyName[64];
         BuildColoredMailName(liveSender, senderSteamId, senderName, coloredSender, sizeof(coloredSender));
         BuildColoredMailName(receiver, receiverSteamId, receiverName, coloredReceiver, sizeof(coloredReceiver));
-        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), gems);
 
         int author = IsMailClient(liveSender) ? liveSender : receiver;
         if (IsMailClient(author))
         {
-            CPrintToChatAllEx(author,
+            Oblivion_ChatSteamAll(senderSteamId, receiverSteamId,
                 "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!",
                 coloredSender,
                 coloredReceiver,
@@ -360,7 +360,7 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
         }
         else
         {
-            CPrintToChatAll(
+            Oblivion_ChatSteamAll(senderSteamId, receiverSteamId,
                 "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!",
                 coloredSender,
                 coloredReceiver,

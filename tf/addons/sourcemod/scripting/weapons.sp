@@ -63,7 +63,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.2" ... VERSION_SUFFIX,
+    version = "7.2.1" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 

@@ -407,7 +407,7 @@ public void Event_PlayerClass(Event event, const char[] name, bool dontBroadcast
         NotifyClassRestricted(iClient, iClass, limit);
 
         // Revert the class selection and reopen the class panel.
-        // Never call TF2_RespawnPlayer here â€” the panel keeps them off the
+        // Never call TF2_RespawnPlayer here — the panel keeps them off the
         // field, and Event_PlayerSpawn enforces the limit when they spawn.
         TF2_SetPlayerClass(iClient, view_as<TFClassType>(g_iClass[iClient]));
         ShowVGUIPanel(iClient, iTeam == TF_TEAM_BLU ? "class_blue" : "class_red");

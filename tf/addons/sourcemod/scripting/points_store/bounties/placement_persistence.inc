@@ -225,7 +225,7 @@ public void SQLTxn_OnBountyPlaced(Database db, any data, int numQueries, DBResul
     GetCurrencyShortLabelForAmount(amount, currencyName, sizeof(currencyName));
     for (int recipient = 1; recipient <= MaxClients; recipient++)
     {
-        if (Client_IsHumanInGame(recipient))
+        if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, senderSteamId) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
         {
             CPrintToChatEx(recipient, Client_IsHumanInGame(client) ? client : recipient,
                 "%s %s placed a %s%d %s{default} bounty on %s! Dominate him to get the gems!",

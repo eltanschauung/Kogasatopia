@@ -153,7 +153,6 @@
 		bool rape,
 		bool feed)
 	{
-		if (PublicActivity_IsExcludedSteam(senderSteamId64) || PublicActivity_IsExcluded(receiver)) return;
 		if (Oblivion_InteractionBlocked(sender, receiver)) return;
 		char senderDisplay[256];
 		BuildMailedHugsChatName(sender, senderSteamId64, senderName, senderDisplay, sizeof(senderDisplay));
@@ -163,7 +162,7 @@
 		char action[16];
 		strcopy(action, sizeof(action), rape ? "raped" : (feed ? "fed" : "hugged"));
 
-		if (!IsClientRedlisted(receiver))
+		if (!IsClientRedlisted(receiver) && Oblivion_SteamMessageVisible(receiver, senderSteamId64))
 		{
 			CPrintToChatEx(receiver, sender > 0 ? sender : receiver,
 				"{green}[Hugs] %s{default} %s you!", senderDisplay, action);

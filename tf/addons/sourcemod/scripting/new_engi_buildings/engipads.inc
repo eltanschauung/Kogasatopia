@@ -932,7 +932,7 @@ void ConvertTeleporterToPad(int iEnt, int iPadType, bool bAddHealth)
 	g_iPadType[iEnt] = iPadType;
 	g_flPadRechargeEnd[iEnt] = 0.0;
 	
-	// SetEntityModel(iEnt, "MODEL_PAD");	//Coming soonâ„¢, maybe...
+	// SetEntityModel(iEnt, "MODEL_PAD");	//Coming soon™, maybe...
 	
 	SetEntProp(iEnt, Prop_Send, "m_iHighestUpgradeLevel", 3);	//Set Pads to level 3 for cosmetic reasons related to recharging
 	SetEntProp(iEnt, Prop_Send, "m_iUpgradeLevel", 3);

@@ -105,7 +105,7 @@ MailRedemptionQueueResult QueueValidatedMailRedemption(
     {
         char currencyColor[40];
         char currencyName[64];
-        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+        GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), gems);
         FormatEx(title, sizeof(title), "%d %s", gems, currencyName);
     }
 
@@ -227,7 +227,7 @@ public void SQL_OnMailMarkedRedeemed(Database db, DBResultSet results, const cha
     char currencyColor[40];
     char currencyName[64];
     BuildColoredMailName(client, steamId, fallbackName, coloredName, sizeof(coloredName));
-    GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName));
+    GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), gems);
     if (StrEqual(title, "Stimulus Check", false) && IsMailClient(client))
     {
         CPrintToChatAllEx(client,

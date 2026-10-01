@@ -26,7 +26,6 @@
 			PrintToChat(client, "No player found matching \"%s\".", targetName);
 			return Plugin_Handled;
 		}
-		if (PublicActivity_IsPairExcluded(client, target)) return Plugin_Handled;
 
 		if (target == client)
 		{
@@ -174,7 +173,6 @@
 
 void Hugs_PrintDuelAnnouncement(const char[] format, any ...)
 {
-    if (PublicActivity_IsPairExcluded(g_iRequester, g_iTarget)) return;
     char message[512];
     VFormat(message, sizeof(message), format, 2);
     for (int viewer = 1; viewer <= MaxClients; viewer++)

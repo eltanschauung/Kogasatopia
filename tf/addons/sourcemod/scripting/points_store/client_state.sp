@@ -291,7 +291,7 @@ void BroadcastPurchaseRanOut(int client, const char[] itemKey)
     BuildPurchaseDisplayName(client, displayName, sizeof(displayName));
     if (Client_IsHumanInGame(client))
     {
-        CPrintToChatAllEx(client, "%s %s's {gold}%s{default} ran out!", prefix, displayName, itemName);
+        Oblivion_ChatAllEx(client, "%s %s's {gold}%s{default} ran out!", prefix, displayName, itemName);
     }
 }
 

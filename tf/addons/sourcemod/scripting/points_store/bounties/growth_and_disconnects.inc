@@ -376,7 +376,7 @@ public void SQLTxn_OnDisconnectedBountiesRefunded(Database db, any data, int num
 
             for (int recipient = 1; recipient <= MaxClients; recipient++)
             {
-                if (Client_IsHumanInGame(recipient))
+                if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
                 {
                     CPrintToChatEx(recipient, sender > 0 ? sender : recipient,
                         "%s %s has been disconnected for {gold}%d minutes{default}; %s%d %s{default} has been refunded!",

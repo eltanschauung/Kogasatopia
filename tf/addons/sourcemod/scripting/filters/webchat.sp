@@ -474,15 +474,15 @@ public void Filters_InsertChatCallback(Database db, DBResultSet results, const c
     else Filters_LogDebug("Chat insert succeeded");
 }
 
-void Filters_InsertSystemMessage(bool webchatOnly, bool alertFlag, const char[] format, any ...)
+bool Filters_InsertSystemMessage(bool webchatOnly, bool alertFlag, const char[] format, any ...)
 {
-    if (!Filters_DbAvailable()) return;
+    if (!Filters_DbAvailable()) return false;
     char message[256], sanitizedMsg[512], escapedMsg[1025];
     char escapedServerTag[(FILTERS_CROSS_SERVER_TAG_MAX * 2) + 1];
     VFormat(message, sizeof(message), format, 4);
     Filters_SanitizeDbMessage(message, sanitizedMsg, sizeof(sanitizedMsg));
     if (!Db_Escape(g_hFiltersDb, sanitizedMsg, escapedMsg, sizeof(escapedMsg), "filters")
-        || !Filters_TryGetEscapedCrossServerTag(escapedServerTag, sizeof(escapedServerTag))) return;
+        || !Filters_TryGetEscapedCrossServerTag(escapedServerTag, sizeof(escapedServerTag))) return false;
     int timestamp = GetTime();
     char query[1792];
     FormatEx(query, sizeof(query),
@@ -496,6 +496,7 @@ void Filters_InsertSystemMessage(bool webchatOnly, bool alertFlag, const char[] 
         Filters_PrintToChatAll(message);
         PrintToServer("%s", message);
     }
+    return true;
 }
 
 public void Filters_EventPlayerConnect(Event event, const char[] name, bool dontBroadcast)

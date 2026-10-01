@@ -151,6 +151,7 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+    CurrencyLeaderboard_OnMapEnd();
     Lotteries_OnMapEnd();
 }
 
