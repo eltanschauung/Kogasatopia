@@ -602,6 +602,13 @@ void SpecQueue_CheckActivity(float now) {
         return;
     }
 
+    SpecQueue_PruneWaitQueue();
+    if (!SpecQueue_IsServerFull() && g_SpecQueue.IsEmpty()) {
+        // Spectator activity is intent to join an active queue, not a team directly.
+        SpecQueue_ResetAutoQueueActivityBaselines();
+        return;
+    }
+
     bool queued = false;
     for (int client = 1; client <= MaxClients; client++) {
         if (!SpecQueue_IsQueuedSpectator(client) || g_SpecQueue.InQueue(client) || SpecQueue_HasPendingJoin(client)) {

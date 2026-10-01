@@ -27,6 +27,9 @@ enum struct Queue {
     bool InQueue(int client) {
         return inQueue[client];
     }
+    bool IsEmpty() {
+        return this.Length == 0;
+    }
 }
 Toggle g_cvSpecQueueAutoJoin;
 Queue g_SpecQueue;
@@ -58,6 +61,7 @@ int kicks;
 int moves;
 float gProbeTime;
 bool operational;
+bool serverFull;
 int reads;
 int scheduled;
 int notices;
@@ -87,6 +91,7 @@ void Check(bool result, const char[] label) {
 void ResetScenario() {
     gProbeTime = 100.0;
     operational = g_cvSpecQueueAutoJoin.BoolValue = true;
+    serverFull = true;
     reads = scheduled = notices = 0;
     g_SpecQueue.Length = 0;
     for (int client = 1; client <= MaxClients; client++) {
@@ -122,6 +127,18 @@ void ProbeChat(int client, const char[] format, any ...) {
 }
 void SpecQueue_UpdateQueueSuspension() {}
 bool SpecQueue_IsPluginOperational() { return operational; }
+bool SpecQueue_IsServerFull() { return serverFull; }
+void SpecQueue_PruneWaitQueue() {
+    g_SpecQueue.Length = 0;
+    for (int client = 1; client <= MAXPLAYERS; client++) {
+        if (inQueue[client] && (!human[client] || !spectator[client])) {
+            inQueue[client] = false;
+        }
+        if (inQueue[client]) {
+            g_SpecQueue.Length++;
+        }
+    }
+}
 bool Client_IsHumanInGame(int client) {
     return client > 0 && client <= MaxClients && human[client];
 }
@@ -196,6 +213,33 @@ public Action RunProbe(int client, int args) {
     Check(inQueue[1] && scheduled == 1 && notices == 1, "fresh spectator activity queues once");
     SpecQueue_CheckActivity(gProbeTime);
     Check(scheduled == 1 && notices == 1, "queued client is not repeated");
+
+    ResetScenario(); serverFull = false;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(!inQueue[1] && reads == 0 && scheduled == 0 && notices == 0,
+        "spare capacity with no queue leaves spectators alone");
+    Check(g_flSpecQueueActivityBaseline[1] == 100.0,
+        "inactive queue discards spectator activity");
+    serverFull = true; gProbeTime = 102.0;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(!inQueue[1], "input from before queue activation is not replayed");
+    activity[1] = 101.0;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(inQueue[1], "fresh input can queue once playing teams are full");
+
+    ResetScenario(); serverFull = false;
+    human[2] = spectator[2] = inQueue[2] = true;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(inQueue[1] && inQueue[2] && scheduled == 1,
+        "existing waiting queue accepts fresh input while a slot is available");
+
+    ResetScenario(); serverFull = false; inQueue[2] = true;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(!inQueue[1] && !inQueue[2], "stale queue entries do not enable autoqueue");
+
+    ResetScenario(); serverFull = false; pending[2] = true;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(!inQueue[1], "pending join alone does not enable activity autoqueue");
 
     ResetScenario(); activity[1] = 0.0;
     SpecQueue_CheckActivity(gProbeTime);

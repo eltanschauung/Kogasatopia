@@ -57,7 +57,10 @@ Keep the existing convars and configuration files:
 The FIFO, capacity reservations, suspension hysteresis, menus, `!joinqueue`,
 `!leavequeue`, `!checkautojoin`, `!spec`, `!afk`, `!remove`, and aliases remain.
 Activity autoqueue requires a human spectator with fresh input, not already
-queued or joining. `!leavequeue` grants 60 seconds of automatic-requeue immunity;
+queued or joining, and either full playing teams or an existing valid waiting
+queue. An enabled module alone does not qualify. Input while there is spare
+capacity and no waiting queue is discarded, not replayed when a queue starts.
+`!leavequeue` grants 60 seconds of automatic-requeue immunity;
 `!afk`, `!spec`, `!remove` and spectator-command aliases grant five minutes.
 Input during immunity is discarded;
 explicit joining remains permitted. Map transitions preserve unexpired
