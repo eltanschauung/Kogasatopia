@@ -26,7 +26,11 @@ void DGM_RefreshRespawnVisualState()
         return;
     }
 
-    SetConVarBool(g_cvMpDisableRespawnTimes, g_cvRespawnTime.FloatValue < 5.0);
+    bool nativeRespawns = DGM_NativeWavesActive()
+        || (g_cvHalveRespawnWaves != null && g_cvHalveRespawnWaves.BoolValue
+            && DGM_AreRespawnTimesForcedOn());
+    SetConVarBool(g_cvMpDisableRespawnTimes,
+        !nativeRespawns && g_cvRespawnTime.FloatValue < 5.0);
 }
 
 bool DGM_AreRespawnTimesForcedOn()
@@ -59,6 +63,8 @@ void DGM_SetRespawnTimesEnabled(bool enabled)
     {
         DGM_ClearAllRespawnReminderTimers();
     }
+    DGM_ClearAllRespawnTimers();
+    DGM_NativeWavesSync();
 }
 
 bool DGM_InternalIsRoundRunning()

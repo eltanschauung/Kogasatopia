@@ -9,13 +9,14 @@ public void DGM_Event_RoundActive(Event event, const char[] name, bool dontBroad
     DGM_ResetCaptureIntervalStats(g_iDgmRoundStartTimestamp);
 
     if (g_cvTimeOverride != null)    g_cvTimeOverride.RestoreDefault();
-    if (!g_cvPopulationRespawns.BoolValue)
+    if (!g_cvPopulationRespawns.BoolValue || g_cvHalveRespawnWaves.BoolValue)
     {
         // Round end forces this true; unmanaged modes need their configured state restored.
         g_InternalOverride = DGM_AreRespawnTimesForcedOn();
     }
 
     DGM_AdjustRespawnByPlayerCount(0);
+    DGM_NativeWavesQueueApply();
     g_PointCaptures = 0;
     DGM_UpdateSetupState();
     if (!g_bRoundStartedOnce)
@@ -82,6 +83,7 @@ public void DGM_Event_RoundWin(Event event, const char[] name, bool dontBroadcas
     g_PointCaptures = 0;
     DGM_ResetCaptureIntervalStats(0);
     g_InternalOverride = true; // We're gonna stop clients from getting insta-respawned with this
+    DGM_NativeWavesSync();
     DGM_RefreshRespawnVisualState();
 }
 

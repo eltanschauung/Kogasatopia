@@ -12,7 +12,8 @@ bool DGM_HasInstantRespawnImmunity(int client)
 void DGM_StartRespawnReminderTimer(int client)
 {
     DGM_ClearRespawnReminderTimer(client);
-    if (!Client_IsInGame(client) || !g_cvPopulationRespawns.BoolValue)
+    if (!Client_IsInGame(client)
+        || (!g_cvPopulationRespawns.BoolValue && !g_cvHalveRespawnWaves.BoolValue))
     {
         return;
     }
@@ -32,15 +33,19 @@ public Action Timer_RespawnReminder(Handle timer, int serial)
         return Plugin_Stop;
     }
 
-    if (!g_cvPopulationRespawns.BoolValue || !IsClientInGame(client)
+    if ((!g_cvPopulationRespawns.BoolValue && !g_cvHalveRespawnWaves.BoolValue)
+        || !IsClientInGame(client)
         || g_InternalOverride || DGM_AreRespawnTimesForcedOn())
     {
         g_hRespawnReminderTimers[client] = null;
         return Plugin_Stop;
     }
 
-    CPrintToChat(client,
-        "You currently have respawn times disabled. Use {gold}sm_respawn{default} to toggle back.");
+    if (g_cvHalveRespawnWaves.BoolValue)
+        CPrintToChat(client, "Respawn times are halved; use {gold}sm_respawn{default} to toggle.");
+    else
+        CPrintToChat(client,
+            "You currently have respawn times disabled. Use {gold}sm_respawn{default} to toggle back.");
     return Plugin_Continue;
 }
 
@@ -149,7 +154,7 @@ public void DGM_Event_PlayerDeath(Event event, const char[] name, bool dontBroad
     }
     DGM_ClearRespawnTimer(client);
 
-    if (DGM_ShouldDisableInstantRespawn() || g_InternalOverride)
+    if (DGM_ShouldDisableInstantRespawn() || g_InternalOverride || DGM_NativeWavesActive())
     {
         return;
     }
@@ -205,6 +210,7 @@ public Action Timer_RespawnClient(Handle timer, int serial)
     // Settings and team membership can change while the timer is queued.
     if (!Client_IsInGame(client) || g_InternalOverride
         || DGM_AreRespawnTimesForcedOn() || DGM_ShouldDisableInstantRespawn()
+        || DGM_NativeWavesActive()
         || DGM_HasInstantRespawnImmunity(client))
     {
         return Plugin_Stop;

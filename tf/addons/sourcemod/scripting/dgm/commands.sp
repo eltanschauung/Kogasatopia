@@ -56,6 +56,7 @@ public Action Command_Stats(int client, int args)
                     asymCapRespawn);
     }
 
+    DGM_ReplyNativeWaveState(client);
     return Plugin_Handled;
 }
 
@@ -128,6 +129,7 @@ public Action Command_CvarHelp(int client, int args)
 {
     char lines[][] = {
         "respawn_time: float - Default respawn delay (seconds). Set to 30 to disable plugin handling.",
+        "dgm_halve_respawn_waves: 0/1 - Halve map-authored native waves; unsupported maps retain legacy timers.",
         "dgm_lowpop_threshhold: int - Disable respawn times below this connected human count.",
         "sm_highpop_threshhold: int - Player count threshold to execute high-pop configs",
         "sm_dgm_population_configs: 0/1 - Enables low-pop/high-pop config execution",
@@ -175,7 +177,8 @@ public Action Command_RespawnToggle(int client, int args)
 
     g_bRespawnAdminTouchedThisMap = true;
     DGM_SetRespawnTimesEnabled(!DGM_AreRespawnTimesForcedOn());
-    DGM_RespawnDeadClients();
+    if (!g_cvHalveRespawnWaves.BoolValue || !DGM_AreRespawnTimesForcedOn())
+        DGM_RespawnDeadClients();
     DGM_ClearAllRespawnReminderTimers();
     if (!g_InternalOverride && client > 0 && IsClientInGame(client))
     {
@@ -195,6 +198,13 @@ public Action Command_RespawnToggle(int client, int args)
     }
 
     DGM_LogRespawnToggle(client, g_InternalOverride, respawnTime);
+    if (g_cvHalveRespawnWaves.BoolValue)
+    {
+        ReplyToCommand(client, DGM_AreRespawnTimesForcedOn()
+            ? "Respawn times are now back to normal."
+            : "Respawn times are now halved; respawning all clients!");
+        return Plugin_Handled;
+    }
     if (client <= 0)
     {
         PrintToServer("Respawn times %s (%ss)", g_InternalOverride ? "forced on" : "forced off", respawnTimeText);

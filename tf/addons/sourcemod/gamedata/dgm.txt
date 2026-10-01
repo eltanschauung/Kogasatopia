@@ -4,6 +4,24 @@
     {
         "Signatures"
         {
+            "CTeamplayRoundBasedRules::SetTeamRespawnWaveTime"
+            {
+                "library" "server"
+                "linux" "@_ZN24CTeamplayRoundBasedRules22SetTeamRespawnWaveTimeEif"
+                "linux64" "@_ZN24CTeamplayRoundBasedRules22SetTeamRespawnWaveTimeEif"
+            }
+            "CTeamplayRoundBasedRules::AddTeamRespawnWaveTime"
+            {
+                "library" "server"
+                "linux" "@_ZN24CTeamplayRoundBasedRules22AddTeamRespawnWaveTimeEif"
+                "linux64" "@_ZN24CTeamplayRoundBasedRules22AddTeamRespawnWaveTimeEif"
+            }
+            "CTFGameRules::RoundRespawn"
+            {
+                "library" "server"
+                "linux" "@_ZN12CTFGameRules12RoundRespawnEv"
+                "linux64" "@_ZN12CTFGameRules12RoundRespawnEv"
+            }
             "CBaseObject::GetConstructionMultiplier"
             {
                 "library" "server"

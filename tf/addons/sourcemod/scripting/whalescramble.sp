@@ -8,6 +8,7 @@
 #include <sdkhooks>
 #include <sdktools_gamerules>
 #include <dhooks>
+#include <entitylump>
 #include <tf2>
 #include <tf2_stocks>
 #include <controlpoints>
@@ -44,7 +45,7 @@ native int FilterAlerts_MarkAutobalance(int client);
 native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 native bool Announcers_IsGroupEnabled(int client, const char[] groupName);
 
-#define PLUGIN_VERSION "5.2"
+#define PLUGIN_VERSION "5.3"
 
 // DGM state and policy.
 #define DGM_MAX_CONTROL_POINTS 8
@@ -76,6 +77,7 @@ ConVar g_cvTimeOverride;
 ConVar g_cvRespawnTime;
 ConVar g_cvPopulationConfigs;
 ConVar g_cvPopulationRespawns;
+ConVar g_cvHalveRespawnWaves;
 ConVar g_cvLowPopThreshold;
 ConVar g_cvHeavyInstantRespawnImmunity;
 bool g_bSymmetrical;
@@ -240,6 +242,11 @@ public void OnMapStart()
     AFK_OnMapStart();
 }
 
+public void OnMapInit(const char[] mapName)
+{
+    DGM_NativeWavesInvalidateMap();
+}
+
 public void OnMapEnd()
 {
     AFK_OnMapEnd();
@@ -327,6 +334,7 @@ public void OnClientSpeaking(int client)
 #include "dgm/internal_api.sp"
 #include "dgm/native_api.sp"
 #include "dgm/respawn_and_setup_state.sp"
+#include "dgm/native_respawn_waves.sp"
 #include "dgm/statistics.sp"
 #include "dgm/setup_overrides.sp"
 #include "dgm/configuration.sp"

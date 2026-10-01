@@ -4,6 +4,10 @@ void DGM_OnPluginStart()
     // The respawn time
     g_cvRespawnTime = CreateConVar("respawn_time", "3.0", "Respawn time length", _, true, 0.0, true, 30.0);
     g_cvPopulationRespawns = CreateConVar("dgm_population_respawns", "1", "Allow playercount changes to adjust respawn times.", _, true, 0.0, true, 1.0);
+    g_cvHalveRespawnWaves = CreateConVar("dgm_halve_respawn_waves", "0",
+        "Use half the map-authored respawn waves when reduced respawns are requested; unsupported maps retain DGM timers.",
+        _, true, 0.0, true, 1.0);
+    g_cvHalveRespawnWaves.AddChangeHook(DGM_ConVarChangeNativeWaves);
     g_cvLowPopThreshold = CreateConVar("dgm_lowpop_threshhold", "10", "Connected human count below which respawn times are disabled.", _, true, 0.0, true, 100.0);
     g_cvHeavyInstantRespawnImmunity = CreateConVar(
         "dgm_heavy_instant_respawn_immunity",
@@ -90,11 +94,13 @@ void DGM_OnPluginStart()
     RegConsoleCmd("sm_manual", Command_CvarHelp, "Displays information about plugin ConVars.");
 
     DGM_InitializeConstructionMultiplierDetour();
+    DGM_NativeWavesInitialize();
     DGM_RefreshRespawnVisualState();
 }
 
 void DGM_OnPluginEnd()
 {
+    DGM_NativeWavesShutdown();
     DGM_RestoreSetupUpgradeMetal();
     g_bSetupConstructionMultiplierActive = false;
 
@@ -111,7 +117,7 @@ void DGM_OnPluginEnd()
 
     if (g_cvMpDisableRespawnTimes != null)
     {
-        SetConVarBool(g_cvMpDisableRespawnTimes, true);
+        SetConVarBool(g_cvMpDisableRespawnTimes, !g_cvHalveRespawnWaves.BoolValue);
     }
 
     delete g_hSetupTeamRatioReadyForward;
@@ -119,6 +125,7 @@ void DGM_OnPluginEnd()
 
 void DGM_OnMapStart()
 {
+    DGM_NativeWavesOnMapStart();
     DGM_RestoreSetupUpgradeMetal();
     g_bGameRulesReady = false;
     // NO_MAPCHANGE timers are closed by SourceMod during transitions; clear local handles.
@@ -141,6 +148,8 @@ void DGM_OnMapStart()
 
 void DGM_OnMapEnd()
 {
+    DGM_NativeWavesRestore();
+    DGM_NativeWavesInvalidateMap();
     DGM_RestoreSetupUpgradeMetal();
     g_bGameRulesReady = false;
     g_bSetupConstructionMultiplierActive = false;
@@ -157,8 +166,10 @@ public void ConVarChange_RespawnSetting(ConVar convar, const char[] oldValue, co
     if (convar == g_cvRespawnTime && !StrEqual(oldValue, newValue))
     {
         g_InternalOverride = DGM_AreRespawnTimesForcedOn();
-        DGM_RefreshRespawnVisualState();
-        DGM_RespawnDeadClients();
+        DGM_ClearAllRespawnTimers();
+        DGM_NativeWavesSync();
+        if (!g_cvHalveRespawnWaves.BoolValue)
+            DGM_RespawnDeadClients();
     }
 }
 
@@ -210,6 +221,7 @@ void DGM_OnConfigsExecuted()
     DGM_ApplySetupUberMultiplier();
     RequestFrame(DGM_FrameUpdateSetupState);
     DGM_QueueSetupStartCheck();
+    DGM_NativeWavesQueueApply();
 }
 
 public void DGM_FrameUpdateSetupState(any data)
