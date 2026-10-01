@@ -6,6 +6,7 @@
 #define SQ_RECONCILE_DELAY 0.5
 #define SQ_ACTIVITY_QUEUE_INTERVAL 3.0
 #define SQ_ACTIVITY_QUEUE_IMMUNITY 60.0
+#define SQ_SPECTATE_QUEUE_IMMUNITY 300.0
 
 #define SQ_JOIN_TEAM_BLU "blue"
 #define SQ_JOIN_TEAM_RED "red"
@@ -493,7 +494,7 @@ public Action SpecQueue_Cmd_Spectate(int client, int args) {
         return Plugin_Handled;
     }
 
-    SpecQueue_SuppressActivityAutoQueue(client);
+    SpecQueue_SuppressActivityAutoQueue(client, SQ_SPECTATE_QUEUE_IMMUNITY);
     SpecQueue_ClearPendingJoin(client);
     SpecQueue_RemoveClientFromWaitQueue(client, "voluntary_spectator");
 
@@ -589,10 +590,10 @@ void SpecQueue_ResetAutoQueueActivityBaselines() {
     }
 }
 
-void SpecQueue_SuppressActivityAutoQueue(int client) {
+void SpecQueue_SuppressActivityAutoQueue(int client, float duration = SQ_ACTIVITY_QUEUE_IMMUNITY) {
     float now = GetEngineTime();
     g_flSpecQueueActivityBaseline[client] = now;
-    g_flSpecQueueImmuneUntil[client] = now + SQ_ACTIVITY_QUEUE_IMMUNITY;
+    g_flSpecQueueImmuneUntil[client] = now + duration;
 }
 
 void SpecQueue_CheckActivity(float now) {

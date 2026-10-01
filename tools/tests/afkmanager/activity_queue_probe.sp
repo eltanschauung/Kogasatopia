@@ -237,6 +237,18 @@ public Action RunProbe(int client, int args) {
     SpecQueue_CheckActivity(gProbeTime);
     Check(inQueue[1], "new post-immunity input queues");
 
+    ResetScenario(); SpecQueue_SuppressActivityAutoQueue(1, 300.0);
+    Check(g_flSpecQueueImmuneUntil[1] == 400.0, "spectator command grants five minutes");
+    gProbeTime = 399.0; activity[1] = 398.0;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(!inQueue[1], "spectator immunity lasts the full five minutes");
+    gProbeTime = 403.0;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(!inQueue[1], "spectator immunity input is not replayed");
+    activity[1] = 402.0;
+    SpecQueue_CheckActivity(gProbeTime);
+    Check(inQueue[1], "fresh input queues after spectator immunity expires");
+
     ResetScenario(); g_flSpecQueueImmuneUntil[1] = 160.0;
     gProbeTime = 163.0; activity[1] = 159.0;
     SpecQueue_CheckActivity(gProbeTime);
