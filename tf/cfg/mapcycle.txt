@@ -128,7 +128,6 @@ cp_mountainlab
 cp_altitude
 cp_coldfront
 cp_forest_of_magic_rc2
-koth_clearcut_b15
 cp_gravelpit
 cp_gorge_reborn_smissmas_rc1
 cp_hotrod_2025_rc1
@@ -168,7 +167,6 @@ dm_congo_b1
 cp_dustdouble_v1
 pl_hoodoo_final
 cp_dustbowl
-cp_steel
 ctf_turbine
 pd_selbyen
 workshop/pl_escarpment_rc1.ugc454194336
@@ -220,7 +218,6 @@ pl_mountainside_rc2
 pl_phoenix
 cp_riverside_b5a
 koth_silo_park_rc3
-pd_nutcracker_b8
 dm_sdmxmas
 pl_cashworks_classic
 tc_hydro
@@ -262,7 +259,6 @@ koth_stupidcar_b1
 koth_fort_cirno_alpha
 ctf_snowfort
 trade_alicehouse
-koth_eientei_rc1
 ctf_sawmill
 koth_farmed_v2
 arena_byre
