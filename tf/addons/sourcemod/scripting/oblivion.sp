@@ -10,7 +10,7 @@
 #include <tf2utils>
 #include <oblivion_net>
 
-#define VERSION "0.2.2"
+#define VERSION "0.2.3"
 #define AUTH_LEN 40
 #define ENTITY_LIMIT 2049
 

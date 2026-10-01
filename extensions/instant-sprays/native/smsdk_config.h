@@ -1,6 +1,6 @@
 #define SMEXT_CONF_NAME "Instant Sprays"
 #define SMEXT_CONF_DESCRIPTION "Refresh selected TF2 sprays on the current connection"
-#define SMEXT_CONF_VERSION "1.3.5"
+#define SMEXT_CONF_VERSION "1.4.0"
 #define SMEXT_CONF_AUTHOR "Codex"
 #define SMEXT_CONF_URL ""
 #define SMEXT_CONF_LOGTAG "SPRAY_REFRESH"

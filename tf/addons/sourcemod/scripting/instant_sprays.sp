@@ -5,7 +5,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <instant_sprays>
-#define VERSION "1.3.6"
+#define VERSION "1.4.0"
 
 public Plugin myinfo={name="Instant Sprays",author="Codex",description="Instant local spray changes with background synchronization",version=VERSION,url=""};
 ConVar g_Enabled,g_Upload,g_Download;
@@ -89,7 +89,7 @@ void StartUpload(int c){
     g_Sharing[c]=true;
 }
 public void OnPluginStart(){
-    if(GetEngineVersion()!=Engine_TF2||ISprays_ApiVersion()!=6)SetFailState("Requires TF2 and the matching Instant Sprays extension (API 6).");
+    if(GetEngineVersion()!=Engine_TF2||ISprays_ApiVersion()!=7)SetFailState("Requires TF2 and the matching Instant Sprays extension (API 7).");
     g_Upload=FindConVar("sv_allowupload");g_Download=FindConVar("sv_allowdownload");
     if(g_Upload==null||g_Download==null)SetFailState("TF2 file-transfer settings are unavailable.");
     g_Enabled=CreateConVar("sm_instant_sprays_enabled","1","Refresh selected sprays without reconnecting.",FCVAR_NONE,true,0.0,true,1.0);
@@ -297,4 +297,14 @@ public Action Status(int c,int args){
         ReplyToCommand(c,"[Instant Sprays] %N: native=%d crc=%08x uploads=%d changes=%d local=%d terrain_guard=%d shared=%d",i,phase,crc,requests,changes,EntRefToEntIndex(g_Sprite[i])>MaxClients,g_Guarded[i],g_Public[i]);
         char reason[192];ISprays_LastError(i,reason,sizeof(reason));if(reason[0])ReplyToCommand(c,"  Last failure: %s",reason);
     }return Plugin_Handled;
+}
+
+// A client reply is a reliable round trip through the same game connection.
+// Tokens and connection serials are checked again in the native transport.
+public void ISprays_OnClearBarrier(int client,int token){
+    if(!Human(client))return;
+    QueryClientConVar(client,"cl_spraydisable",ClearBarrierReply,token);
+}
+public void ClearBarrierReply(QueryCookie cookie,int client,ConVarQueryResult result,const char[] name,const char[] value,any token){
+    if(Human(client))ISprays_BarrierAck(client,token,result==ConVarQuery_Okay);
 }

@@ -25,6 +25,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <map>
 #include <memory>
 #include <set>
@@ -33,6 +34,7 @@
 
 SH_DECL_HOOK2_void(INetChannelHandler,PacketStart,SH_NOATTRIB,0,int,int);
 SH_DECL_HOOK0_void(INetChannelHandler,PacketEnd,SH_NOATTRIB,0);
+SH_DECL_HOOK1_void(INetChannel,SetFileTransmissionMode,SH_NOATTRIB,0,bool);
 SH_DECL_HOOK2_void(INetChannelHandler,FileReceived,SH_NOATTRIB,0,const char *,unsigned int);
 SH_DECL_HOOK2_void(INetChannelHandler,FileDenied,SH_NOATTRIB,0,const char *,unsigned int);
 SH_DECL_HOOK2_void(INetChannelHandler,FileRequested,SH_NOATTRIB,0,const char *,unsigned int);
@@ -56,7 +58,7 @@ SMEXT_LINK(&g_Sprays);
 
 namespace {
 constexpr int Slots=SM_MAXPLAYERS+1;
-enum Phase {Idle=0,Uploading=1,Ready=2,Processing=3,Distributing=4,Preloading=5,Failed=-1};
+enum Phase {Idle=0,Uploading=1,Ready=2,Processing=3,Distributing=4,Warming=6,AwaitClear=7,Failed=-1};
 IVEngineServer *serverEngine;
 IEngineTrace *engineTrace;
 IVModelInfo *modelInfo;
@@ -76,10 +78,11 @@ std::vector<int> globalHooks;
 int tableHook;
 bool publishing;
 bool replaying;
-IForward *placedForward,*guardForward,*visibleForward,*changedForward;
+IForward *placedForward,*guardForward,*visibleForward,*changedForward,*barrierForward;
 uint64_t sequence;
 int nextToken;
-struct Download {unsigned transfer=0;bool pending=false,denied=false;};
+
+struct Download {unsigned transfer=0;bool pending=false;};
 struct ModelDelivery {double settle=0,deadline=0,hardDeadline=0;bool ready=false,failed=false;std::set<unsigned> transfers;};
 class Recipients final : public IRecipientFilter {
 public:
@@ -109,7 +112,7 @@ struct Client {
     std::map<std::string,uint32_t> known;
     std::map<uint32_t,uint32_t> originalCrcs;
     std::set<std::string> previewPaths,previewDelivered;
-    std::set<uint32_t> readyTextures;
+    std::set<uint32_t> readyTextures,readyCaches;
     std::map<std::string,ModelDelivery> surfaceDownloads;
     spray_geometry::Model surfaceMesh;
     std::string surfaceModel;
@@ -117,7 +120,12 @@ struct Client {
     std::set<unsigned> surfaceCleared;
     uint32_t surfaceCrc=0;
     std::string selected,error,cache;
-    std::string textureCache;
+
+    std::set<std::string> fastFiles;
+    bool backgroundMode=true,fastMode=false,fastControlled=false;
+    double fastCredit=0;
+    std::string cacheIdentity;
+    std::array<unsigned,Slots> barrier{};int barrierStage=0;double barrierNext=0;
     std::string wanted,previewMaterial;
     std::vector<std::string> previewAssets;
     double previewSettle=0,previewDeadline=0,hardDeadline=0;
@@ -164,11 +172,18 @@ public:
         smutils->LogMessage(myself,"Slow spray operation: %s took %.1f ms",name,elapsed*1000);
     }
 };
+void ArmFastFile(int client,const char *name){
+    auto &c=clients[client];if(!c.net)return;
+    c.fastFiles.insert(name);
+    c.fastControlled=true;
+}
 bool QueueFile(int client,const char *name,unsigned transfer){
     SlowOperation timing("queueing file transfer");
     // Let TF2 schedule file fragments alongside its normal game snapshots.
     // Extra Transmit calls can consume the channel's budget before snapshots.
-    return clients[client].net&&clients[client].net->SendFile(name,transfer);
+    auto net=clients[client].net;if(!net)return false;
+    ArmFastFile(client,name);
+    return net->SendFile(name,transfer);
 }
 bool WaitingForFile(int client,const std::string &name){
     auto net=clients[client].net;if(!net)return true;
@@ -189,6 +204,36 @@ bool Current(int client) {
     if(client<1||client>=Slots)return false;
     auto player=playerhelpers->GetGamePlayer(client);
     return player&&player->IsInGame()&&!player->IsFakeClient()&&player->GetSerial()==clients[client].serial;
+}
+void LoadSelectionCache(int client){
+    auto &c=clients[client];if(!c.cacheIdentity.empty())return;
+    auto player=playerhelpers->GetGamePlayer(client);
+    auto identity=player?player->GetSteamId64():0;if(!identity)return;
+    c.cacheIdentity=std::to_string(identity);
+    auto path=incomingRoot.parent_path()/"selections"/(c.cacheIdentity+".txt");
+    std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec||size>65536)return;
+    std::ifstream input(path);std::string version;std::getline(input,version);if(version!="IS_CACHE_1")return;
+    uint32_t crc=0,original=0;std::string selected,normalized;
+    for(unsigned i=0;i<128&&input>>crc>>original>>std::quoted(selected);++i){
+        if(crc&&sprays::SelectedPath(selected,normalized)&&selected==normalized){
+            c.known.emplace(selected,crc);c.originalCrcs.emplace(crc,original?original:crc);
+        }
+    }
+}
+void SaveSelectionCache(int client){
+    auto &c=clients[client];if(c.cacheIdentity.empty())return;
+    auto directory=incomingRoot.parent_path()/"selections";std::error_code ec;
+    std::filesystem::create_directories(directory,ec);if(ec)return;
+    auto path=directory/(c.cacheIdentity+".txt");
+    // These small, replaceable hints are never trusted as image contents; a
+    // cache hit must pass the normal bounded VTF validation before publication.
+    std::ofstream output(path,std::ios::trunc);if(!output)return;
+    output<<"IS_CACHE_1\n";unsigned count=0;
+    for(auto &entry:c.known){
+        if(++count>128)break;
+        auto original=c.originalCrcs.find(entry.second);
+        output<<entry.second<<' '<<(original==c.originalCrcs.end()?entry.second:original->second)<<' '<<std::quoted(entry.first)<<'\n';
+    }
 }
 bool Visible(int client,int recipient) {
     if(!Current(client)||!Current(recipient))return false;
@@ -253,6 +298,21 @@ void ClearOwnerDecal(int client,const Placement &p,bool everyone=false,int recip
     else onlyOwner.members.push_back(recipient?recipient:client);
     SH_CALL(serverEngine,&IVEngineServer::PlaybackTempEntity)(onlyOwner,0.0f,data.data(),p.table,p.classId);
 }
+void QueryBarrier(Client &c){
+    c.barrier={};
+    for(int peer=1;peer<Slots;++peer)if(Current(peer)){
+        c.barrier[peer]=clients[peer].serial;
+        barrierForward->PushCell(peer);barrierForward->PushCell(c.token);barrierForward->Execute(nullptr);
+    }
+}
+bool BarrierPending(Client &c){
+    bool pending=false;
+    for(int peer=1;peer<Slots;++peer)if(c.barrier[peer]){
+        if(!Current(peer)||clients[peer].serial!=c.barrier[peer])c.barrier[peer]=0;
+        else pending=true;
+    }
+    return pending;
+}
 void Publish(int client,uint32_t crc) {
     auto &c=clients[client];
     player_info_t info{};bool swapped;
@@ -270,7 +330,8 @@ void Publish(int client,uint32_t crc) {
     double grace=.35;
     for(int i=1;i<Slots;++i)if(Current(i)&&clients[i].net)
         grace=std::max(grace,.25+4.0*clients[i].net->GetAvgLatency(FLOW_OUTGOING));
-    c.settle=Now()+std::min(grace,2.0);c.deadline=Now()+30.0;c.phase=Distributing;
+    c.settle=Now()+std::min(grace,2.0);c.deadline=Now()+30.0;c.hardDeadline=Now()+180;c.phase=Distributing;
+    c.barrierStage=0;c.barrierNext=Now()+.04;
 }
 bool CacheTexture(std::vector<uint8_t> &data,uint32_t &crc){
     SlowOperation timing("preparing spray texture");
@@ -282,17 +343,13 @@ bool CacheTexture(std::vector<uint8_t> &data,uint32_t &crc){
 }
 void PreparePublication(int client,uint32_t crc){
     auto &c=clients[client];c.targetCrc=crc;c.cache=sprays::CachePath(crc);
-    c.textureCache="materials/temp/"+sprays::Hex(crc)+".vtf";c.downloads={};
-    // A visible old decal can bind PlayerLogo to the NEW CRC immediately after
-    // userinfo changes. The stock proxy retains missing textures indefinitely.
-    // Deliver the exact renderer file and wait for acknowledgement first.
+    c.downloads={};
+    // Clear the old decal under its still-valid CRC. Two acknowledged client
+    // queries, separated by game frames, let that clear execute before the
+    // new userinfo arrives. The client can then request only a missing DAT.
     ClearOwnerDecal(client,c.placement,true);
-    for(int recipient=1;recipient<Slots;++recipient)if(Current(recipient)&&clients[recipient].net){
-        auto &peer=clients[recipient];if(peer.readyTextures.count(crc))continue;
-        auto &d=c.downloads[recipient];d.transfer=static_cast<unsigned>(++sequence);d.pending=true;
-        if(!QueueFile(recipient,c.textureCache.c_str(),d.transfer)){d.pending=false;d.denied=true;}
-    }
-    c.settle=Now()+.25;c.deadline=Now()+60;c.hardDeadline=Now()+180;c.phase=Preloading;
+    c.barrier={};c.barrierStage=0;c.barrierNext=Now()+.04;
+    c.deadline=Now()+15;c.phase=AwaitClear;
 }
 void Complete(int client) {
     auto &c=clients[client];std::vector<uint8_t> data;std::string reason;
@@ -300,7 +357,7 @@ void Complete(int client) {
     if(!sprays::ValidTexture(data,reason)){Fail(c,reason.c_str());return;}
     uint32_t crc=0,original=sprays::Crc(data);
     if(!CacheTexture(data,crc)){Fail(c,"Spray cache write failed or its identifier conflicts with another file.");return;}
-    c.originalCrcs[crc]=original;c.known[c.selected]=crc;RemoveIncoming(c.incoming);c.incoming.clear();
+    c.originalCrcs[crc]=original;c.known[c.selected]=crc;SaveSelectionCache(client);RemoveIncoming(c.incoming);c.incoming.clear();
     if(!c.wanted.empty()&&c.wanted!=c.selected){c.phase=Ready;return;}
     PreparePublication(client,crc);
 }
@@ -415,6 +472,15 @@ bool UploadDirectory(const char *path,const char *pathID){
 }
 class Hooks {
 public:
+    void FileMode(bool background){
+        auto net=META_IFACEPTR(INetChannel);
+        for(auto &c:clients)if(c.net==net){
+            c.backgroundMode=background;
+            if(c.fastControlled)RETURN_META_NEWPARAMS(MRES_IGNORED,&INetChannel::SetFileTransmissionMode,(!c.fastMode));
+            break;
+        }
+        RETURN_META(MRES_IGNORED);
+    }
     void PacketBegin(int,int){
         // PacketStart precedes fragment completion in the stock engine. Avoid
         // wrapping ProcessPacket itself, which can dispatch plugin-unload commands.
@@ -447,16 +513,16 @@ public:
         if(client&&clients[client].previewTransfers.count(transfer))clients[client].previewFailed=true;
         if(client)for(auto &entry:clients[client].surfaceDownloads)
             if(entry.second.transfers.count(transfer))entry.second.failed=true;
-        if(client&&name)for(auto &c:clients)if(c.phase==Preloading&&c.textureCache==name&&c.downloads[client].transfer==transfer){
-            c.downloads[client].pending=false;c.downloads[client].denied=true;
-        }
         if(client&&name&&clients[client].phase==Uploading&&clients[client].transfer==transfer&&clients[client].selected==name)
             Fail(clients[client],"Client declined the spray upload or could not find the file.");
         RETURN_META(MRES_IGNORED);
     }
     void Requested(const char *name,unsigned transfer){
         int recipient=FromHandler(META_IFACEPTR(INetChannelHandler));
-        if(recipient&&name)for(auto &c:clients)if(c.phase==Distributing&&c.cache==name)c.downloads[recipient]={transfer,true};
+        if(recipient&&name)for(auto &c:clients)if(c.cache==name&&c.activeCrc){
+            ArmFastFile(recipient,name);
+            if(c.phase==Distributing)c.downloads[recipient]={transfer,true};
+        }
         RETURN_META(MRES_IGNORED);
     }
     void SprayBefore(IRecipientFilter &filter,float delay,const void *sender,const SendTable *table,int classId){
@@ -527,6 +593,7 @@ public:
 
 void ClearClient(int client){
     auto &c=clients[client];
+    if(c.net&&c.fastControlled)SH_CALL(c.net,&INetChannel::SetFileTransmissionMode)(c.backgroundMode);
     for(int hook:c.hooks)if(hook)SH_REMOVE_HOOK_ID(hook);
     RemoveIncoming(c.incoming);c=Client{};
     for(auto &state:clients)state.downloads[client]={};
@@ -540,6 +607,7 @@ void BindClient(int client) {
     if(clients[client].net==net&&clients[client].serial==player->GetSerial())return;
     ClearClient(client);auto &c=clients[client];c.net=net;c.handler=net->GetMsgHandler();c.serial=player->GetSerial();
     c.hooks={
+        SH_ADD_HOOK(INetChannel,SetFileTransmissionMode,c.net,SH_MEMBER(&hooks,&Hooks::FileMode),false),
         SH_ADD_HOOK(INetChannelHandler,PacketStart,c.handler,SH_MEMBER(&hooks,&Hooks::PacketBegin),false),
         SH_ADD_HOOK(INetChannelHandler,PacketEnd,c.handler,SH_MEMBER(&hooks,&Hooks::PacketEnd),true),
         SH_ADD_HOOK(INetChannelHandler,FileReceived,c.handler,SH_MEMBER(&hooks,&Hooks::Received),false),
@@ -573,6 +641,26 @@ void Frame(bool){
     double now=Now();bool processed=false;
     for(int i=1;i<Slots;++i){auto &c=clients[i];
         if(c.net&&Current(i)){
+            for(auto f=c.fastFiles.begin();f!=c.fastFiles.end();){
+                if(!WaitingForFile(i,*f))f=c.fastFiles.erase(f);else ++f;
+            }
+            if(c.fastControlled&&c.fastFiles.empty()){
+                SH_CALL(c.net,&INetChannel::SetFileTransmissionMode)(c.backgroundMode);
+                c.fastMode=false;c.fastControlled=false;c.fastCredit=0;
+            }else if(c.fastControlled){
+                // At most the normal scheduler's four 256-byte fragments per
+                // packet. Reserve bandwidth for snapshots; lower-rate or
+                // choking clients retain more background-mode packets.
+                const double rate=c.net->GetDataRate();
+                const double packetsPerSecond=1.0/std::max(double(globals->interval_per_tick),.001);
+                const double fileBudget=std::max(0.0,rate-std::max(16384.0,rate*.35));
+                double fraction=std::clamp((fileBudget/(256.0*packetsPerSecond)-1.0)/3.0,0.0,1.0);
+                if(c.net->GetAvgChoke(FLOW_OUTGOING)>.03f)fraction=0;
+                c.fastCredit=std::min(c.fastCredit+fraction,2.0);
+                bool fast=!c.backgroundMode||c.fastCredit>=1.0;
+                if(c.fastCredit>=1.0)c.fastCredit-=1.0;
+                if(fast!=c.fastMode){SH_CALL(c.net,&INetChannel::SetFileTransmissionMode)(!fast);c.fastMode=fast;}
+            }
             if(c.placementDirty){
                 c.placementDirty=false;const auto p=c.placement;
                 cell_t origin[3]={sp_ftoc(p.origin.x),sp_ftoc(p.origin.y),sp_ftoc(p.origin.z)};
@@ -595,42 +683,53 @@ void Frame(bool){
         }
         if(c.phase==Processing&&!processed){processed=true;if(Current(i))Complete(i);else Fail(c,"Player left before upload completed.");}
         else if(c.phase==Uploading&&now>c.deadline)Fail(c,"Spray upload timed out.");
-        else if(c.phase==Preloading){bool pending=false,denied=false;
-            for(int recipient=1;recipient<Slots;++recipient){auto &d=c.downloads[recipient];
-                if(!Current(recipient)){d.pending=false;continue;}
-                if(d.pending&&clients[recipient].outboundMoved)c.deadline=std::min(now+60.0,c.hardDeadline);
-                if(d.pending&&now>=c.settle&&!WaitingForFile(recipient,c.textureCache)){
-                    d.pending=false;clients[recipient].readyTextures.insert(c.targetCrc);
-                }
-                pending|=d.pending;denied|=(recipient==i&&d.denied);
-            }
-            if(denied)Fail(c,"Your client declined the prepared spray texture. Your previous spray is unchanged.");
-            else if(now>=c.deadline&&pending)Fail(c,"Spray delivery stalled. Press the spray key to retry.");
-            else if(now>=c.settle&&!pending){
-                if(!c.wanted.empty()&&c.wanted!=c.selected)c.phase=Ready;
+        else if(c.phase==AwaitClear){
+            if(now>=c.deadline){Fail(c,"Client did not acknowledge the spray clear.");continue;}
+            if((c.barrierStage==0||c.barrierStage==2)&&now>=c.barrierNext){++c.barrierStage;QueryBarrier(c);}
+            if((c.barrierStage==1||c.barrierStage==3)&&!BarrierPending(c)){
+                if(c.barrierStage==1){c.barrierStage=2;c.barrierNext=now+.05;}
+                else if(!c.wanted.empty()&&c.wanted!=c.selected)c.phase=Ready;
                 else Publish(i,c.targetCrc);
             }
         }
         else if(c.phase==Distributing){bool pending=false;
+            if(c.barrierStage==0&&now>=c.barrierNext){c.barrierStage=1;QueryBarrier(c);}
+            pending=c.barrierStage==0||BarrierPending(c);
             for(int recipient=1;recipient<Slots;++recipient){auto &d=c.downloads[recipient];
                 // Only this image's DAT matters; another player's queued file
                 // or ordinary reliable traffic must not hold up its handoff.
-                if(d.pending&&(!Current(recipient)||!WaitingForFile(recipient,c.cache)))d.pending=false;
+                if(d.pending&&Current(recipient)&&clients[recipient].outboundMoved)c.deadline=std::min(now+30.0,c.hardDeadline);
+                if(d.pending&&(!Current(recipient)||!WaitingForFile(recipient,c.cache))){
+                    d.pending=false;if(Current(recipient))clients[recipient].readyCaches.insert(c.activeCrc);
+                }
                 pending|=d.pending;
             }
-            if((now>=c.settle&&!pending)||now>=c.deadline)c.phase=Ready;
+            if(now>=c.deadline&&pending){Fail(c,"Spray delivery stalled.");continue;}
+            if(now>=c.settle&&!pending){
+                for(int peer=1;peer<Slots;++peer)if(Current(peer))clients[peer].readyCaches.insert(c.activeCrc);
+                if(!c.placement.data.empty()){
+                    // Creating a normal player decal first materializes DAT as
+                    // VTF. The studio-model target clears without projecting.
+                    ClearOwnerDecal(i,c.placement,true);
+                    double grace=.25;
+                    for(int peer=1;peer<Slots;++peer)if(Current(peer)&&clients[peer].net)
+                        grace=std::max(grace,.15+2.0*clients[peer].net->GetAvgLatency(FLOW_OUTGOING));
+                    c.settle=now+std::min(grace,2.0);c.phase=Warming;
+                }else c.phase=Ready;
+            }
         }
+        else if(c.phase==Warming&&now>=c.settle)c.phase=Ready;
     }
 }
 bool Claim(IPluginContext *context){if(owner&&owner!=context){context->ThrowNativeError("Instant Sprays already has a controlling plugin");return false;}owner=context;return true;}
-cell_t Api(IPluginContext *,const cell_t *){return 6;}
+cell_t Api(IPluginContext *,const cell_t *){return 7;}
 cell_t Request(IPluginContext *context,const cell_t *params){
     if(!Claim(context))return 0;
     int client=params[1];char *input;context->LocalToString(params[2],&input);std::string path;
     if(!sprays::SelectedPath(input,path))return -1;
     BindClient(client);if(!Current(client)||!clients[client].net||!userinfo||!tableHook)return 0;
-    auto &c=clients[client];
-    if(c.phase==Uploading||c.phase==Processing||c.phase==Distributing||c.phase==Preloading)return 0;
+    auto &c=clients[client];LoadSelectionCache(client);
+    if(c.phase==Uploading||c.phase==Processing||c.phase==Distributing||c.phase==Warming||c.phase==AwaitClear)return 0;
     if(!params[3]){auto found=c.known.find(path);if(found!=c.known.end()&&baseFiles->FileExists(sprays::CachePath(found->second).c_str(),"GAME")){
         c.selected=path;c.error.clear();nextToken=nextToken>=INT_MAX?1:nextToken+1;c.token=nextToken;
         auto handle=baseFiles->Open(sprays::CachePath(found->second).c_str(),"rb","GAME");
@@ -670,15 +769,24 @@ cell_t Watch(IPluginContext *context,const cell_t *params){
     int client=params[1];char *input;context->LocalToString(params[2],&input);std::string path;
     if(!sprays::SelectedPath(input,path))return -1;
     BindClient(client);if(!Current(client)||!clients[client].net)return 0;
-    auto &c=clients[client];
+    auto &c=clients[client];LoadSelectionCache(client);
     if(c.wanted!=path){c.previewMaterial.clear();c.previewReady=false;}
     c.wanted=path;bool associated=false;
-    if(params[3]&&c.known.empty()&&!c.requests){player_info_t info{};bool swapped;
+    if(params[3]&&!c.requests){player_info_t info{};bool swapped;
         if(ReadInfo(client,info,swapped)){uint32_t crc=swapped?Swap(info.customFiles[0]):info.customFiles[0];
             // The signon upload can still be arriving when PutInServer runs.
             // Its announced CRC already identifies the initial selection; do
             // not start a second upload just because its DAT is not written yet.
-            if(crc){c.known[path]=crc;associated=true;}
+            if(crc){
+                auto found=c.known.find(path);
+                bool same=false;
+                if(found!=c.known.end()){
+                    auto original=c.originalCrcs.find(found->second);
+                    same=original!=c.originalCrcs.end()&&original->second==crc;
+                }
+                if(!same)c.known[path]=crc;
+                associated=true;
+            }
         }
     }
     return associated?2:1;
@@ -731,7 +839,12 @@ cell_t SurfaceModel(IPluginContext *context,const cell_t *params){
     if(found==peer.surfaceDownloads.end()){
         ModelDelivery d;d.settle=Now()+std::max(.15,4.0*peer.net->GetAvgLatency(FLOW_OUTGOING));d.deadline=Now()+60;d.hardDeadline=Now()+180;
         auto send=[&](const std::string &name){auto id=static_cast<unsigned>(++sequence);d.transfers.insert(id);if(!QueueFile(recipient,name.c_str(),id))d.failed=true;};
-        if(!peer.readyTextures.count(c.surfaceCrc))send("materials/temp/"+sprays::Hex(c.surfaceCrc)+".vtf");
+        if(!peer.readyTextures.count(c.surfaceCrc)){
+            if(peer.readyCaches.count(c.surfaceCrc)){
+                ClearOwnerDecal(client,p,false,recipient);
+                d.settle=Now()+std::max(.25,4.0*peer.net->GetAvgLatency(FLOW_OUTGOING));
+            }else send("materials/temp/"+sprays::Hex(c.surfaceCrc)+".vtf");
+        }
         for(const auto &name:c.surfaceAssets)send(name);
         peer.surfaceDownloads.emplace(c.surfaceModel,std::move(d));return 0;
     }
@@ -802,7 +915,16 @@ cell_t Replay(IPluginContext *context,const cell_t *params){
     if(filter.members.empty())return 0;
     replaying=true;serverEngine->PlaybackTempEntity(filter,0.0f,p.data.data(),p.table,p.classId);replaying=false;return 1;
 }
-sp_nativeinfo_t natives[]={{"ISprays_ApiVersion",Api},{"ISprays_Request",Request},{"ISprays_Status",Status},{"ISprays_Cancel",Cancel},{"ISprays_Inspect",Inspect},
+cell_t BarrierAck(IPluginContext *context,const cell_t *params){
+    if(owner!=context)return context->ThrowNativeError("Not the controlling plugin");
+    int peer=params[1],token=params[2];if(!Current(peer))return 0;
+    for(auto &c:clients)if(c.token==token&&(c.phase==AwaitClear||c.phase==Distributing)&&c.barrier[peer]==clients[peer].serial){
+        if(params[3])c.barrier[peer]=0;
+        return 1;
+    }
+    return 0;
+}
+sp_nativeinfo_t natives[]={{"ISprays_BarrierAck",BarrierAck},{"ISprays_ApiVersion",Api},{"ISprays_Request",Request},{"ISprays_Status",Status},{"ISprays_Cancel",Cancel},{"ISprays_Inspect",Inspect},
     {"ISprays_Watch",Watch},{"ISprays_Preview",Preview},{"ISprays_EnablePreview",EnablePreview},{"ISprays_Replay",Replay},
     {"ISprays_SetSurface",Surface},{"ISprays_SurfaceModel",SurfaceModel},{"ISprays_ClearPrevious",ClearPrevious},{"ISprays_LastError",LastError},{"ISprays_CanReceive",CanReceive},{"ISprays_GetDecalFile",DecalFile},{"ISprays_ClearViewer",ClearViewer},{nullptr,nullptr}};
 }
@@ -843,6 +965,7 @@ bool InstantSprays::SDK_OnLoad(char *error,size_t length,bool){
         SH_ADD_HOOK(IVEngineServer,PlaybackTempEntity,serverEngine,SH_MEMBER(&hooks,&Hooks::SprayAfter),true)};
     for(int hook:globalHooks)if(!hook){for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();spray_files::Uninstall();if(queueConfig)gameconfs->CloseGameConfigFile(queueConfig);queueConfig=nullptr;fileWaiting=nullptr;snprintf(error,length,"Cannot install spray transport hooks");return false;}
     sharesys->AddNatives(myself,natives);sharesys->RegisterLibrary(myself,"instant_sprays");
+    barrierForward=forwards->CreateForward("ISprays_OnClearBarrier",ET_Ignore,2,nullptr,Param_Cell,Param_Cell);
     placedForward=forwards->CreateForward("ISprays_OnSprayPlaced",ET_Ignore,5,nullptr,Param_Cell,Param_Array,Param_Cell,Param_Cell,Param_Cell);
     guardForward=forwards->CreateForward("ISprays_ShouldGuardSurface",ET_Event,3,nullptr,Param_Cell,Param_Array,Param_Cell);
     visibleForward=forwards->CreateForward("ISprays_CanSeeSpray",ET_Hook,2,nullptr,Param_Cell,Param_Cell);
@@ -850,7 +973,7 @@ bool InstantSprays::SDK_OnLoad(char *error,size_t length,bool){
     playerhelpers->AddClientListener(this);plsys->AddPluginsListener(this);smutils->AddGameFrameHook(Frame);
     if(smutils->IsMapRunning()){BindTable();for(int i=1;i<=globals->maxClients;++i)BindClient(i);}return true;
 }
-void InstantSprays::SDK_OnUnload(){spray_files::Uninstall();if(queueConfig)gameconfs->CloseGameConfigFile(queueConfig);queueConfig=nullptr;fileWaiting=nullptr;smutils->RemoveGameFrameHook(Frame);playerhelpers->RemoveClientListener(this);plsys->RemovePluginsListener(this);StopMap();for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();if(placedForward)forwards->ReleaseForward(placedForward);if(guardForward)forwards->ReleaseForward(guardForward);if(visibleForward)forwards->ReleaseForward(visibleForward);if(changedForward)forwards->ReleaseForward(changedForward);placedForward=nullptr;guardForward=nullptr;visibleForward=nullptr;changedForward=nullptr;owner=nullptr;}
+void InstantSprays::SDK_OnUnload(){if(barrierForward)forwards->ReleaseForward(barrierForward);barrierForward=nullptr;spray_files::Uninstall();if(queueConfig)gameconfs->CloseGameConfigFile(queueConfig);queueConfig=nullptr;fileWaiting=nullptr;smutils->RemoveGameFrameHook(Frame);playerhelpers->RemoveClientListener(this);plsys->RemovePluginsListener(this);StopMap();for(int h:globalHooks)if(h)SH_REMOVE_HOOK_ID(h);globalHooks.clear();if(placedForward)forwards->ReleaseForward(placedForward);if(guardForward)forwards->ReleaseForward(guardForward);if(visibleForward)forwards->ReleaseForward(visibleForward);if(changedForward)forwards->ReleaseForward(changedForward);placedForward=nullptr;guardForward=nullptr;visibleForward=nullptr;changedForward=nullptr;owner=nullptr;}
 void InstantSprays::OnClientPutInServer(int client){BindClient(client);}
 void InstantSprays::OnClientDisconnecting(int client){if(client>0&&client<Slots)ClearClient(client);}
 void InstantSprays::OnPluginUnloaded(IPlugin *plugin){if(plugin->GetBaseContext()==owner){for(auto &c:clients){RemoveIncoming(c.incoming);c.incoming.clear();c.phase=Idle;c.activeCrc=0;c.originalCrc=0;c.previewEnabled=false;c.placementDirty=false;c.placement={};c.downloads={};}owner=nullptr;}}

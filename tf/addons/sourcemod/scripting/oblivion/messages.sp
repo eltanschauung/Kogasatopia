@@ -8,7 +8,7 @@ void Messages_Start()
         "player_changeclass", "player_spawn", "player_builtobject", "player_upgradedobject",
         "object_destroyed", "object_detonated", "object_deflected", "player_teleported",
         "player_stunned", "player_jarated", "player_jarated_fade", "player_death_explosion",
-        "item_found", "achievement_earned"
+        "item_found", "achievement_earned", "teamplay_capture_blocked"
     };
     for (int i = 0; i < sizeof(events); i++)
     {
@@ -33,6 +33,11 @@ bool EventHidden(Event event, int viewer)
     if (viewer < 1 || viewer > MaxClients || !g_HasRules[viewer]) return false;
     char name[64];
     event.GetName(name, sizeof(name));
+    // CTeamControlPoint::CaptureBlocked uses entity indices for both actors.
+    // Return here so victim is never mistaken for a userid by the generic path.
+    if (StrEqual(name, "teamplay_capture_blocked"))
+        return Hidden(viewer, event.GetInt("blocker", 0))
+            || Hidden(viewer, event.GetInt("victim", 0));
     // These notifications carry an entity index, unlike the userids used by
     // death/chat events. They are rendered into chat by the client itself.
     if ((StrEqual(name, "item_found") || StrEqual(name, "achievement_earned"))
