@@ -100,31 +100,9 @@ public void SQL_OnMailBanStateLoaded(Database db, DBResultSet rows, const char[]
 
 bool CanClientUseMailCommands(int client, bool notify = true)
 {
-    if (!IsMailClient(client))
-    {
-        return false;
-    }
-
-    if (!g_MailBanLoaded[client])
-    {
-        RequestMailBanState(client);
-        if (notify)
-        {
-            CPrintToChat(client, "%s Your mail access is still loading. Try again shortly.", MAIL_PREFIX);
-        }
-        return false;
-    }
-
-    if (g_MailBanned[client])
-    {
-        if (notify)
-        {
-            CPrintToChat(client, "%s You are banned from using mail commands.", MAIL_PREFIX);
-        }
-        return false;
-    }
-
-    return true;
+    #pragma unused notify
+    // Delivery bans are enforced atomically in SQL, never at the command layer.
+    return IsMailClient(client);
 }
 
 public Action Command_MailBan(int client, int args)
@@ -210,7 +188,6 @@ Action HandleMailBanCommand(int client, int args, bool ban)
     int generation = ++g_MailBanGeneration[target];
     g_MailBanLoaded[target] = false;
     g_MailBanQueryPending[target] = true;
-    ClearClientMailState(target);
 
     DataPack pack = new DataPack();
     pack.WriteCell(client == 0 ? 0 : GetClientUserId(client));
@@ -272,30 +249,22 @@ public void SQL_OnMailBanMutationComplete(Database db, DBResultSet results,
         g_MailBanQueryPending[target] = false;
         g_MailBanLoaded[target] = true;
         g_MailBanned[target] = ban;
-        if (ban)
-        {
-            CPrintToChat(target, "%s An admin banned you from using mail commands.", MAIL_PREFIX);
-        }
-        else
-        {
-            CPrintToChat(target, "%s An admin restored your access to mail commands.", MAIL_PREFIX);
-        }
     }
 
     ReplyToCommand(admin, ban
-        ? "[Mail] Banned %s from using mail commands."
-        : "[Mail] Restored %s's access to mail commands.",
+        ? "[Mail] Silently blocked mail delivery to and from %s."
+        : "[Mail] Restored mail delivery to and from %s.",
         targetName);
 
     if (target > 0)
     {
         if (ban)
         {
-            LogAction(admin, target, "\"%L\" banned \"%L\" from mail commands.", admin, target);
+            LogAction(admin, target, "\"%L\" silently blocked mail delivery to and from \"%L\".", admin, target);
         }
         else
         {
-            LogAction(admin, target, "\"%L\" restored mail-command access for \"%L\".", admin, target);
+            LogAction(admin, target, "\"%L\" restored mail delivery to and from \"%L\".", admin, target);
         }
     }
 }

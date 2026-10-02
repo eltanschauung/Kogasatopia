@@ -279,6 +279,24 @@ public void SQL_OnMailBanSchemaReady(Database db, DBResultSet results, const cha
         return;
     }
 
+    char query[256];
+    FormatEx(query, sizeof(query),
+        "ALTER TABLE %s ADD COLUMN %s delivery_suppressed INTEGER NOT NULL DEFAULT 0",
+        MAIL_TABLE, g_MailDatabaseIsMySql ? "IF NOT EXISTS" : "");
+    g_MailDatabase.Query(SQL_OnMailDeliveryColumnReady, query);
+}
+
+public void SQL_OnMailDeliveryColumnReady(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (error[0] != '\0'
+        && StrContains(error, "duplicate column", false) == -1
+        && StrContains(error, "already exists", false) == -1)
+    {
+        LogError("[server_mail] Mail delivery-state migration failed: %s", error);
+        ScheduleMailReconnect();
+        return;
+    }
+
     Stimulus_EnsureSchema();
 }
 

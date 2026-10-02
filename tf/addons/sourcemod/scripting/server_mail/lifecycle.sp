@@ -23,8 +23,8 @@ public void OnPluginStart()
     RegConsoleCmd("sm_mailrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
     RegConsoleCmd("sm_sendrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
     RegConsoleCmd("sm_giftrtd", Command_MailRtd, "Mail a prepaid RTD roll to a player.");
-    RegAdminCmd("sm_mailban", Command_MailBan, ADMFLAG_BAN, "sm_mailban <target> - Ban a player from mail commands.");
-    RegAdminCmd("sm_mailunban", Command_MailUnban, ADMFLAG_BAN, "sm_mailunban <target> - Unban a player from mail commands.");
+    RegAdminCmd("sm_mailban", Command_MailBan, ADMFLAG_BAN, "sm_mailban <target> - Silently block mail delivery to and from a player.");
+    RegAdminCmd("sm_mailunban", Command_MailUnban, ADMFLAG_BAN, "sm_mailunban <target> - Restore mail delivery to and from a player.");
     HookEvent("player_team", Event_MailPlayerTeam, EventHookMode_Post);
     g_MailUnreadReminderCookie = new Cookie("server_mail_unread_reminder_day",
         "Last date the unread-mail reminder was displayed.", CookieAccess_Private);
@@ -207,6 +207,7 @@ public Action Timer_CheckUnreadMail(Handle timer, any serial)
     char query[512];
     FormatEx(query, sizeof(query),
         "SELECT 1 FROM %s WHERE receiver_steamid64 = '%s' AND read_at = 0 "
+        ... "AND delivery_suppressed = 0 "
         ... "AND (expires_at = 0 OR expires_at > %d OR gems_redeemed != 0) LIMIT 1",
         MAIL_TABLE, escapedSteam, GetTime());
     DataPack pack = new DataPack();

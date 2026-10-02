@@ -64,7 +64,7 @@ void BeginMailAttachmentRedemption(int client, int mailId)
     FormatEx(query, sizeof(query),
         "SELECT sender_steamid64, sender_name, attachment_type FROM %s "
         ... "WHERE mail_id = %d AND receiver_steamid64 = '%s' "
-        ... "AND attachment_type != '' AND attachment_redeemed = 0 LIMIT 1",
+        ... "AND delivery_suppressed = 0 AND attachment_type != '' AND attachment_redeemed = 0 LIMIT 1",
         MAIL_TABLE,
         mailId,
         escapedReceiver);

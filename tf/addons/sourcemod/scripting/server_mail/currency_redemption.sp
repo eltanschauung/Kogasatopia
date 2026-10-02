@@ -30,6 +30,7 @@ void BeginMailRedemption(int client, int mailId)
         "SELECT title, gems FROM %s "
         ... "WHERE mail_id = %d AND receiver_steamid64 = '%s' "
         ... "AND gems > 0 AND gems_redeemed = 0 "
+        ... "AND delivery_suppressed = 0 "
         ... "AND (expires_at = 0 OR expires_at > %d) LIMIT 1",
         MAIL_TABLE,
         mailId,

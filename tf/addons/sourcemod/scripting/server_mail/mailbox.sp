@@ -72,6 +72,7 @@ void RequestMailList(int client, MailViewMode mode)
         FormatEx(query, sizeof(query),
             "SELECT mail_id, title, created_at, gems, sender_name, read_at FROM %s "
             ... "WHERE receiver_steamid64 = '%s' "
+            ... "AND delivery_suppressed = 0 "
             ... "AND (expires_at = 0 OR expires_at > %d OR gems_redeemed != 0) "
             ... "%s"
             ... "ORDER BY created_at DESC, mail_id DESC LIMIT %d",
@@ -222,11 +223,13 @@ void RequestMailDetails(int client, int mailId, MailViewMode mode)
     FormatEx(query, sizeof(query),
         "SELECT mail_id, sender_steamid64, sender_name, receiver_steamid64, receiver_name, contents, gems, gems_redeemed, attachment_type, attachment_redeemed "
         ... "FROM %s WHERE mail_id = %d AND %s = '%s' "
+        ... "AND (%d = 1 OR delivery_suppressed = 0) "
         ... "AND (expires_at = 0 OR expires_at > %d OR gems_redeemed != 0) LIMIT 1",
         MAIL_TABLE,
         mailId,
         mode == MailView_Inbox ? "receiver_steamid64" : "sender_steamid64",
         escapedSteam,
+        mode == MailView_Sent ? 1 : 0,
         GetTime());
 
     DataPack pack = new DataPack();

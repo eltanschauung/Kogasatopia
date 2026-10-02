@@ -70,7 +70,7 @@ public Action Command_ReadAll(int client, int args)
 
     char query[384];
     FormatEx(query, sizeof(query),
-        "UPDATE %s SET read_at = %d WHERE receiver_steamid64 = '%s' AND read_at = 0",
+        "UPDATE %s SET read_at = %d WHERE receiver_steamid64 = '%s' AND read_at = 0 AND delivery_suppressed = 0",
         MAIL_TABLE,
         GetTime(),
         escapedSteam);
@@ -138,6 +138,7 @@ public Action Command_RedeemAll(int client, int args)
     FormatEx(query, sizeof(query),
         "SELECT mail_id, title, gems FROM %s "
         ... "WHERE receiver_steamid64 = '%s' AND gems > 0 AND gems_redeemed = 0 "
+        ... "AND delivery_suppressed = 0 "
         ... "AND (expires_at = 0 OR expires_at > %d) ORDER BY mail_id",
         MAIL_TABLE,
         escapedSteam,

@@ -193,8 +193,9 @@ bool QueueMailInsert(
     {
         FormatEx(query, sizeof(query),
             "INSERT INTO %s "
-            ... "(sender_steamid64, sender_name, receiver_steamid64, receiver_name, created_at, title, contents, gems, gems_redeemed, attachment_type, attachment_redeemed, expires_at, read_at, idempotency_key) "
-            ... "VALUES ('%s', '%s', '%s', '%s', %d, '%s', '%s', %d, 0, '%s', 0, %d, 0, %s) "
+            ... "(sender_steamid64, sender_name, receiver_steamid64, receiver_name, created_at, title, contents, gems, gems_redeemed, attachment_type, attachment_redeemed, expires_at, read_at, idempotency_key, delivery_suppressed) "
+            ... "VALUES ('%s', '%s', '%s', '%s', %d, '%s', '%s', %d, 0, '%s', 0, %d, 0, %s, "
+            ... "EXISTS(SELECT 1 FROM %s WHERE steamid64 IN ('%s', '%s'))) "
             ... "ON DUPLICATE KEY UPDATE mail_id = LAST_INSERT_ID(mail_id)",
             MAIL_TABLE,
             escapedSenderSteam,
@@ -207,14 +208,18 @@ bool QueueMailInsert(
             gems,
             escapedAttachment,
             expiresAt,
-            idempotencyValue);
+            idempotencyValue,
+            MAIL_BAN_TABLE,
+            escapedSenderSteam,
+            escapedReceiverSteam);
     }
     else
     {
         FormatEx(query, sizeof(query),
             "INSERT OR IGNORE INTO %s "
-            ... "(sender_steamid64, sender_name, receiver_steamid64, receiver_name, created_at, title, contents, gems, gems_redeemed, attachment_type, attachment_redeemed, expires_at, read_at, idempotency_key) "
-            ... "VALUES ('%s', '%s', '%s', '%s', %d, '%s', '%s', %d, 0, '%s', 0, %d, 0, %s)",
+            ... "(sender_steamid64, sender_name, receiver_steamid64, receiver_name, created_at, title, contents, gems, gems_redeemed, attachment_type, attachment_redeemed, expires_at, read_at, idempotency_key, delivery_suppressed) "
+            ... "VALUES ('%s', '%s', '%s', '%s', %d, '%s', '%s', %d, 0, '%s', 0, %d, 0, %s, "
+            ... "EXISTS(SELECT 1 FROM %s WHERE steamid64 IN ('%s', '%s')))",
             MAIL_TABLE,
             escapedSenderSteam,
             escapedSenderName,
@@ -226,7 +231,10 @@ bool QueueMailInsert(
             gems,
             escapedAttachment,
             expiresAt,
-            idempotencyValue);
+            idempotencyValue,
+            MAIL_BAN_TABLE,
+            escapedSenderSteam,
+            escapedReceiverSteam);
     }
 
     DataPack pack = new DataPack();
@@ -247,6 +255,25 @@ bool QueueMailInsert(
 public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] error, any data)
 {
     DataPack pack = view_as<DataPack>(data);
+    // Append the insert outcome; the delivery lookup must not replace it.
+    pack.WriteCell(results != null ? results.InsertId : 0);
+    pack.WriteCell(results != null && results.AffectedRows == 1);
+    if (error[0] != '\0' || results == null)
+    {
+        SQL_OnMailDeliveryChecked(db, null, error, pack);
+        return;
+    }
+
+    char query[256];
+    FormatEx(query, sizeof(query),
+        "SELECT delivery_suppressed FROM %s WHERE mail_id = %d",
+        MAIL_TABLE, results.InsertId);
+    db.Query(SQL_OnMailDeliveryChecked, query, pack);
+}
+
+public void SQL_OnMailDeliveryChecked(Database db, DBResultSet results, const char[] error, any data)
+{
+    DataPack pack = view_as<DataPack>(data);
     pack.Reset();
 
     char requestKey[MAIL_REQUEST_KEY_MAX];
@@ -264,9 +291,11 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
     int gems = pack.ReadCell();
     int senderCost = pack.ReadCell();
     bool userInitiated = pack.ReadCell() != 0;
+    int mailId = pack.ReadCell();
+    bool newlyCreated = pack.ReadCell() != 0;
     delete pack;
 
-    if (error[0] != '\0' || results == null)
+    if (error[0] != '\0' || results == null || !results.FetchRow())
     {
         if (userInitiated)
         {
@@ -287,8 +316,7 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
         return;
     }
 
-    int mailId = results.InsertId;
-    bool newlyCreated = results.AffectedRows == 1;
+    bool suppressed = results.FetchInt(0) != 0;
     if (userInitiated)
     {
         FinishUserMailSend(senderUserId, newlyCreated);
@@ -308,6 +336,31 @@ public void SQL_OnMailInserted(Database db, DBResultSet results, const char[] er
 
     int receiver = Kogasa_FindClientBySteamId64(receiverSteamId);
     int liveSender = Kogasa_FindClientBySteamId64(senderSteamId);
+    if (suppressed)
+    {
+        // Keep the sender's normal acknowledgement, but never notify recipients.
+        int sender = GetClientOfUserId(senderUserId);
+        if (IsMailClient(sender))
+        {
+            char coloredReceiver[256];
+            BuildColoredMailName(receiver, receiverSteamId, receiverName, coloredReceiver, sizeof(coloredReceiver));
+            if (gems > 0 && StrContains(requestKey, "server_mail:gift:", false) == 0)
+            {
+                char coloredSender[256], currencyColor[40], currencyName[64];
+                BuildColoredMailName(liveSender, senderSteamId, senderName, coloredSender, sizeof(coloredSender));
+                GetCurrencyFormatting(currencyColor, sizeof(currencyColor), currencyName, sizeof(currencyName), gems);
+                CPrintToChatEx(sender, sender,
+                    "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!",
+                    coloredSender, coloredReceiver, currencyColor, gems, currencyName);
+            }
+            else
+            {
+                CPrintToChatEx(sender, receiver > 0 ? receiver : sender,
+                    "%s Sent to %s{default}.", MAIL_PREFIX, coloredReceiver);
+            }
+        }
+        return;
+    }
     if (gems > 0 && StrContains(requestKey, "server_mail:stimulus:", false) == 0)
     {
         char coloredReceiver[256];
