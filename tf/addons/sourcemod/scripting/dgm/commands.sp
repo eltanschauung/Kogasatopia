@@ -171,7 +171,10 @@ public Action Command_RespawnToggle(int client, int args)
 {
     if (DGM_ShouldDisableInstantRespawn())
     {
-        ReplyToCommand(client, "DGM respawn management is disabled on small-format maps.");
+        if (client > 0 && IsClientInGame(client))
+            PrintToChat(client, "DGM respawn management is disabled on small-format maps.");
+        else
+            PrintToServer("DGM respawn management is disabled on small-format maps.");
         return Plugin_Handled;
     }
 
@@ -199,9 +202,14 @@ public Action Command_RespawnToggle(int client, int args)
     DGM_LogRespawnToggle(client, g_InternalOverride, respawnTime);
     if (g_cvHalveRespawnWaves.BoolValue)
     {
-        ReplyToCommand(client, DGM_AreRespawnTimesForcedOn()
+        char message[96];
+        strcopy(message, sizeof(message), DGM_AreRespawnTimesForcedOn()
             ? "Respawn times are now back to normal."
             : "Respawn times are now halved; respawning all clients!");
+        if (client > 0 && IsClientInGame(client))
+            PrintToChat(client, "%s", message);
+        else
+            PrintToServer("%s", message);
         return Plugin_Handled;
     }
     if (client <= 0)
