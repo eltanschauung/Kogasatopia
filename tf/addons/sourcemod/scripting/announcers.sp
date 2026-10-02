@@ -419,10 +419,12 @@ public int Native_PlayAirshot(Handle plugin, int numParams)
         return false;
     }
 
+    StringMap choices = new StringMap();
     bool played;
     for (int viewer = 1; viewer <= MaxClients; viewer++)
         if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, attacker)
-            && !Oblivion_ShouldHide(viewer, victim)) played = Announcer_PlaySound(viewer, attacker, commandName) || played;
+            && !Oblivion_ShouldHide(viewer, victim)) played = Announcer_PlaySound(viewer, attacker, commandName, choices) || played;
+    delete choices;
     return played;
 }
 
@@ -434,12 +436,14 @@ public void Announcer_UberDeployed(Event event,const char[] name,bool dontBroadc
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)
         GetAnnouncerSoundCommand(g_UberSoundMaps[i],0,"",medic,commands[i],sizeof(commands[]));
     int team=GetClientTeam(medic);
+    StringMap choices = new StringMap();
     for(int listener=1;listener<=MaxClients;listener++)
     {
         if(!IsHumanAnnouncerClient(listener) || GetClientTeam(listener)<2)continue;
         int category=listener==medic || listener==patient ? 2 : (GetClientTeam(listener)==team ? 0 : 1);
-        if(commands[category][0])Announcer_PlaySound(listener,medic,commands[category]);
+        if(commands[category][0])Announcer_PlaySound(listener,medic,commands[category],choices);
     }
+    delete choices;
 }
 
 public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
@@ -698,12 +702,13 @@ void PlayShutdownSounds(int attacker, int victim, int killstreak)
         && IsHumanAnnouncerClient(attacker)
         && GetClientTeam(attacker) != GetClientTeam(victim);
 
+    StringMap choices = new StringMap();
     char yoursCommand[ANNOUNCER_MAX_COMMAND_NAME];
     bool haveYours = GetShutdownSoundCommand(
-        g_ShutdownSoundMap, victim, killstreak, yoursCommand, sizeof(yoursCommand));
+        g_ShutdownSoundMap, victim, killstreak, yoursCommand, sizeof(yoursCommand), choices);
     char theirsCommand[ANNOUNCER_MAX_COMMAND_NAME];
     bool haveTheirs = attackerIsEnemy && GetShutdownSoundCommand(
-        g_ShutdownTheirsSoundMap, attacker, killstreak, theirsCommand, sizeof(theirsCommand));
+        g_ShutdownTheirsSoundMap, attacker, killstreak, theirsCommand, sizeof(theirsCommand), choices);
 
     // Keep the existing high-streak broadcast, but give the killer their own
     // perspective and let both participants hear their sound below that limit.
@@ -718,7 +723,7 @@ void PlayShutdownSounds(int attacker, int victim, int killstreak)
         {
             if (haveTheirs)
             {
-                Announcer_PlaySound(client, attacker, theirsCommand);
+                Announcer_PlaySound(client, attacker, theirsCommand, choices);
             }
             continue;
         }
@@ -726,9 +731,10 @@ void PlayShutdownSounds(int attacker, int victim, int killstreak)
         if (client == victim || killstreak >= shutdownMinimum)
         {
             Announcer_PlayShutdownYoursForClient(client, victim, killstreak,
-                yoursCommand, haveYours);
+                yoursCommand, haveYours, choices);
         }
     }
+    delete choices;
 }
 
 static bool Announcer_PlayShutdownYoursForClient(
@@ -736,21 +742,22 @@ static bool Announcer_PlayShutdownYoursForClient(
     int victim,
     int killstreak,
     const char[] sourceCommand,
-    bool haveSourceCommand)
+    bool haveSourceCommand,
+    StringMap choices)
 {
     if (haveSourceCommand)
     {
-        return Announcer_PlaySound(listener, victim, sourceCommand);
+        return Announcer_PlaySound(listener, victim, sourceCommand, choices);
     }
 
     char commandName[ANNOUNCER_MAX_COMMAND_NAME];
     if (!GetShutdownSoundCommand(g_ShutdownSoundMap, listener, killstreak,
-        commandName, sizeof(commandName)))
+        commandName, sizeof(commandName), choices))
     {
         return false;
     }
 
-    return Announcer_PlaySound(listener, listener, commandName);
+    return Announcer_PlaySound(listener, listener, commandName, choices);
 }
 
 void PlayMedicDropSound(int attacker, int medic)
@@ -961,12 +968,12 @@ void FormatMultikillMessage(const char[] clientName, const char[] label, int kil
     Format(message, messageLen, "%s got a %s!", clientName, label);
 }
 
-void Announcer_CenterText(int target, int sourceClient, const char[] commandName, bool useSound, const char[] message)
+void Announcer_CenterText(int target, int sourceClient, const char[] commandName, bool useSound, const char[] message, StringMap choices = null)
 {
     if (target > 0 && Oblivion_ShouldHide(target, sourceClient)) return;
     if (target > 0)
     {
-        if (IsHumanAnnouncerClient(target) && (!useSound || Announcer_PlaySound(target, sourceClient, commandName)))
+        if (IsHumanAnnouncerClient(target) && (!useSound || Announcer_PlaySound(target, sourceClient, commandName, choices)))
         {
             PrintCenterText(target, "%s", message);
         }
@@ -980,10 +987,13 @@ void Announcer_CenterText(int target, int sourceClient, const char[] commandName
         return;
     }
 
+    bool ownsChoices = choices == null;
+    if (ownsChoices) choices = new StringMap();
     for (int i = 1; i <= MaxClients; i++)
     {
-        Announcer_CenterText(i, sourceClient, commandName, true, message);
+        Announcer_CenterText(i, sourceClient, commandName, true, message, choices);
     }
+    if (ownsChoices) delete choices;
 }
 
 void Announcer_Announce(int target, int author, const char[] commandName, bool useSound, bool useChat, const char[] message)
@@ -1011,7 +1021,23 @@ void Announcer_Announce(int target, int author, const char[] commandName, bool u
     Announcer_MessageAll(author, true, message);
 }
 
-bool Announcer_PlaySound(int target, int sourceClient, const char[] commandName)
+bool Announcer_PlaySound(int target, int sourceClient, const char[] commandName, StringMap choices = null)
+{
+    bool ownsChoices = choices == null;
+    if (ownsChoices)
+    {
+        choices = new StringMap();
+    }
+
+    bool played = Announcer_PlaySoundInContext(target, sourceClient, commandName, choices);
+    if (ownsChoices)
+    {
+        delete choices;
+    }
+    return played;
+}
+
+static bool Announcer_PlaySoundInContext(int target, int sourceClient, const char[] commandName, StringMap choices)
 {
     if (!commandName[0])
     {
@@ -1034,10 +1060,11 @@ bool Announcer_PlaySound(int target, int sourceClient, const char[] commandName)
                 commandName,
                 client,
                 listenerCommand,
-                sizeof(listenerCommand)
+                sizeof(listenerCommand),
+                choices
             );
 
-            if (Announcer_PlaySoundCommand(client, sourceClient, listenerCommand))
+            if (Announcer_PlaySoundCommand(client, sourceClient, listenerCommand, choices))
             {
                 played = true;
             }
@@ -1051,13 +1078,14 @@ bool Announcer_PlaySound(int target, int sourceClient, const char[] commandName)
         commandName,
         target,
         listenerCommand,
-        sizeof(listenerCommand)
+        sizeof(listenerCommand),
+        choices
     );
 
-    return Announcer_PlaySoundCommand(target, sourceClient, listenerCommand);
+    return Announcer_PlaySoundCommand(target, sourceClient, listenerCommand, choices);
 }
 
-static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[] commandName)
+static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[] commandName, StringMap choices)
 {
     if (target > 0 && Oblivion_ShouldHide(target, sourceClient)) return false;
     if (!commandName[0])
@@ -1065,15 +1093,24 @@ static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[
         return false;
     }
 
+    char key[ANNOUNCER_MAX_COMMAND_NAME + 16];
+    FormatEx(key, sizeof(key), "sample:%s", commandName);
+    int selectionSeed;
+    if (!choices.GetValue(key, selectionSeed))
+    {
+        selectionSeed = GetRandomInt(0, 2147483646);
+        choices.SetValue(key, selectionSeed);
+    }
+
     if (IsValidAnnouncerClient(sourceClient)
         && GetFeatureStatus(FeatureType_Native, ANNOUNCER_SOUND_PLAY_AS_NATIVE) == FeatureStatus_Available)
     {
-        return SaySounds_PlayCommandAs(sourceClient, target, commandName, false);
+        return SaySounds_PlayCommandAs(sourceClient, target, commandName, false, true, selectionSeed);
     }
 
     if (GetFeatureStatus(FeatureType_Native, ANNOUNCER_SOUND_NATIVE) == FeatureStatus_Available)
     {
-        return SaySounds_PlayCommand(target, commandName, false);
+        return SaySounds_PlayCommand(target, commandName, false, true, selectionSeed);
     }
 
     return false;
@@ -1471,14 +1508,14 @@ void AddUniqueAnnouncerGroup(ArrayList groups, const char[] groupName)
     groups.PushString(groupName);
 }
 
-bool GetAnnouncerSoundCommand(StringMap map, int level, const char[] fallbackCommand, int sourceClient, char[] commandName, int commandLen)
+bool GetAnnouncerSoundCommand(StringMap map, int level, const char[] fallbackCommand, int sourceClient, char[] commandName, int commandLen, StringMap choices = null)
 {
     commandName[0] = '\0';
 
     ArrayList commands = GetAnnouncerSoundCommandList(map, level);
     if (commands != null && commands.Length > 0)
     {
-        return SelectAnnouncerSoundCommand(commands, sourceClient, commandName, commandLen);
+        return SelectAnnouncerSoundCommand(commands, sourceClient, commandName, commandLen, choices);
     }
 
     if (!fallbackCommand[0])
@@ -1515,7 +1552,42 @@ ArrayList GetAnnouncerSoundCommandList(StringMap map, int level)
     return view_as<ArrayList>(listValue);
 }
 
-bool SelectAnnouncerSoundCommand(ArrayList commands, int sourceClient, char[] commandName, int commandLen)
+static bool SelectSynchronizedAnnouncerCommand(ArrayList commands, ArrayList eligible, StringMap choices,
+    char[] commandName, int commandLen)
+{
+    if (eligible.Length == 0)
+    {
+        commandName[0] = '\0';
+        return false;
+    }
+    if (choices == null)
+    {
+        eligible.GetString(GetRandomInt(0, eligible.Length - 1), commandName, commandLen);
+        return true;
+    }
+
+    // Exact eligibility signature, scoped to this announcement and config list.
+    int keyLen = 32 + commands.Length;
+    char[] key = new char[keyLen];
+    FormatEx(key, keyLen, "pool:%x:", view_as<int>(commands));
+    int offset = strlen(key);
+    char candidate[ANNOUNCER_MAX_COMMAND_NAME];
+    for (int i = 0; i < commands.Length; i++)
+    {
+        commands.GetString(i, candidate, sizeof(candidate));
+        key[offset++] = eligible.FindString(candidate) != -1 ? '1' : '0';
+    }
+    key[offset] = '\0';
+
+    if (!choices.GetString(key, commandName, commandLen))
+    {
+        eligible.GetString(GetRandomInt(0, eligible.Length - 1), commandName, commandLen);
+        choices.SetString(key, commandName);
+    }
+    return true;
+}
+
+bool SelectAnnouncerSoundCommand(ArrayList commands, int sourceClient, char[] commandName, int commandLen, StringMap choices = null)
 {
     commandName[0] = '\0';
     if (commands == null || commands.Length <= 0)
@@ -1525,8 +1597,7 @@ bool SelectAnnouncerSoundCommand(ArrayList commands, int sourceClient, char[] co
 
     if (!CanUsePurchaseAwareSoundSelection(sourceClient))
     {
-        commands.GetString(GetRandomInt(0, commands.Length - 1), commandName, commandLen);
-        return commandName[0] != '\0';
+        return SelectSynchronizedAnnouncerCommand(commands, commands, choices, commandName, commandLen);
     }
 
     ArrayList paidCommands = new ArrayList(ByteCountToCells(ANNOUNCER_MAX_COMMAND_NAME));
@@ -1559,13 +1630,11 @@ bool SelectAnnouncerSoundCommand(ArrayList commands, int sourceClient, char[] co
     bool found = false;
     if (paidCommands.Length > 0)
     {
-        paidCommands.GetString(GetRandomInt(0, paidCommands.Length - 1), commandName, commandLen);
-        found = true;
+        found = SelectSynchronizedAnnouncerCommand(commands, paidCommands, choices, commandName, commandLen);
     }
     else if (freeCommands.Length > 0)
     {
-        freeCommands.GetString(GetRandomInt(0, freeCommands.Length - 1), commandName, commandLen);
-        found = true;
+        found = SelectSynchronizedAnnouncerCommand(commands, freeCommands, choices, commandName, commandLen);
     }
 
     delete paidCommands;
@@ -1583,7 +1652,8 @@ static void ResolveAnnouncerSoundForListener(
     const char[] sourceCommand,
     int listener,
     char[] resolvedCommand,
-    int resolvedLen)
+    int resolvedLen,
+    StringMap choices)
 {
     strcopy(resolvedCommand, resolvedLen, sourceCommand);
 
@@ -1600,7 +1670,7 @@ static void ResolveAnnouncerSoundForListener(
     }
 
     char replacement[ANNOUNCER_MAX_COMMAND_NAME];
-    if (SelectPaidAnnouncerSoundForListener(commands, listener, replacement, sizeof(replacement)))
+    if (SelectPaidAnnouncerSoundForListener(commands, listener, replacement, sizeof(replacement), choices))
     {
         strcopy(resolvedCommand, resolvedLen, replacement);
     }
@@ -1688,7 +1758,8 @@ static bool SelectPaidAnnouncerSoundForListener(
     ArrayList commands,
     int listener,
     char[] commandName,
-    int commandLen)
+    int commandLen,
+    StringMap choices)
 {
     commandName[0] = '\0';
     if (!CanUsePurchaseAwareSoundSelection(listener))
@@ -1712,17 +1783,10 @@ static bool SelectPaidAnnouncerSoundForListener(
         paidCommands.PushString(candidate);
     }
 
-    if (paidCommands.Length > 0)
-    {
-        paidCommands.GetString(
-            GetRandomInt(0, paidCommands.Length - 1),
-            commandName,
-            commandLen
-        );
-    }
+    bool found = SelectSynchronizedAnnouncerCommand(commands, paidCommands, choices, commandName, commandLen);
 
     delete paidCommands;
-    return commandName[0] != '\0';
+    return found;
 }
 
 bool CanUsePurchaseAwareSoundSelection(int sourceClient)
@@ -1814,7 +1878,7 @@ void AddEligiblePaidSoundCommands(ArrayList commands, int sourceClient, ArrayLis
     }
 }
 
-bool GetShutdownSoundCommand(StringMap map, int sourceClient, int killstreak, char[] commandName, int commandLen)
+bool GetShutdownSoundCommand(StringMap map, int sourceClient, int killstreak, char[] commandName, int commandLen, StringMap choices = null)
 {
     commandName[0] = '\0';
 
@@ -1826,13 +1890,13 @@ bool GetShutdownSoundCommand(StringMap map, int sourceClient, int killstreak, ch
     int roundedKillstreak = killstreak - (killstreak % WHALE_KILLSTREAK_BONUS_INTERVAL);
     for (int level = roundedKillstreak; level >= WHALE_KILLSTREAK_BONUS_INTERVAL; level -= WHALE_KILLSTREAK_BONUS_INTERVAL)
     {
-        if (GetAnnouncerSoundCommand(map, level, "", sourceClient, commandName, commandLen))
+        if (GetAnnouncerSoundCommand(map, level, "", sourceClient, commandName, commandLen, choices))
         {
             return true;
         }
     }
 
-    return GetAnnouncerSoundCommand(map, 0, "", sourceClient, commandName, commandLen);
+    return GetAnnouncerSoundCommand(map, 0, "", sourceClient, commandName, commandLen, choices);
 }
 
 void ClearSoundMap(StringMap map)

@@ -32,9 +32,13 @@ native void SaySounds_PlaySoundToOptedIn(const char[] soundPath, const char[] gr
  * @param bypassAPIOnly
  *                      If true, ignores APIOnlyGroups for this API-triggered sound.
  *                      API playback always bypasses paid-group ownership.
+ * @param selectionSeed Optional nonnegative seed to synchronize random command/group
+ *                      selection across calls. Identical inputs and eligibility with
+ *                      the same seed select the same sample; -1 uses normal randomness.
+ *                      This does not bypass listener preferences or change volume.
  * @return              True if the sound resolved and was emitted to at least one client.
  */
-native bool SaySounds_PlayCommand(int client, const char[] commandName, bool force = false, bool bypassAPIOnly = true);
+native bool SaySounds_PlayCommand(int client, const char[] commandName, bool force = false, bool bypassAPIOnly = true, int selectionSeed = -1);
 
 /**
  * Plays a configured command only when the optional SaySounds native is available.
@@ -58,9 +62,11 @@ stock bool SaySounds_TryPlayCommand(int client, const char[] commandName, bool f
  * @param force         If true, bypasses listener opt-in checks.
  * @param bypassAPIOnly
  *                      If true, ignores APIOnlyGroups for this API-triggered sound.
+ * @param selectionSeed Optional nonnegative seed shared by recipients of one
+ *                      announcement. -1 preserves normal random selection.
  * @return              True if the sound resolved and was emitted to at least one client.
  */
-native bool SaySounds_PlayCommandAs(int sourceClient, int targetClient, const char[] commandName, bool force = false, bool bypassAPIOnly = true);
+native bool SaySounds_PlayCommandAs(int sourceClient, int targetClient, const char[] commandName, bool force = false, bool bypassAPIOnly = true, int selectionSeed = -1);
 
 /**
  * Returns whether a source client can use a configured say sound command or group.

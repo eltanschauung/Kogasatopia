@@ -73,6 +73,7 @@ public int Native_PlayCommand(Handle plugin, int numParams)
     {
         bypassAPIOnly = view_as<bool>(GetNativeCell(4));
     }
+    int selectionSeed = numParams >= 5 ? GetNativeCell(5) : -1;
 
     char commandName[MAX_COMMAND_NAME * 4];
     GetNativeString(2, commandName, sizeof(commandName));
@@ -91,7 +92,7 @@ public int Native_PlayCommand(Handle plugin, int numParams)
     bool fromGroup = false;
     bool restricted = false;
     bool paidRestricted = false;
-    if (!GetCommandSoundDataForClientEx(client, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true, IsAnnouncerPluginCaller(plugin)))
+    if (!GetCommandSoundDataForClientEx(client, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true, IsAnnouncerPluginCaller(plugin), selectionSeed))
     {
         return 0;
     }
@@ -129,6 +130,7 @@ public int Native_PlayCommandAs(Handle plugin, int numParams)
     {
         bypassAPIOnly = view_as<bool>(GetNativeCell(5));
     }
+    int selectionSeed = numParams >= 6 ? GetNativeCell(6) : -1;
 
     char commandName[MAX_COMMAND_NAME * 4];
     GetNativeString(3, commandName, sizeof(commandName));
@@ -147,7 +149,7 @@ public int Native_PlayCommandAs(Handle plugin, int numParams)
     bool fromGroup = false;
     bool restricted = false;
     bool paidRestricted = false;
-    if (!GetCommandSoundDataForClientEx(sourceClient, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true, IsAnnouncerPluginCaller(plugin)))
+    if (!GetCommandSoundDataForClientEx(sourceClient, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, true, IsAnnouncerPluginCaller(plugin), selectionSeed))
     {
         return 0;
     }

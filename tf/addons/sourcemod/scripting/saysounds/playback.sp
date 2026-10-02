@@ -242,7 +242,23 @@ bool GetCommandSoundData(const char[] commandName, char[] soundPath, int soundLe
     return true;
 }
 
-static bool GetRandomCommandInGroupForClient(int client, const char[] groupName, char[] commandName, int commandLen, bool &restricted, bool &paidRestricted, bool bypassAPIOnly = false, bool bypassPaid = false, bool allowAnnouncerOnly = false)
+static int GetSoundSelectionIndex(int count, int &state)
+{
+    if (state < 0)
+    {
+        return GetRandomInt(0, count - 1);
+    }
+
+    // Local deterministic stream: do not reseed Source's global random generator.
+    state = (state + 0x6D2B79F5) & 0x7FFFFFFF;
+    int value = state;
+    value = (value ^ (value >>> 16)) * 0x7FEB352D;
+    value = (value ^ (value >>> 15)) * 0x846CA68B;
+    value ^= value >>> 16;
+    return (value & 0x7FFFFFFF) % count;
+}
+
+static bool GetRandomCommandInGroupForClient(int client, const char[] groupName, char[] commandName, int commandLen, bool &restricted, bool &paidRestricted, bool bypassAPIOnly = false, bool bypassPaid = false, bool allowAnnouncerOnly = false, int selectionSeed = -1)
 {
     if (commandLen > 0)
     {
@@ -270,6 +286,7 @@ static bool GetRandomCommandInGroupForClient(int client, const char[] groupName,
     char currentCommand[MAX_COMMAND_NAME];
     char currentGroup[MAX_GROUP_NAME];
     int matchCount = 0;
+    int selectionState = selectionSeed;
 
     for (int i = 0; i < gCommandNames.Length; i++)
     {
@@ -289,7 +306,7 @@ static bool GetRandomCommandInGroupForClient(int client, const char[] groupName,
         }
 
         matchCount++;
-        if (GetRandomInt(1, matchCount) == 1)
+        if (GetSoundSelectionIndex(matchCount, selectionState) == 0)
         {
             strcopy(commandName, commandLen, currentCommand);
         }
@@ -305,7 +322,7 @@ bool GetCommandOptionForClient(int client, const char[] inputName, char[] comman
     return GetCommandOptionForClientEx(client, inputName, commandName, commandLen, restricted, paidRestricted, fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly, false, allowAnnouncerOnly);
 }
 
-static bool GetCommandOptionForClientEx(int client, const char[] inputName, char[] commandName, int commandLen, bool &restricted, bool &paidRestricted, bool &fromGroup, char[] sourceGroup, int sourceGroupLen, bool bypassAPIOnly = false, bool bypassPaid = false, bool allowAnnouncerOnly = false)
+static bool GetCommandOptionForClientEx(int client, const char[] inputName, char[] commandName, int commandLen, bool &restricted, bool &paidRestricted, bool &fromGroup, char[] sourceGroup, int sourceGroupLen, bool bypassAPIOnly = false, bool bypassPaid = false, bool allowAnnouncerOnly = false, int selectionSeed = -1)
 {
     if (commandLen > 0)
     {
@@ -363,7 +380,7 @@ static bool GetCommandOptionForClientEx(int client, const char[] inputName, char
         return false;
     }
 
-    if (!GetRandomCommandInGroupForClient(client, normalizedGroup, commandName, commandLen, restricted, paidRestricted, bypassAPIOnly, bypassPaid, allowAnnouncerOnly))
+    if (!GetRandomCommandInGroupForClient(client, normalizedGroup, commandName, commandLen, restricted, paidRestricted, bypassAPIOnly, bypassPaid, allowAnnouncerOnly, selectionSeed))
     {
         return false;
     }
@@ -381,7 +398,7 @@ stock bool GetCommandSoundDataForClient(int client, const char[] commandNames, c
     return GetCommandSoundDataForClientEx(client, commandNames, soundPath, soundLen, groupName, groupLen, restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup), bypassAPIOnly);
 }
 
-bool GetCommandSoundDataForClientEx(int client, const char[] commandNames, char[] soundPath, int soundLen, char[] groupName, int groupLen, bool &restricted, bool &paidRestricted, char[] selectedCommand, int selectedCommandLen, bool &fromGroup, char[] sourceGroup, int sourceGroupLen, bool bypassAPIOnly = false, bool bypassPaid = false, bool allowAnnouncerOnly = false)
+bool GetCommandSoundDataForClientEx(int client, const char[] commandNames, char[] soundPath, int soundLen, char[] groupName, int groupLen, bool &restricted, bool &paidRestricted, char[] selectedCommand, int selectedCommandLen, bool &fromGroup, char[] sourceGroup, int sourceGroupLen, bool bypassAPIOnly = false, bool bypassPaid = false, bool allowAnnouncerOnly = false, int selectionSeed = -1)
 {
     restricted = false;
     paidRestricted = false;
@@ -413,7 +430,7 @@ bool GetCommandSoundDataForClientEx(int client, const char[] commandNames, char[
     if (StrContains(working, ",", false) == -1)
     {
         char chosen[MAX_COMMAND_NAME];
-        if (!GetCommandOptionForClientEx(client, working, chosen, sizeof(chosen), restricted, paidRestricted, fromGroup, sourceGroup, sourceGroupLen, bypassAPIOnly, bypassPaid, allowAnnouncerOnly))
+        if (!GetCommandOptionForClientEx(client, working, chosen, sizeof(chosen), restricted, paidRestricted, fromGroup, sourceGroup, sourceGroupLen, bypassAPIOnly, bypassPaid, allowAnnouncerOnly, selectionSeed))
         {
             return false;
         }
@@ -466,7 +483,7 @@ bool GetCommandSoundDataForClientEx(int client, const char[] commandNames, char[
                 char chosen[MAX_COMMAND_NAME];
                 bool currentFromGroup = false;
                 char currentSourceGroup[MAX_GROUP_NAME];
-                if (GetCommandOptionForClientEx(client, token, chosen, sizeof(chosen), restricted, paidRestricted, currentFromGroup, currentSourceGroup, sizeof(currentSourceGroup), bypassAPIOnly, bypassPaid, allowAnnouncerOnly))
+                if (GetCommandOptionForClientEx(client, token, chosen, sizeof(chosen), restricted, paidRestricted, currentFromGroup, currentSourceGroup, sizeof(currentSourceGroup), bypassAPIOnly, bypassPaid, allowAnnouncerOnly, selectionSeed))
                 {
                     strcopy(options[optionCount], sizeof(options[]), chosen);
                     optionFromGroup[optionCount] = currentFromGroup;
@@ -488,7 +505,8 @@ bool GetCommandSoundDataForClientEx(int client, const char[] commandNames, char[
         return false;
     }
 
-    int pick = GetRandomInt(0, optionCount - 1);
+    int selectionState = selectionSeed;
+    int pick = GetSoundSelectionIndex(optionCount, selectionState);
     if (!GetCommandSoundData(options[pick], soundPath, soundLen, groupName, groupLen))
     {
         return false;
