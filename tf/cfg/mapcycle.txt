@@ -2,6 +2,12 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
+pl_aridpass_event
+koth_oilchange_rc3b
+koth_eivent_final
+ctf_medi_evil
+cp_holyhell
+cp_wildcat_event
 koth_dolls_playground_a6
 workshop/ctf_mandrillmaze_b2.ugc2908762556
 workshop/koth_spillway_rc3a.ugc1962574007
@@ -100,7 +106,6 @@ cp_badlands
 cp_whiterock_letty
 ctf_office
 cp_nagae_b3
-koth_eivent_final
 ctf_doublecross_snowy
 cp_freight_final1
 workshop/koth_rocktop_rc2.ugc454207393
