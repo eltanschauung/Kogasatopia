@@ -28,6 +28,12 @@ void NormalizeLeaderboardColorTag(char[] colorTag, int maxlen)
 }
 
 #define CURRENCY_LEADERBOARD_LIMIT 50
+enum CurrencyLeaderboardKind
+{
+    CurrencyLeaderboard_Balance,
+    CurrencyLeaderboard_GemsSent,
+    CurrencyLeaderboard_Lottery
+};
 static char g_CurrencyLeaderboardSteamIds[CURRENCY_LEADERBOARD_LIMIT][32];
 static char g_CurrencyLeaderboardNames[CURRENCY_LEADERBOARD_LIMIT][128];
 static char g_CurrencyLeaderboardColors[CURRENCY_LEADERBOARD_LIMIT][32];
@@ -65,9 +71,9 @@ void GemsSentLeaderboard_OnPluginEnd()
     g_GemsSentLeaderboardRetry = null;
 }
 
-static void GemsSentLeaderboard_LogField(const char[] field, char[] expression, int maxlen, bool mysql)
+void Leaderboard_LogField(const char[] field, char[] expression, int maxlen, bool mysql)
 {
-    // Transfer events use a pipe-delimited key=value protocol. Match the full key
+    // Points-store events use a pipe-delimited key=value protocol. Match the full key
     // boundary so amount cannot match sender_balance or text in a player's name.
     if (mysql)
     {
@@ -87,9 +93,9 @@ static void GemsSentLeaderboard_LogField(const char[] field, char[] expression, 
 static void GemsSentLeaderboard_BuildQuery(char[] query, int maxlen, bool mysql)
 {
     char sender[512], target[512], amount[512];
-    GemsSentLeaderboard_LogField("sender_steamid64", sender, sizeof(sender), mysql);
-    GemsSentLeaderboard_LogField("target_steamid64", target, sizeof(target), mysql);
-    GemsSentLeaderboard_LogField("amount", amount, sizeof(amount), mysql);
+    Leaderboard_LogField("sender_steamid64", sender, sizeof(sender), mysql);
+    Leaderboard_LogField("target_steamid64", target, sizeof(target), mysql);
+    Leaderboard_LogField("amount", amount, sizeof(amount), mysql);
     char validFields[512], cacheJoin[128], nameJoin[128], ruleJoin[128];
     strcopy(validFields, sizeof(validFields), mysql
         ? "sender_id REGEXP '^[0-9]{17}$' AND target_id REGEXP '^[0-9]{17}$' AND amount REGEXP '^[0-9]+$'"
@@ -249,19 +255,47 @@ public Action CurrencyLeaderboard_Retry(Handle timer, any generation)
 
 public Action Command_ShowCurrencyLeaderboard(int client, int args)
 {
-    return CurrencyLeaderboard_ShowCached(client, args, false);
+    return CurrencyLeaderboard_ShowCached(client, args, CurrencyLeaderboard_Balance);
 }
 
 public Action Command_ShowGemsSentLeaderboard(int client, int args)
 {
-    return CurrencyLeaderboard_ShowCached(client, args, true);
+    return CurrencyLeaderboard_ShowCached(client, args, CurrencyLeaderboard_GemsSent);
 }
 
-static Action CurrencyLeaderboard_ShowCached(int client, int args, bool gemsSent)
+public Action Command_ShowLotteryLeaderboard(int client, int args)
+{
+    return CurrencyLeaderboard_ShowCached(client, args, CurrencyLeaderboard_Lottery);
+}
+
+static Action CurrencyLeaderboard_ShowCached(int client, int args, CurrencyLeaderboardKind kind)
 {
     if (!Client_IsHumanInGame(client))
         return Plugin_Handled;
-    if (!(gemsSent ? g_GemsSentLeaderboardReady : g_CurrencyLeaderboardReady))
+    bool ready;
+    int rows;
+    char command[4];
+    switch (kind)
+    {
+        case CurrencyLeaderboard_Balance:
+        {
+            ready = g_CurrencyLeaderboardReady;
+            rows = g_CurrencyLeaderboardRows;
+            strcopy(command, sizeof(command), "gl");
+        }
+        case CurrencyLeaderboard_GemsSent:
+        {
+            ready = g_GemsSentLeaderboardReady;
+            rows = g_GemsSentLeaderboardRows;
+            strcopy(command, sizeof(command), "gsl");
+        }
+        case CurrencyLeaderboard_Lottery:
+        {
+            rows = LotteryLeaderboard_GetRows(ready);
+            strcopy(command, sizeof(command), "ll");
+        }
+    }
+    if (!ready)
     {
         CPrintToChat(client, "%s Leaderboard is loading; please try again shortly.", g_CurrencyPrefix);
         return Plugin_Handled;
@@ -274,18 +308,22 @@ static Action CurrencyLeaderboard_ShowCached(int client, int args, bool gemsSent
         page = StringToInt(argument);
     }
     int visible[CURRENCY_LEADERBOARD_LIMIT], count;
-    int rows = gemsSent ? g_GemsSentLeaderboardRows : g_CurrencyLeaderboardRows;
     char steamId[32];
     for (int row = 0; row < rows; row++)
     {
-        strcopy(steamId, sizeof(steamId), gemsSent ? g_GemsSentLeaderboardSteamIds[row] : g_CurrencyLeaderboardSteamIds[row]);
+        switch (kind)
+        {
+            case CurrencyLeaderboard_Balance: strcopy(steamId, sizeof(steamId), g_CurrencyLeaderboardSteamIds[row]);
+            case CurrencyLeaderboard_GemsSent: strcopy(steamId, sizeof(steamId), g_GemsSentLeaderboardSteamIds[row]);
+            case CurrencyLeaderboard_Lottery: LotteryLeaderboard_GetSteamId(row, steamId, sizeof(steamId));
+        }
         if (Oblivion_SteamMessageVisible(client, steamId)) visible[count++] = row;
     }
     int pages = (count + BP_LEADERBOARD_PAGE_SIZE - 1) / BP_LEADERBOARD_PAGE_SIZE;
     if (pages < 1) pages = 1;
     if (page < 1 || page > pages)
     {
-        CPrintToChat(client, "%s Use !%s <1-%d>; only the top 50 are listed.", g_CurrencyPrefix, gemsSent ? "gsl" : "gl", pages);
+        CPrintToChat(client, "%s Use !%s <1-%d>; only the top 50 are listed.", g_CurrencyPrefix, command, pages);
         return Plugin_Handled;
     }
     int start = (page - 1) * BP_LEADERBOARD_PAGE_SIZE;
@@ -296,16 +334,21 @@ static Action CurrencyLeaderboard_ShowCached(int client, int args, bool gemsSent
     for (int index = start; index < end; index++)
     {
         int row = visible[index];
-        if (gemsSent)
-            CPrintToChat(client, "#%d {%s}%s{default} %s%s", index + 1,
-                g_GemsSentLeaderboardColors[row], g_GemsSentLeaderboardNames[row], currencyColor, g_GemsSentLeaderboardTotals[row]);
-        else
-            CPrintToChat(client, "#%d {%s}%s{default} %s%d", index + 1,
-                g_CurrencyLeaderboardColors[row], g_CurrencyLeaderboardNames[row], currencyColor, g_CurrencyLeaderboardBalances[row]);
+        switch (kind)
+        {
+            case CurrencyLeaderboard_Balance:
+                CPrintToChat(client, "#%d {%s}%s{default} %s%d", index + 1,
+                    g_CurrencyLeaderboardColors[row], g_CurrencyLeaderboardNames[row], currencyColor, g_CurrencyLeaderboardBalances[row]);
+            case CurrencyLeaderboard_GemsSent:
+                CPrintToChat(client, "#%d {%s}%s{default} %s%s", index + 1,
+                    g_GemsSentLeaderboardColors[row], g_GemsSentLeaderboardNames[row], currencyColor, g_GemsSentLeaderboardTotals[row]);
+            case CurrencyLeaderboard_Lottery:
+                LotteryLeaderboard_PrintRow(client, index + 1, row, currencyColor);
+        }
     }
     if (start >= end)
         CPrintToChat(client, "%s No cached leaderboard entries on page %d.", g_CurrencyPrefix, page);
     else if (end < count && page < pages)
-        CPrintToChat(client, "{default}Use {gold}!%s %d{default} for the next page (top 50).", gemsSent ? "gsl" : "gl", page + 1);
+        CPrintToChat(client, "{default}Use {gold}!%s %d{default} for the next page (top 50).", command, page + 1);
     return Plugin_Handled;
 }

@@ -60,6 +60,7 @@ public void OnPluginStart()
     RegConsoleCmd("sm_bpranks", Command_ShowCurrencyLeaderboard, "Show the currency leaderboard.");
     RegConsoleCmd("sm_gl", Command_ShowCurrencyLeaderboard, "Show the currency leaderboard.");
     GemsSentLeaderboard_OnPluginStart();
+    LotteryLeaderboard_OnPluginStart();
     RegConsoleCmd("sm_send", Command_SendBonusPoints, "Send currency to another player.");
     RegConsoleCmd("sm_donate", Command_SendBonusPoints, "Send currency to another player.");
     RegConsoleCmd("sm_sendbp", Command_SendBonusPoints, "Send currency to another player.");
@@ -107,6 +108,7 @@ public void OnPluginEnd()
     MemomanEvent_OnPluginEnd();
     Stimulus_OnPluginEnd();
     GemsSentLeaderboard_OnPluginEnd();
+    LotteryLeaderboard_OnPluginEnd();
     delete g_IdempotentAwardForward;
 
     delete g_ItemKeys;
