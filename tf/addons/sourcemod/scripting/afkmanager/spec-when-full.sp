@@ -522,6 +522,11 @@ public Action SpecQueue_Cmd_Spectate(int client, int args) {
     SpecQueue_ClearPendingJoin(client);
     SpecQueue_RemoveClientFromWaitQueue(client, "voluntary_spectator");
 
+    SpecQueue_UpdateQueueSuspension();
+    SpecQueue_PruneWaitQueue();
+    bool queueActive = SpecQueue_IsPluginOperational()
+        && (SpecQueue_IsServerFull() || !g_SpecQueue.IsEmpty());
+
     int oldTeam = GetClientTeam(client);
     if (oldTeam == view_as<int>(TFTeam_Spectator)) {
         SpecQueue_SchedulePlayerChangeChecks();
@@ -529,6 +534,9 @@ public Action SpecQueue_Cmd_Spectate(int client, int args) {
     }
 
     TeamBalance_MoveToSpectator(client, "spectate_command");
+    if (!queueActive) {
+        return Plugin_Handled;
+    }
     CPrintToChat(client, "%t", "SPEC_WHEN_FULL_JOIN_SPEC");
 
     if (SpecQueue_IsPlayingTeam(oldTeam)) {
