@@ -1081,6 +1081,7 @@ static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[
 
 void Announcer_MessageClient(int target, int author, const char[] message)
 {
+    if (!IsHumanAnnouncerClient(target)) return;
     if (Oblivion_ShouldHide(target, author)) return;
     if (IsValidAnnouncerClient(author) && IsClientInGame(author))
     {
@@ -2184,5 +2185,5 @@ bool IsHumanAnnouncerClient(int client)
 
 bool IsValidAnnouncerClient(int client)
 {
-    return client > 0 && client <= MaxClients && IsClientConnected(client);
+    return client > 0 && client <= MaxClients && IsClientInGame(client);
 }

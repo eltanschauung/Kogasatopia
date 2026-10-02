@@ -230,6 +230,9 @@ void InitClientCache()
 
 void ResetAllClients(RTDRemoveReason reason, const int iInitiator=0, const bool bForce=true)
 {
+	if (g_hRollers == null)
+		return;
+
 	for (int i = 1; i <= MaxClients; ++i)
 	{
 		if (g_hRollers.GetInRoll(i))
@@ -282,6 +285,7 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+	ResetAllClients(RTDRemove_NoPrint, .bForce=false);
 	Events.Cleanup();
 
 	UnhookEvent("player_death", Event_PlayerDeath);
@@ -1378,6 +1382,7 @@ bool ParseEffects()
 	if (g_hPerkContainer == null)
 		g_hPerkContainer = new PerkContainer();
 
+	ResetAllClients(RTDRemove_PluginUnload);
 	g_hPerkContainer.DisposePerks();
 
 	int iStatus[2];
@@ -2029,15 +2034,20 @@ public int ManagerDescriptionMenu(Menu hMenu, MenuAction maState, const int clie
 public Action Timer_PerkRunTick(Handle hTimer, const int iUserId)
 {
 	int client = GetClientOfUserId(iUserId);
-	if (!client)
+	if (!client || g_hRollers.GetTimer(client) != hTimer)
 		return Plugin_Stop;
 
 	if (!g_hRollers.GetInRoll(client))
-		return Plugin_Stop;
-
-	if (GetTime() >= g_hRollers.GetEndRollTime(client))
 	{
-		ManagePerk(client, g_hRollers.GetPerk(client), false);
+		g_hRollers.SetTimer(client, null);
+		return Plugin_Stop;
+	}
+
+	if (g_hRollers.GetPerk(client) == null || GetTime() >= g_hRollers.GetEndRollTime(client))
+	{
+		// This callback owns its timer until it returns Plugin_Stop.
+		g_hRollers.SetTimer(client, null);
+		RemovePerk(client);
 		return Plugin_Stop;
 	}
 
@@ -2085,10 +2095,19 @@ void FormatRemoveReasonLog(char[] sBuffer, const int iBufferLen, const RTDRemove
 
 Perk RemovePerk(const int client, const RTDRemoveReason reason=RTDRemove_WearOff, const char[] sReason="")
 {
+	g_hRollers.StopTimer(client);
 	Perk perk = g_hRollers.GetPerk(client);
 
 	if (perk != null)
 		ManagePerk(client, perk, false, reason, sReason);
+	else if (g_hRollers.GetInRoll(client))
+	{
+		Cache[client].Cleanup();
+		g_hRollers.SetInRoll(client, false);
+		g_hRollers.SetPerk(client, null);
+		FinishPerkCooldown(client);
+		LogMessage("Cleared stale perk state for client %d.", client);
+	}
 
 	return perk;
 }

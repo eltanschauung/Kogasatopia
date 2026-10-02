@@ -23,8 +23,11 @@ methodmap Rollers < ArrayList
 		ArrayList data = new ArrayList(8, MAXPLAYERS + 1);
 
 		for (int i = 1; i <= MaxClients; ++i)
+		{
 			for (int block = 0; block <= 6; ++block)
 				data.Set(i, 0, block); // init to false/0/null
+			data.Set(i, -1, 4);
+		}
 
 		return view_as<Rollers>(data);
 	}
@@ -71,12 +74,13 @@ methodmap Rollers < ArrayList
 
 	public Perk GetPerk(int client)
 	{
-		return view_as<Perk>(this.Get(client, 4));
+		// The container owns perk handles; rollers retain only their IDs.
+		return g_hPerkContainer.GetFromId(this.Get(client, 4));
 	}
 
 	public void SetPerk(int client, Perk val)
 	{
-		this.Set(client, val, 4);
+		this.Set(client, val != null ? val.Id : -1, 4);
 	}
 
 	public Handle GetTimer(int client)
@@ -87,6 +91,13 @@ methodmap Rollers < ArrayList
 	public void SetTimer(int client, Handle val)
 	{
 		this.Set(client, val, 5);
+	}
+
+	public void StopTimer(int client)
+	{
+		Handle timer = this.GetTimer(client);
+		this.SetTimer(client, null);
+		delete timer;
 	}
 
 	public Handle GetHud(int client)
@@ -154,8 +165,11 @@ methodmap Rollers < ArrayList
 
 	public void Reset(const int client)
 	{
+		this.StopTimer(client);
 		this.SetInRoll(client, false);
 		this.SetLastRollTime(client, 0);
+		this.SetEndRollTime(client, 0);
+		this.SetUnconsumedAddedTime(client, 0);
 		this.SetPerk(client, null);
 		this.ResetPerkHistory(client);
 	}

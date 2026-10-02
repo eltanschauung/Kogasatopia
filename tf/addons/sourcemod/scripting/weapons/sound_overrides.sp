@@ -112,7 +112,8 @@ static void WeaponsSound_HookWeaponEntity(int weapon, const char[] className)
 
 public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)
 {
-	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES || !IsValidEntity(weapon))
+	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES || !IsValidEntity(weapon)
+		|| !TF2Util_IsEntityWeapon(weapon))
 		return MRES_Ignored;
 	g_WeaponsSoundPendingSwing[weapon] = TF2Util_GetWeaponSlot(weapon) == TFWeaponSlot_Melee;
 	if (g_WeaponsSoundPendingSwing[weapon])
@@ -201,7 +202,8 @@ void WeaponsSound_OnWeaponSwitchPost(int client, int weapon)
 
 static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 {
-	if (!Weapons_IsValidClient(client) || !IsValidEntity(weapon))
+	if (!Weapons_IsValidClient(client) || !Weapons_IsValidWeaponEntity(weapon)
+		|| !TF2Util_IsEntityWeapon(weapon))
 	{
 		return;
 	}
@@ -282,6 +284,7 @@ void WeaponsSound_PlayCustomMeleeHit(int attacker, int weapon)
 {
 	if (weapon <= MaxClients
 			|| !IsValidEntity(weapon)
+			|| !TF2Util_IsEntityWeapon(weapon)
 			|| TF2Util_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
 	{
 		return;

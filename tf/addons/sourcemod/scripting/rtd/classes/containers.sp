@@ -112,7 +112,8 @@ methodmap PerkContainer < StringMap
 		if (iId >= g_hPerkTokenMapper.Length || iId < 0)
 			return null;
 
-		return this.GetFromIdEx(iId);
+		Perk perk = this.GetFromIdEx(iId);
+		return perk != null && IsValidHandle(perk) ? perk : null;
 	}
 
 #define READ_STRING(%1,%2) \
