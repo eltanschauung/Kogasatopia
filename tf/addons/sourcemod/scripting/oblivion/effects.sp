@@ -3,22 +3,29 @@ enum struct EffectScope
     int entity;
     int reference;
     int kind;
+    int token;
 }
 
 enum
 {
     EffectScope_Think,
     EffectScope_Touch,
-    EffectScope_Bullets
+    EffectScope_Bullets,
+    EffectScope_Damage,
+    EffectScope_Condition
 };
 
 ArrayList g_EffectScopes;
+ArrayList g_DamageEffectTokens, g_ConditionEffectTokens;
+int g_NextEffectToken;
 DynamicHook g_FireBullets;
 bool g_ReplayingEffect;
 
 void Effects_Start()
 {
     g_EffectScopes = new ArrayList(sizeof(EffectScope));
+    g_DamageEffectTokens = new ArrayList();
+    g_ConditionEffectTokens = new ArrayList();
     // Sentries fire from a named context think, which bypasses the ordinary
     // CBaseEntity::Think hook. Capture their actual FireBullets call instead.
     GameData data = new GameData("sdkhooks.games");
@@ -50,16 +57,22 @@ void Effects_HookEntity(int entity)
 void Effects_Reset()
 {
     if (g_EffectScopes != null) g_EffectScopes.Clear();
+    if (g_DamageEffectTokens != null) g_DamageEffectTokens.Clear();
+    if (g_ConditionEffectTokens != null) g_ConditionEffectTokens.Clear();
 }
 
-void EnterEffectScope(int entity, int kind)
+int EnterEffectScope(int entity, int kind)
 {
+    if (g_EffectScopes == null) return 0;
     Actor(entity); // Cache identity before a projectile can lose its owner.
     EffectScope scope;
     scope.entity = entity;
     scope.reference = EntIndexToEntRef(entity);
     scope.kind = kind;
+    g_NextEffectToken = g_NextEffectToken == 2147483647 ? 1 : g_NextEffectToken + 1;
+    scope.token = g_NextEffectToken;
     g_EffectScopes.PushArray(scope);
+    return scope.token;
 }
 
 void LeaveEffectScope(int entity, int kind)
@@ -161,3 +174,49 @@ void SilenceExistingLoops(int viewer, int subject)
         if (Actor(entity) == subject)
             EmitSoundToClient(viewer, "common/null.wav", entity, SNDCHAN_AUTO, SNDLEVEL_NONE, SND_STOPLOOPING, 0.0);
 }
+
+// Damage and condition callbacks may emit from the victim instead of their
+// provider (for example Fire.Engulf). Preserve the actual cause until return.
+// Match the exact token: destruction can remove an inner scope before its
+// detour post callback, which must never consume an unrelated outer scope.
+void EndEffectToken(int token)
+{
+    if (!token || g_EffectScopes == null) return;
+    EffectScope scope;
+    for (int i = g_EffectScopes.Length - 1; i >= 0; i--)
+    {
+        g_EffectScopes.GetArray(i, scope);
+        if (scope.token == token) { g_EffectScopes.Erase(i); return; }
+    }
+}
+
+void BeginProviderEffect(ArrayList tokens, int provider, int fallback, int kind)
+{
+    if (tokens == null) return;
+    int source = Actor(provider);
+    if (!source) source = Actor(fallback);
+    // Retain an owned entity's cached identity when its player has left.
+    if (!source && provider > 0 && provider < ENTITY_LIMIT && IsValidEntity(provider)) source = provider;
+    if (!source && fallback > 0 && fallback < ENTITY_LIMIT && IsValidEntity(fallback)) source = fallback;
+    tokens.Push(source ? EnterEffectScope(source, kind) : 0);
+}
+
+void EndProviderEffect(ArrayList tokens)
+{
+    if (tokens == null || !tokens.Length) return;
+    int last = tokens.Length - 1;
+    int token = tokens.Get(last);
+    tokens.Erase(last);
+    EndEffectToken(token);
+}
+
+void BeginDamageEffect(int attacker, int inflictor)
+{
+    BeginProviderEffect(g_DamageEffectTokens, attacker, inflictor, EffectScope_Damage);
+}
+void EndDamageEffect() { EndProviderEffect(g_DamageEffectTokens); }
+void BeginConditionEffect(int provider)
+{
+    BeginProviderEffect(g_ConditionEffectTokens, provider, 0, EffectScope_Condition);
+}
+void EndConditionEffect() { EndProviderEffect(g_ConditionEffectTokens); }

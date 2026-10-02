@@ -40,12 +40,15 @@ void Interactions_Start()
         SetFailState("An Oblivion interaction signature is unavailable for this server build.");
     if (!g_DamagePlayer.Enable(Hook_Pre, NativeDamage)
         || !g_DamageObject.Enable(Hook_Pre, NativeDamage)
+        || !g_DamagePlayer.Enable(Hook_Post, NativeDamagePost)
+        || !g_DamageObject.Enable(Hook_Post, NativeDamagePost)
         || !g_MedigunTarget.Enable(Hook_Pre, NativeMedigun)
         || !g_AirblastTarget.Enable(Hook_Pre, NativeAirblast)
         || !g_ObserverTarget.Enable(Hook_Pre, NativeObserver)
         || !g_DispenserTarget.Enable(Hook_Pre, NativeMedigun)
         || !g_DeflectEntity.Enable(Hook_Pre, NativeAirblast)
-        || !g_AddCondition.Enable(Hook_Pre, NativeCondition))
+        || !g_AddCondition.Enable(Hook_Pre, NativeCondition)
+        || !g_AddCondition.Enable(Hook_Post, NativeConditionPost))
         SetFailState("Unable to enable Oblivion interaction hooks.");
 }
 
@@ -66,6 +69,7 @@ void RememberSharedState(int client)
 public MRESReturn NativeCondition(Address shared, DHookParam params)
 {
     int provider = params.IsNull(3) ? 0 : params.Get(3);
+    BeginConditionEffect(provider);
     if (!provider && !EffectSource()) return MRES_Ignored;
     char key[24];
     FormatEx(key, sizeof(key), "%x", view_as<int>(shared));
@@ -119,6 +123,7 @@ public MRESReturn NativeDamage(int victim, DHookReturn result, DHookParam params
     // attacker and weapon EHANDLEs. EHANDLE remains four bytes on x86 and x64.
     int attacker = params.GetObjectVar(1, 40, ObjectValueType_Ehandle);
     int inflictor = params.GetObjectVar(1, 36, ObjectValueType_Ehandle);
+    BeginDamageEffect(attacker, inflictor);
     if (!EntitiesBlocked(victim, attacker) && !EntitiesBlocked(victim, inflictor)) return MRES_Ignored;
     result.Value = 0;
     return MRES_Supercede;
@@ -136,4 +141,16 @@ public MRESReturn NativeAirblast(int weapon, DHookReturn result, DHookParam para
     if (!EntitiesBlocked(params.Get(2), params.Get(1))) return MRES_Ignored;
     result.Value = false;
     return MRES_Supercede;
+}
+
+public MRESReturn NativeDamagePost(int victim, DHookReturn result, DHookParam params)
+{
+    EndDamageEffect();
+    return MRES_Ignored;
+}
+
+public MRESReturn NativeConditionPost(Address shared, DHookParam params)
+{
+    EndConditionEffect();
+    return MRES_Ignored;
 }

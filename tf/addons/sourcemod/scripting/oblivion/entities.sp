@@ -212,9 +212,10 @@ public Action FilterSound(int clients[MAXPLAYERS], int &count, char sample[PLATF
     char soundEntry[PLATFORM_MAX_PATH], int &seed)
 {
     if (flags & (SND_STOP | SND_STOPLOOPING)) return Plugin_Continue;
+    int source = EffectSource();
     int kept;
     for (int i = 0; i < count; i++)
-        if (!HiddenEntity(clients[i], entity) && !HiddenEntity(clients[i], EffectSource())) clients[kept++] = clients[i];
+        if (!HiddenEntity(clients[i], entity) && !HiddenEntity(clients[i], source)) clients[kept++] = clients[i];
     if (kept == count) return Plugin_Continue;
     count = kept;
     return kept ? Plugin_Changed : Plugin_Handled;
