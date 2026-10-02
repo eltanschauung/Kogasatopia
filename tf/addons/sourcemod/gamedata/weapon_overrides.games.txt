@@ -31,7 +31,8 @@
 				"signature" "IsFixedWeaponSpreadEnabled"
 				"linux"
 				{
-					"offset" "1963809"
+					// Verified against the 2026-10-01 Linux server binary.
+					"offset" "1964177"
 					"verify" "\x75\x0D" // JNE native crit algorithm when melee crits are enabled
 					"patch"  "\xEB\x0D" // Always enter it when this helper is called explicitly
 				}
