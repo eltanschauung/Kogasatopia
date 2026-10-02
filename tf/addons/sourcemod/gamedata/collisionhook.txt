@@ -13,6 +13,12 @@
 			 * How to find on windows:
 			 * https://forums.alliedmods.net/showpost.php?p=2737146&postcount=119
 			*/
+            "PassServerEntityFilter_Optimized"
+            {
+                "library" "server"
+                "linux" "@_Z22PassServerEntityFilterPK13IHandleEntityS1_.part.0"
+                "linux64" "@_Z22PassServerEntityFilterPK13IHandleEntityS1_.part.0"
+            }
 			"PassServerEntityFilter"
 			{
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x75\x2A\xB0\x2A\x5F\xC3\x56"

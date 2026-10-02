@@ -7,6 +7,7 @@
 
 #include "vphysics_interface.h"
 #include "ihandleentity.h"
+#include "engine/IStaticPropMgr.h"
 
 #include "tier1/strtools.h"
 
@@ -33,6 +34,14 @@ SH_DECL_HOOK4( IPhysicsCollisionSolver, ShouldCollide, SH_NOATTRIB, 0, int, IPhy
 
 IGameConfig *g_pGameConf = NULL;
 CDetour *g_pFilterDetour = NULL;
+CDetour *g_pOptimizedFilterDetour = NULL;
+IStaticPropMgrServer *g_pStaticProps = NULL;
+static thread_local unsigned int g_InsideOriginalFilter;
+struct OriginalFilterScope
+{
+    OriginalFilterScope() { ++g_InsideOriginalFilter; }
+    ~OriginalFilterScope() { --g_InsideOriginalFilter; }
+};
 
 IPhysics *g_pPhysics = NULL;
 
@@ -42,43 +51,54 @@ IForward *g_pPassFwd = NULL;
 int gSetCollisionSolverHookId, gShouldCollideHookId;
 
 
-DETOUR_DECL_STATIC2( PassServerEntityFilterFunc, bool, const IHandleEntity *, pTouch, const IHandleEntity *, pPass )
+// Apply the same public forward to the exported wrapper and the optimizer's
+// private entry. Source's own wrapper can tail-call that private entry, so only
+// suppress a duplicate while executing the original implementation.
+static bool OverridePassFilter(const IHandleEntity *touch, const IHandleEntity *pass, bool &allow)
 {
-	if ( g_pPassFwd->GetFunctionCount() == 0 )
-		return DETOUR_STATIC_CALL( PassServerEntityFilterFunc )( pTouch, pPass );
+    if (g_InsideOriginalFilter || !g_pPassFwd || !g_pPassFwd->GetFunctionCount()
+        || !touch || !pass || touch == pass)
+        return false;
+    // A static prop is an IHandleEntity but is not an IServerUnknown.
+    if (g_pStaticProps->IsStaticProp(const_cast<IHandleEntity *>(touch))
+        || g_pStaticProps->IsStaticProp(const_cast<IHandleEntity *>(pass)))
+        return false;
+    CBaseEntity *first = const_cast<CBaseEntity *>(UTIL_EntityFromEntityHandle(touch));
+    CBaseEntity *second = const_cast<CBaseEntity *>(UTIL_EntityFromEntityHandle(pass));
+    if (!first || !second) return false;
+    cell_t result = 0, action = 0;
+    g_pPassFwd->PushCell(gamehelpers->EntityToBCompatRef(first));
+    g_pPassFwd->PushCell(gamehelpers->EntityToBCompatRef(second));
+    g_pPassFwd->PushCellByRef(&result);
+    g_pPassFwd->Execute(&action);
+    if (action <= Pl_Continue) return false;
+    allow = result == 1;
+    return true;
+}
 
-	if ( pTouch == pPass )
-		return DETOUR_STATIC_CALL( PassServerEntityFilterFunc )( pTouch, pPass ); // self checks aren't interesting
+DETOUR_DECL_STATIC2(PassServerEntityFilterFunc, bool, const IHandleEntity *, touch, const IHandleEntity *, pass)
+{
+    bool allow;
+    if (OverridePassFilter(touch, pass, allow)) return allow;
+    OriginalFilterScope scope;
+    return DETOUR_STATIC_CALL(PassServerEntityFilterFunc)(touch, pass);
+}
 
-	if ( !pTouch || !pPass )
-		return DETOUR_STATIC_CALL( PassServerEntityFilterFunc )( pTouch, pPass ); // need two valid entities
-
-	CBaseEntity *pEnt1 = const_cast<CBaseEntity *>( UTIL_EntityFromEntityHandle( pTouch ) );
-	CBaseEntity *pEnt2 = const_cast<CBaseEntity *>( UTIL_EntityFromEntityHandle( pPass ) );
-
-	if ( !pEnt1 || !pEnt2 )
-		return DETOUR_STATIC_CALL( PassServerEntityFilterFunc )( pTouch, pPass ); // we need both entities
-
-	cell_t ent1 = gamehelpers->EntityToBCompatRef( pEnt1 );
-	cell_t ent2 = gamehelpers->EntityToBCompatRef( pEnt2 );
-
-	// todo: do we want to fill result with with the game's result? perhaps the forward path is more performant...
-	cell_t result = 0;
-	g_pPassFwd->PushCell( ent1 );
-	g_pPassFwd->PushCell( ent2 );
-	g_pPassFwd->PushCellByRef( &result );
-
-	cell_t retValue = 0;
-	g_pPassFwd->Execute( &retValue );
-
-	if ( retValue > Pl_Continue )
-	{
-		// plugin wants to change the result
-		return result == 1;
-	}
-
-	// otherwise, game decides
-	return DETOUR_STATIC_CALL( PassServerEntityFilterFunc )( pTouch, pPass );
+// GCC's internal TF2 i386 .part.0 helper uses EAX/EDX rather than the public
+// wrapper's stack ABI. This was checked in both the wrapper and real movement
+// caller of build 11068238. x86-64 uses its ordinary SysV register ABI.
+#if defined(__linux__) && defined(__i386__)
+#define OPTIMIZED_FILTER_ABI __attribute__((regparm(2)))
+#else
+#define OPTIMIZED_FILTER_ABI
+#endif
+static bool (OPTIMIZED_FILTER_ABI *OptimizedFilterActual)(const IHandleEntity *, const IHandleEntity *);
+static bool OPTIMIZED_FILTER_ABI OptimizedFilter(const IHandleEntity *touch, const IHandleEntity *pass)
+{
+    bool allow;
+    if (OverridePassFilter(touch, pass, allow)) return allow;
+    OriginalFilterScope scope;
+    return OptimizedFilterActual(touch, pass);
 }
 
 
@@ -100,11 +120,33 @@ bool CollisionHook::SDK_OnLoad( char *error, size_t maxlength, bool late )
 		return false;
 	}
 
-	g_pFilterDetour->EnableDetour();
+
 
 	g_pCollisionFwd = forwards->CreateForward( "CH_ShouldCollide", ET_Hook, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef );
 	g_pPassFwd = forwards->CreateForward( "CH_PassFilter", ET_Hook, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef );
 
+#if defined(__linux__) && SOURCE_ENGINE == SE_TF2
+    void *optimized = NULL;
+    if (g_pGameConf->GetMemSig("PassServerEntityFilter_Optimized", &optimized) && optimized)
+    {
+        g_pOptimizedFilterDetour = CDetourManager::CreateDetour(
+            reinterpret_cast<void *>(&OptimizedFilter),
+            reinterpret_cast<void **>(&OptimizedFilterActual), optimized);
+        if (!g_pOptimizedFilterDetour)
+        {
+            forwards->ReleaseForward(g_pCollisionFwd);
+            forwards->ReleaseForward(g_pPassFwd);
+            g_pCollisionFwd = g_pPassFwd = NULL;
+            g_pFilterDetour->Destroy(); g_pFilterDetour = NULL;
+            gameconfs->CloseGameConfigFile(g_pGameConf); g_pGameConf = NULL;
+            snprintf(error, maxlength, "Cannot hook TF2's optimized trace filter");
+            return false;
+        }
+        g_pOptimizedFilterDetour->EnableDetour();
+    }
+#endif
+    g_pFilterDetour->EnableDetour();
+    smutils->LogMessage(myself, "Optimized TF2 trace filter: %s", g_pOptimizedFilterDetour ? "active" : "not present");
 	sharesys->RegisterLibrary( myself, "collisionhook" );
 
 	return true;
@@ -112,6 +154,10 @@ bool CollisionHook::SDK_OnLoad( char *error, size_t maxlength, bool late )
 
 void CollisionHook::SDK_OnUnload()
 {
+    if (g_pOptimizedFilterDetour)
+    {
+        g_pOptimizedFilterDetour->Destroy(); g_pOptimizedFilterDetour = NULL;
+    }
 	forwards->ReleaseForward( g_pCollisionFwd );
 	forwards->ReleaseForward( g_pPassFwd );
 
@@ -127,6 +173,7 @@ void CollisionHook::SDK_OnUnload()
 bool CollisionHook::SDK_OnMetamodLoad( ISmmAPI *ismm, char *error, size_t maxlen, bool late )
 {
 	GET_V_IFACE_CURRENT( GetPhysicsFactory, g_pPhysics, IPhysics, VPHYSICS_INTERFACE_VERSION );
+    GET_V_IFACE_CURRENT(GetEngineFactory, g_pStaticProps, IStaticPropMgrServer, INTERFACEVERSION_STATICPROPMGR_SERVER);
 
 	SH_ADD_HOOK( IPhysics, CreateEnvironment, g_pPhysics, SH_MEMBER( this, &CollisionHook::CreateEnvironment ), true );
 
