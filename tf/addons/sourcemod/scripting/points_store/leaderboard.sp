@@ -41,6 +41,129 @@ static int g_CurrencyLeaderboardPreviousPopulation;
 static int g_CurrencyLeaderboardLivePopulation;
 static bool g_CurrencyLeaderboardSamplePopulation;
 
+static char g_GemsSentLeaderboardSteamIds[CURRENCY_LEADERBOARD_LIMIT][32];
+static char g_GemsSentLeaderboardNames[CURRENCY_LEADERBOARD_LIMIT][128];
+static char g_GemsSentLeaderboardColors[CURRENCY_LEADERBOARD_LIMIT][32];
+static char g_GemsSentLeaderboardTotals[CURRENCY_LEADERBOARD_LIMIT][32];
+static int g_GemsSentLeaderboardRows;
+static bool g_GemsSentLeaderboardReady;
+static bool g_GemsSentLeaderboardRequested;
+static bool g_GemsSentLeaderboardInFlight;
+static Handle g_GemsSentLeaderboardRetry;
+
+void GemsSentLeaderboard_OnPluginStart()
+{
+    RegConsoleCmd("sm_gsl", Command_ShowGemsSentLeaderboard, "Show the gems sent leaderboard.");
+    RegConsoleCmd("sm_gemssentleaderboard", Command_ShowGemsSentLeaderboard, "Show the gems sent leaderboard.");
+    // The startup request waits for FinishSchemaReady; maps never request it again.
+    g_GemsSentLeaderboardRequested = true;
+}
+
+void GemsSentLeaderboard_OnPluginEnd()
+{
+    delete g_GemsSentLeaderboardRetry;
+    g_GemsSentLeaderboardRetry = null;
+}
+
+static void GemsSentLeaderboard_LogField(const char[] field, char[] expression, int maxlen, bool mysql)
+{
+    // Transfer events use a pipe-delimited key=value protocol. Match the full key
+    // boundary so amount cannot match sender_balance or text in a player's name.
+    if (mysql)
+    {
+        FormatEx(expression, maxlen,
+            "SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT('|',message),'|%s=',-1),'|',1)", field);
+    }
+    else
+    {
+        int markerLength = strlen(field) + 2;
+        FormatEx(expression, maxlen,
+            "substr(message,instr(message,'|%s=')+%d,"
+            ... "instr(substr(message||'|',instr(message,'|%s=')+%d),'|')-1)",
+            field, markerLength, field, markerLength);
+    }
+}
+
+static void GemsSentLeaderboard_BuildQuery(char[] query, int maxlen, bool mysql)
+{
+    char sender[512], target[512], amount[512];
+    GemsSentLeaderboard_LogField("sender_steamid64", sender, sizeof(sender), mysql);
+    GemsSentLeaderboard_LogField("target_steamid64", target, sizeof(target), mysql);
+    GemsSentLeaderboard_LogField("amount", amount, sizeof(amount), mysql);
+    char validFields[512], cacheJoin[128], nameJoin[128], ruleJoin[128];
+    strcopy(validFields, sizeof(validFields), mysql
+        ? "sender_id REGEXP '^[0-9]{17}$' AND target_id REGEXP '^[0-9]{17}$' AND amount REGEXP '^[0-9]+$'"
+        : "length(sender_id)=17 AND sender_id NOT GLOB '*[^0-9]*' "
+        ... "AND length(target_id)=17 AND target_id NOT GLOB '*[^0-9]*' "
+        ... "AND length(amount)>0 AND amount NOT GLOB '*[^0-9]*'");
+    strcopy(cacheJoin, sizeof(cacheJoin), mysql
+        ? "BINARY pc.steamid = BINARY totals.steamid64" : "pc.steamid = totals.steamid64");
+    strcopy(nameJoin, sizeof(nameJoin), mysql
+        ? "BINARY fs.steamid64 = BINARY totals.steamid64" : "fs.steamid64 = totals.steamid64");
+    strcopy(ruleJoin, sizeof(ruleJoin), mysql
+        ? "BINARY pr.pattern = BINARY totals.steamid64" : "pr.pattern = totals.steamid64");
+    FormatEx(query, maxlen,
+        "SELECT totals.steamid64,CAST(totals.gems_sent AS %s),"
+        ... "COALESCE(NULLIF(pr.newname,''),NULLIF(fs.last_name,''),totals.steamid64),"
+        ... "COALESCE(NULLIF(pc.name_color,''),'gold') FROM ("
+        ... "SELECT sender_id AS steamid64,SUM(CAST(amount AS %s)) AS gems_sent FROM ("
+        ... "SELECT %s AS sender_id,%s AS target_id,%s AS amount "
+        ... "FROM plugin_statistics_events WHERE source_plugin='points_store' AND event_name='transfer_success'"
+        ... ") fields WHERE %s AND sender_id<>target_id AND CAST(amount AS %s)>0 GROUP BY sender_id"
+        ... ") totals LEFT JOIN whaletracker_points_cache pc ON %s "
+        ... "LEFT JOIN prename_rules pr ON %s "
+        ... "LEFT JOIN filters_steam_names fs ON %s "
+        ... "ORDER BY totals.gems_sent DESC,totals.steamid64 ASC LIMIT %d",
+        mysql ? "CHAR" : "TEXT", mysql ? "UNSIGNED" : "INTEGER", sender, target, amount, validFields,
+        mysql ? "UNSIGNED" : "INTEGER", cacheJoin, ruleJoin, nameJoin, CURRENCY_LEADERBOARD_LIMIT);
+}
+
+void GemsSentLeaderboard_LoadStartupCache()
+{
+    if (!g_GemsSentLeaderboardRequested || g_GemsSentLeaderboardInFlight
+        || g_GemsSentLeaderboardRetry != null || !g_DatabaseReady || g_Database == null)
+        return;
+    char query[4096];
+    GemsSentLeaderboard_BuildQuery(query, sizeof(query), g_IsMySql);
+    g_GemsSentLeaderboardInFlight = true;
+    g_Database.Query(PointsStore_CacheGemsSentLeaderboard, query);
+}
+
+public void PointsStore_CacheGemsSentLeaderboard(Database db, DBResultSet results, const char[] error, any data)
+{
+    g_GemsSentLeaderboardInFlight = false;
+    if (error[0] != '\0' || results == null)
+    {
+        LogError("[points_store] Gems sent leaderboard startup load failed: %s", error);
+        // Survive map changes while retrying the original startup request.
+        g_GemsSentLeaderboardRetry = CreateTimer(30.0, GemsSentLeaderboard_Retry);
+        return;
+    }
+    g_GemsSentLeaderboardRows = 0;
+    while (g_GemsSentLeaderboardRows < CURRENCY_LEADERBOARD_LIMIT && results.FetchRow())
+    {
+        int row = g_GemsSentLeaderboardRows++;
+        results.FetchString(0, g_GemsSentLeaderboardSteamIds[row], sizeof(g_GemsSentLeaderboardSteamIds[]));
+        results.FetchString(1, g_GemsSentLeaderboardTotals[row], sizeof(g_GemsSentLeaderboardTotals[]));
+        results.FetchString(2, g_GemsSentLeaderboardNames[row], sizeof(g_GemsSentLeaderboardNames[]));
+        results.FetchString(3, g_GemsSentLeaderboardColors[row], sizeof(g_GemsSentLeaderboardColors[]));
+        TrimString(g_GemsSentLeaderboardNames[row]);
+        NormalizeLeaderboardColorTag(g_GemsSentLeaderboardColors[row], sizeof(g_GemsSentLeaderboardColors[]));
+        if (!g_GemsSentLeaderboardNames[row][0])
+            strcopy(g_GemsSentLeaderboardNames[row], sizeof(g_GemsSentLeaderboardNames[]), g_GemsSentLeaderboardSteamIds[row]);
+    }
+    g_GemsSentLeaderboardRequested = false;
+    g_GemsSentLeaderboardReady = true;
+    LogMessage("[points_store] Gems sent leaderboard startup cache ready: %d rows.", g_GemsSentLeaderboardRows);
+}
+
+public Action GemsSentLeaderboard_Retry(Handle timer)
+{
+    g_GemsSentLeaderboardRetry = null;
+    GemsSentLeaderboard_LoadStartupCache();
+    return Plugin_Stop;
+}
+
 public void OnGameFrame()
 {
     if (g_CurrencyLeaderboardSamplePopulation) g_CurrencyLeaderboardLivePopulation = GetClientCount(false);
@@ -126,9 +249,19 @@ public Action CurrencyLeaderboard_Retry(Handle timer, any generation)
 
 public Action Command_ShowCurrencyLeaderboard(int client, int args)
 {
+    return CurrencyLeaderboard_ShowCached(client, args, false);
+}
+
+public Action Command_ShowGemsSentLeaderboard(int client, int args)
+{
+    return CurrencyLeaderboard_ShowCached(client, args, true);
+}
+
+static Action CurrencyLeaderboard_ShowCached(int client, int args, bool gemsSent)
+{
     if (!Client_IsHumanInGame(client))
         return Plugin_Handled;
-    if (!g_CurrencyLeaderboardReady)
+    if (!(gemsSent ? g_GemsSentLeaderboardReady : g_CurrencyLeaderboardReady))
     {
         CPrintToChat(client, "%s Leaderboard is loading; please try again shortly.", g_CurrencyPrefix);
         return Plugin_Handled;
@@ -141,13 +274,18 @@ public Action Command_ShowCurrencyLeaderboard(int client, int args)
         page = StringToInt(argument);
     }
     int visible[CURRENCY_LEADERBOARD_LIMIT], count;
-    for (int row = 0; row < g_CurrencyLeaderboardRows; row++)
-        if (Oblivion_SteamMessageVisible(client, g_CurrencyLeaderboardSteamIds[row])) visible[count++] = row;
+    int rows = gemsSent ? g_GemsSentLeaderboardRows : g_CurrencyLeaderboardRows;
+    char steamId[32];
+    for (int row = 0; row < rows; row++)
+    {
+        strcopy(steamId, sizeof(steamId), gemsSent ? g_GemsSentLeaderboardSteamIds[row] : g_CurrencyLeaderboardSteamIds[row]);
+        if (Oblivion_SteamMessageVisible(client, steamId)) visible[count++] = row;
+    }
     int pages = (count + BP_LEADERBOARD_PAGE_SIZE - 1) / BP_LEADERBOARD_PAGE_SIZE;
     if (pages < 1) pages = 1;
     if (page < 1 || page > pages)
     {
-        CPrintToChat(client, "%s Use !gl <1-%d>; only the top 50 are listed.", g_CurrencyPrefix, pages);
+        CPrintToChat(client, "%s Use !%s <1-%d>; only the top 50 are listed.", g_CurrencyPrefix, gemsSent ? "gsl" : "gl", pages);
         return Plugin_Handled;
     }
     int start = (page - 1) * BP_LEADERBOARD_PAGE_SIZE;
@@ -158,12 +296,16 @@ public Action Command_ShowCurrencyLeaderboard(int client, int args)
     for (int index = start; index < end; index++)
     {
         int row = visible[index];
-        CPrintToChat(client, "#%d {%s}%s{default} %s%d", index + 1,
-            g_CurrencyLeaderboardColors[row], g_CurrencyLeaderboardNames[row], currencyColor, g_CurrencyLeaderboardBalances[row]);
+        if (gemsSent)
+            CPrintToChat(client, "#%d {%s}%s{default} %s%s", index + 1,
+                g_GemsSentLeaderboardColors[row], g_GemsSentLeaderboardNames[row], currencyColor, g_GemsSentLeaderboardTotals[row]);
+        else
+            CPrintToChat(client, "#%d {%s}%s{default} %s%d", index + 1,
+                g_CurrencyLeaderboardColors[row], g_CurrencyLeaderboardNames[row], currencyColor, g_CurrencyLeaderboardBalances[row]);
     }
     if (start >= end)
         CPrintToChat(client, "%s No cached leaderboard entries on page %d.", g_CurrencyPrefix, page);
     else if (end < count && page < pages)
-        CPrintToChat(client, "{default}Use {gold}!gl %d{default} for the next page (top 50).", page + 1);
+        CPrintToChat(client, "{default}Use {gold}!%s %d{default} for the next page (top 50).", gemsSent ? "gsl" : "gl", page + 1);
     return Plugin_Handled;
 }

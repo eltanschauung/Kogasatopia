@@ -315,6 +315,7 @@ void FinishSchemaReady()
 {
     g_DatabaseReady = true;
     CurrencyLeaderboard_RefreshIfRequested();
+    GemsSentLeaderboard_LoadStartupCache();
     EnsureIdempotentAwardsSchema();
     EnsurePerMapAwardsSchema();
     EnsureBountySchema();
