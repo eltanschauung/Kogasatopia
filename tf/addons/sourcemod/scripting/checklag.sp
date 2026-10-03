@@ -24,7 +24,7 @@ public Plugin myinfo =
     name = "CheckLag",
     author = "Hombre",
     description = "Reports the server's current and expected tickrate.",
-    version = "1.1.0",
+    version = "1.2.0",
     url = "https://kogasa.tf"
 };
 
@@ -40,6 +40,7 @@ public void OnPluginStart()
 {
     g_LagScopeIndexes=new StringMap();g_LastFrameAt=GetEngineTime();
     RegAdminCmd("sm_lagdetails",Command_LagDetails,ADMFLAG_ROOT,"Recent measured callback times and network context.");
+    RegAdminCmd("sm_lagsnapshot", Command_LagSnapshot, ADMFLAG_ROOT, "Persist current timings without classifying them as a tickrate drop.");
     RegConsoleCmd("sm_lag", Command_CheckLag, "Broadcast the server tickrate.");
     RegConsoleCmd("sm_checklag", Command_CheckLag, "Broadcast the server tickrate.");
     RegConsoleCmd("sm_ddos", Command_CheckLag, "Broadcast the server tickrate.");
@@ -54,15 +55,21 @@ public void OnPluginStart()
 
 public void Event_RoundQuietPeriod(Event event, const char[] name, bool dontBroadcast)
 {
-    g_PeakFrameGap=0.0;
+    CheckLag_ResetFrames();
     g_RoundQuietUntil = GetEngineTime() + 5.0;
     g_NextAdminAlertAt = g_RoundQuietUntil;
 }
 
 public void OnMapStart()
 {
-    g_PeakFrameGap=0.0;g_LastFrameAt=GetEngineTime();
+    CheckLag_ResetFrames();
     g_LagScopeCount=0;if(g_LagScopeIndexes!=null)g_LagScopeIndexes.Clear();
+    g_LagScopeDropped = 0;
+    g_LagSlowCount = 0;
+    g_LagSlowCursor = 0;
+    g_LagCallSequence = 0;
+    g_LastLagScopeLineCount = 0;
+    g_LastLagSnapshotReady = false;
     g_RoundQuietUntil = GetEngineTime() + 5.0;
     g_NextAdminAlertAt = g_RoundQuietUntil;
 }
@@ -80,6 +87,7 @@ public void OnPluginEnd()
 {
     delete g_AdminMonitorTimer;
     g_AdminMonitorTimer = null;
+    delete g_LagScopeIndexes;
 }
 
 bool IsWordCharacter(char value)
@@ -174,11 +182,8 @@ public Action Timer_MonitorTickrate(Handle timer)
     float maximum = PluginStats_GetExpectedTickrate();
     int serverTick = GetGameTickCount();
     g_NextAdminAlertAt = now + CHECKLAG_ADMIN_ALERT_INTERVAL;
-    PluginStats_Record("tickrate_drop");
     int measured=CheckLag_RecentMeasuredScope();
-    if(measured>=0)
-        LogMessage("[CheckLag] tick=%d rate=%.1f/%.1f frame_peak=%.1f ms measured=%s scope_peak=%.2f ms scope_total=%.2f ms calls=%d",
-            serverTick,current,maximum,g_PeakFrameGap*1000.0,g_LagScopeNames[measured],g_LagScopePeak[measured],g_LagScopeTotal[measured],g_LagScopeCalls[measured]);
+    CheckLag_LogSnapshot(serverTick, current, maximum, measured);
 
     for (int client = 1; client <= MaxClients; client++)
     {

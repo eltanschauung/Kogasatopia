@@ -6,6 +6,18 @@ QueryCookie g_WeaponsRespawnQuery[MAXPLAYERS + 1];
 int g_WeaponsRespawnQueryClass[MAXPLAYERS + 1];
 int s_LastUpdatedClient;
 
+// Session-local IDs only: no names, Steam IDs or private cookie data in traces.
+void WeaponsPerf_EndClient(int profile, const char[] scope, int client, const char[] detail = "")
+{
+    if (profile < 0) return;
+    bool valid = client > 0 && client <= MaxClients && IsClientInGame(client);
+    char context[160];
+    FormatEx(context, sizeof(context), "client=%d;userid=%d;serial=%d;class=%d;%s",
+        client, valid ? GetClientUserId(client) : 0, valid ? GetClientSerial(client) : 0,
+        valid ? view_as<int>(TF2_GetPlayerClass(client)) : 0, detail);
+    KogasaPerfEnd(profile, scope, context);
+}
+
 bool Weapons_LoadoutClientValid(int client)
 {
     return client > 0 && client <= MaxClients && IsClientConnected(client);
@@ -138,7 +150,7 @@ void ApplyClientCustomLoadout(int client)
 {
     int profile = KogasaPerfBegin();
     WeaponsProfiled_ApplyClientCustomLoadout(client);
-    KogasaPerfEnd(profile, "ApplyClientCustomLoadout");
+    WeaponsPerf_EndClient(profile, "ApplyClientCustomLoadout", client);
 }
 
 void WeaponsProfiled_ApplyClientCustomLoadout(int client)
@@ -250,10 +262,26 @@ void Weapons_ApplyLoadoutPass(int client, int playerClass, int serial)
 
 MRESReturn OnGetLoadoutItemPre(int client, DHookReturn hReturn, DHookParam hParams)
 {
-    return WeaponsWhitelist_OnGetLoadoutItemPre(client, hReturn, hParams);
+    int profile = KogasaPerfBegin();
+    MRESReturn result = WeaponsWhitelist_OnGetLoadoutItemPre(client, hReturn, hParams);
+    WeaponsPerf_EndClient(profile, "GetLoadoutItem/pre", client);
+    return result;
 }
 
 MRESReturn OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams)
+{
+    int profile = KogasaPerfBegin();
+    MRESReturn result = WeaponsProfiled_OnGetLoadoutItemPost(client, hReturn, hParams);
+    if (profile >= 0)
+    {
+        char detail[64];
+        FormatEx(detail, sizeof(detail), "requested_class=%d;slot=%d", hParams.Get(1), hParams.Get(2));
+        WeaponsPerf_EndClient(profile, "GetLoadoutItem/post", client, detail);
+    }
+    return result;
+}
+
+MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams)
 {
     MRESReturn whitelistResult = WeaponsWhitelist_ApplyLoadoutRule(client, hReturn, hParams);
     if (whitelistResult == MRES_Supercede)
@@ -326,7 +354,10 @@ MRESReturn OnManageRegularWeaponsPre(int client, Handle hParams)
     if (g_WeaponsInventoryProfileDepth < sizeof(g_WeaponsInventoryProfiles))
         g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth] = KogasaPerfBegin();
     g_WeaponsInventoryProfileDepth++;
-    return WeaponsProfiled_OnManageRegularWeaponsPre(client);
+    int profile = KogasaPerfBegin();
+    MRESReturn result = WeaponsProfiled_OnManageRegularWeaponsPre(client);
+    WeaponsPerf_EndClient(profile, "ManageRegularWeapons/pre", client);
+    return result;
 }
 
 MRESReturn WeaponsProfiled_OnManageRegularWeaponsPre(int client)
@@ -353,7 +384,9 @@ MRESReturn WeaponsProfiled_OnManageRegularWeaponsPre(int client)
 
 MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams)
 {
+    int profile = KogasaPerfBegin();
     MRESReturn result = WeaponsProfiled_OnManageRegularWeaponsPost(client);
+    WeaponsPerf_EndClient(profile, "ManageRegularWeapons/post", client);
     if (g_WeaponsInventoryProfileDepth > 0)
     {
         g_WeaponsInventoryProfileDepth--;
@@ -363,7 +396,7 @@ MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams)
             if (Weapons_IsValidClient(client))
                 TF2Classes_GetKey(TF2_GetPlayerClass(client), playerClass, sizeof(playerClass), "unknown");
             FormatEx(scope, sizeof(scope), "ManageRegularWeapons/%s(engine+hooks)", playerClass);
-            KogasaPerfEnd(g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth], scope);
+            WeaponsPerf_EndClient(g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth], scope, client);
         }
     }
     return result;

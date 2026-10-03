@@ -5,7 +5,7 @@
 #include <sourcemod>
 #include <profiler>
 
-native void CheckLag_RecordScope(const char[] scope, float milliseconds);
+native void CheckLag_RecordScope(const char[] scope, float milliseconds, const char[] context = "");
 public SharedPlugin __pl_kogasa_performance = {name="checklag", file="checklag.smx", required=0};
 public void __pl_kogasa_performance_SetNTVOptional() { MarkNativeAsOptional("CheckLag_RecordScope"); }
 
@@ -22,7 +22,7 @@ stock int KogasaPerfBegin()
     g_KogasaPerfProfiles[slot].Start();
     return slot;
 }
-stock void KogasaPerfEnd(int slot, const char[] scope)
+stock void KogasaPerfEnd(int slot, const char[] scope, const char[] context = "")
 {
     if (slot < 0) return;
     g_KogasaPerfProfiles[slot].Stop();
@@ -30,5 +30,5 @@ stock void KogasaPerfEnd(int slot, const char[] scope)
     float milliseconds = g_KogasaPerfProfiles[slot].Time * 1000.0;
     if (milliseconds >= 0.0 && milliseconds < 60000.0
         && GetFeatureStatus(FeatureType_Native, "CheckLag_RecordScope") == FeatureStatus_Available)
-        CheckLag_RecordScope(scope, milliseconds);
+        CheckLag_RecordScope(scope, milliseconds, context);
 }

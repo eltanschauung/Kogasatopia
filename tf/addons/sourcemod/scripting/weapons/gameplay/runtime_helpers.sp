@@ -24,6 +24,19 @@ void WeaponsGameplay_OnItemRuntimeStateReady(int client, int entity)
 
 public int TF2Items_OnGiveNamedItem_Post(int client, char[] classname, int itemDefinitionIndex, int itemLevel, int itemQuality, int entityIndex)
 {
+    int profile = KogasaPerfBegin();
+    int result = WeaponsProfiled_OnGiveNamedItemPost(client, itemDefinitionIndex, entityIndex);
+    if (profile >= 0)
+    {
+        char detail[64];
+        FormatEx(detail, sizeof(detail), "defindex=%d;entity=%d", itemDefinitionIndex, entityIndex);
+        WeaponsPerf_EndClient(profile, "GiveNamedItem/post", client, detail);
+    }
+    return result;
+}
+
+int WeaponsProfiled_OnGiveNamedItemPost(int client, int itemDefinitionIndex, int entityIndex)
+{
 	CustomHats_OnGiveNamedItemPost(client);
 
 	if (WeaponsGameplay_IsEnabled()) {

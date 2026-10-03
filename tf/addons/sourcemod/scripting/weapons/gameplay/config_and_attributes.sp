@@ -285,6 +285,18 @@ static void WeaponsGameplay_ApplyCustomAttributeSection(int entity)
 
 void WeaponsGameplay_ApplyConfiguredAttributes(int client, int index, int entity)
 {
+    int profile = KogasaPerfBegin();
+    WeaponsGameplay_ApplyConfiguredAttributesImpl(client, index, entity);
+    if (profile >= 0)
+    {
+        char detail[64];
+        FormatEx(detail, sizeof(detail), "defindex=%d;entity=%d", index, entity);
+        WeaponsPerf_EndClient(profile, "GiveNamedItem/configured_attributes", client, detail);
+    }
+}
+
+static void WeaponsGameplay_ApplyConfiguredAttributesImpl(int client, int index, int entity)
+{
 	if (g_hWeaponsGameplayConfig == null || !Weapons_IsClientInGame(client) || !Weapons_IsValidWeaponEntity(entity))
 		return;
 

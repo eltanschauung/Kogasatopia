@@ -316,7 +316,9 @@ int EquipCustomItem(int client, const CustomItemDefinition item) {
 	int entity = WeaponsProfiled_EquipCustomItem(client, item);
 	char scope[72];
 	FormatEx(scope, sizeof(scope), "EquipCustomItem/%s", item.uid);
-	KogasaPerfEnd(profile, scope);
+	char detail[32];
+	FormatEx(detail, sizeof(detail), "entity=%d", entity);
+	WeaponsPerf_EndClient(profile, scope, client, detail);
 	return entity;
 }
 

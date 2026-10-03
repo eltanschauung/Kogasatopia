@@ -31,6 +31,17 @@ void WeaponsBuildings_ResetAll()
 
 static bool WeaponsBuildings_HasRestriction(int client)
 {
+    if (TF2_GetPlayerClass(client) != TFClass_Engineer) return false;
+    int profile = KogasaPerfBegin();
+    bool restricted = WeaponsBuildings_CheckRestriction(client);
+    char detail[32];
+    FormatEx(detail, sizeof(detail), "restricted=%d", restricted);
+    WeaponsPerf_EndClient(profile, "EngineerBuildings/check", client, detail);
+    return restricted;
+}
+
+static bool WeaponsBuildings_CheckRestriction(int client)
+{
     if (TF2_GetPlayerClass(client) != TFClass_Engineer)
     {
         return false;
@@ -55,6 +66,16 @@ static bool WeaponsBuildings_HasRestriction(int client)
 
 static void WeaponsBuildings_StripTools(int client)
 {
+    int profile = KogasaPerfBegin();
+    int removed = WeaponsBuildings_StripToolsImpl(client);
+    char detail[32];
+    FormatEx(detail, sizeof(detail), "removed=%d", removed);
+    WeaponsPerf_EndClient(profile, "EngineerBuildings/strip_tools", client, detail);
+}
+
+static int WeaponsBuildings_StripToolsImpl(int client)
+{
+    int removed;
     int count = GetEntPropArraySize(client, Prop_Send, "m_hMyWeapons");
     for (int slot = count - 1; slot >= 0; slot--)
     {
@@ -75,11 +96,25 @@ static void WeaponsBuildings_StripTools(int client)
         if (RemovePlayerItem(client, weapon) && EntRefToEntIndex(ref) == weapon)
         {
             RemoveEntity(weapon);
+            removed++;
         }
     }
+    return removed;
 }
 
 void WeaponsBuildings_Reconcile(int client, bool inventoryApplied = false)
+{
+    if (!Weapons_IsValidClient(client)) return;
+    bool before = g_bEngineerBuildingsDisabled[client];
+    int profile = KogasaPerfBegin();
+    WeaponsBuildings_ReconcileImpl(client, inventoryApplied);
+    char detail[80];
+    FormatEx(detail, sizeof(detail), "inventory=%d;cached_before=%d;cached_after=%d",
+        inventoryApplied, before, g_bEngineerBuildingsDisabled[client]);
+    WeaponsPerf_EndClient(profile, "EngineerBuildings/reconcile", client, detail);
+}
+
+static void WeaponsBuildings_ReconcileImpl(int client, bool inventoryApplied)
 {
     if (!Weapons_IsValidClient(client))
     {
@@ -95,10 +130,13 @@ void WeaponsBuildings_Reconcile(int client, bool inventoryApplied = false)
 
     if (!g_bEngineerBuildingsDisabled[client] || inventoryApplied)
     {
-        if (GetFeatureStatus(FeatureType_Native, "Amplifier_DestroyOwnedBuildings")
-            == FeatureStatus_Available)
+        int profile = KogasaPerfBegin();
+        int removed;
+        bool nativeAvailable = GetFeatureStatus(FeatureType_Native, "Amplifier_DestroyOwnedBuildings")
+            == FeatureStatus_Available;
+        if (nativeAvailable)
         {
-            Amplifier_DestroyOwnedBuildings(client);
+            removed = Amplifier_DestroyOwnedBuildings(client);
         }
         else
         {
@@ -108,9 +146,15 @@ void WeaponsBuildings_Reconcile(int client, bool inventoryApplied = false)
             {
                 if (HasEntProp(building, Prop_Send, "m_hBuilder")
                     && GetEntPropEnt(building, Prop_Send, "m_hBuilder") == client)
+                {
                     AcceptEntityInput(building, "Kill");
+                    removed++;
+                }
             }
         }
+        char detail[64];
+        FormatEx(detail, sizeof(detail), "native=%d;removed=%d;inventory=%d", nativeAvailable, removed, inventoryApplied);
+        WeaponsPerf_EndClient(profile, "EngineerBuildings/destroy_owned", client, detail);
     }
     g_bEngineerBuildingsDisabled[client] = true;
     WeaponsBuildings_StripTools(client);

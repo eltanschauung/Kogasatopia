@@ -63,7 +63,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.2.1" ... VERSION_SUFFIX,
+    version = "7.2.2" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -271,28 +271,47 @@ public void OnConfigsExecuted()
 
 void Weapons_NotifyItemRuntimeStateReady(int client, int entity)
 {
+    int profile = KogasaPerfBegin();
+    Weapons_NotifyItemRuntimeStateReadyImpl(client, entity);
+    WeaponsPerf_EndClient(profile, "ItemReady/total", client);
+}
+
+void Weapons_NotifyItemRuntimeStateReadyImpl(int client, int entity)
+{
     if (!Weapons_IsValidClient(client) || entity <= MaxClients || !IsValidEntity(entity))
     {
         return;
     }
     int serial = GetClientSerial(client);
     int ref = EntIndexToEntRef(entity);
+    int profile = KogasaPerfBegin();
     Weapons_ApplyEngineOverrides(entity);
+    WeaponsPerf_EndClient(profile, "ItemReady/engine_overrides", client);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    profile = KogasaPerfBegin();
     WeaponsMovement_OnItemRuntimeStateReady(client, entity);
+    WeaponsPerf_EndClient(profile, "ItemReady/movement", client);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    profile = KogasaPerfBegin();
     WeaponsModels_OnItemRuntimeStateReady(client, entity);
+    WeaponsPerf_EndClient(profile, "ItemReady/models", client);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    profile = KogasaPerfBegin();
     WeaponsSound_OnItemRuntimeStateReady(client, entity);
+    WeaponsPerf_EndClient(profile, "ItemReady/sounds", client);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    profile = KogasaPerfBegin();
     WeaponsGameplay_OnItemRuntimeStateReady(client, entity);
+    WeaponsPerf_EndClient(profile, "ItemReady/gameplay", client);
     WeaponsBuildings_Reconcile(client);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)
         || g_hOnItemRuntimeStateReady == null) return;
+    profile = KogasaPerfBegin();
     Call_StartForward(g_hOnItemRuntimeStateReady);
     Call_PushCell(client);
     Call_PushCell(entity);
     Call_Finish();
+    WeaponsPerf_EndClient(profile, "ItemReady/forward", client);
 }
 
 public void OnAllPluginsLoaded()
