@@ -146,11 +146,20 @@ static void Filters_PrintToChatAllEx(int sender, const char[] message, const cha
     }
 }
 
+void Filters_AssignVoiceGroup(int client)
+{
+    if (Filters_IsRealClientInGame(client) && g_iVoiceGroup[client] == 0)
+    {
+        g_iVoiceGroup[client] = GetRandomInt(1, 2);
+    }
+}
+
 void Filters_UpdateVoiceOverrides()
 {
     int filterMode = Filters_GetFilterMode();
     bool cordMode = filterMode != 0;
     bool redlistEnabled = Filters_RedlistEnabled();
+    bool splitVoiceGroups = g_hFiltersAlltalk != null && g_hFiltersAlltalk.BoolValue;
     for (int sender = 1; sender <= MaxClients; sender++)
     {
         if (!IsClientInGame(sender))
@@ -159,6 +168,7 @@ void Filters_UpdateVoiceOverrides()
         }
 
         bool senderBlacklisted = g_PlayerState[sender].isBlacklisted;
+        bool senderIsHuman = !IsFakeClient(sender);
         for (int receiver = 1; receiver <= MaxClients; receiver++)
         {
             if (receiver == sender || !IsClientInGame(receiver))
@@ -190,6 +200,15 @@ void Filters_UpdateVoiceOverrides()
             }
 
             if (Oblivion_ShouldHide(receiver, sender)) shouldBlock = true;
+
+            // This is an additional restriction, not an override of mutes or
+            // quarantine rules. Block pending post-admin assignments as well.
+            if (splitVoiceGroups && senderIsHuman && !IsFakeClient(receiver)
+                && (g_iVoiceGroup[receiver] == 0
+                    || g_iVoiceGroup[receiver] != g_iVoiceGroup[sender]))
+            {
+                shouldBlock = true;
+            }
 
             if (shouldBlock)
             {

@@ -102,6 +102,8 @@ enum struct PlayerState
 PlayerState g_PlayerState[MAXPLAYERS + 1];
 bool g_VoiceBlocked[MAXPLAYERS + 1][MAXPLAYERS + 1];
 bool g_MuteDeafened[MAXPLAYERS + 1];
+// Random voice partitions are connection-local, never saved in cookies.
+int g_iVoiceGroup[MAXPLAYERS + 1];
 int g_AutoRedlistKills[MAXPLAYERS + 1];
 int g_AutoRedlistRapes[MAXPLAYERS + 1];
 bool g_AutoRedlistGotKills[MAXPLAYERS + 1];
@@ -136,6 +138,7 @@ ConVar g_hFiltersTeamChat = null;
 ConVar g_hRedlistEnabled = null;
 ConVar g_hPChat = null;
 ConVar g_hMuteDeafenEnabled = null;
+ConVar g_hFiltersAlltalk = null;
 ConVar g_hParseeEnabled = null;
 ConVar g_hParseeMode = null;
 ConVar g_hMemomanEnabled = null;
@@ -199,7 +202,7 @@ public Plugin myinfo =
     name = "filters",
     author = "Hombre, Dr. McKay, AlliedModders LLC",
     description = "Chat management, filtering, web relay, and BaseComm controls",
-    version = "1.1.1",
+    version = "1.1.2",
     url = "https://kogasa.tf"
 };
 

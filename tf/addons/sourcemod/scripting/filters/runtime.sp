@@ -51,6 +51,8 @@ void Filters_RestoreConnectedClients()
     for (int client = 1; client <= MaxClients; client++)
     {
         if (!IsClientInGame(client)) continue;
+        // Late-loaded plugins do not receive the past post-admin forwards.
+        Filters_AssignVoiceGroup(client);
         if (AreClientCookiesCached(client)) ProcessCookies(client);
         else Filters_ClearClientState(client);
         Filters_ResetExternalStats(client);

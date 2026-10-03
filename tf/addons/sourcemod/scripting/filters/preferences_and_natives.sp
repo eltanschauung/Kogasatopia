@@ -371,11 +371,13 @@ public void Filters_AutoRedlistRapesCallback(Database db, DBResultSet results, c
 
 public void OnClientPostAdminCheck(int client)
 {
+    Filters_AssignVoiceGroup(client);
     if (AreClientCookiesCached(client) && !g_PlayerState[client].cookiesProcessed)
     {
         ProcessCookies(client);
-        Filters_UpdateVoiceOverrides();
     }
+
+    Filters_UpdateVoiceOverrides();
 
     if (Filters_IsRealClientInGame(client))
     {
@@ -415,6 +417,11 @@ public void Filters_OnMuteDeafenChanged(ConVar convar, const char[] oldValue, co
     Filters_RefreshMuteDeafenState();
 }
 
+public void Filters_OnAlltalkChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    Filters_UpdateVoiceOverrides();
+}
+
 public void Filters_OnParseeChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     if (StringToInt(oldValue) == 0 && StringToInt(newValue) != 0)
@@ -433,6 +440,11 @@ public void Filters_OnMemomanChanged(ConVar convar, const char[] oldValue, const
     }
 }
 
+public void OnClientConnected(int client)
+{
+    g_iVoiceGroup[client] = 0;
+}
+
 public void OnClientPutInServer(int client)
 {
     Filters_ClearDisguise(client);
@@ -440,6 +452,8 @@ public void OnClientPutInServer(int client)
     Filters_ResetBlacklistChatRateLimit(client);
     Filters_ResetArchivedMessageCooldowns(client);
     Filters_ResetExternalStats(client);
+    // Enforce the partition while this client awaits post-admin assignment.
+    Filters_UpdateVoiceOverrides();
 }
 
 public void OnClientDisconnect(int client)
@@ -452,6 +466,7 @@ public void OnClientDisconnect(int client)
     Filters_ClearClientState(client);
     Filters_ResetExternalStats(client);
     g_MuteDeafened[client] = false;
+    g_iVoiceGroup[client] = 0;
     for (int i = 1; i <= MaxClients; i++)
     {
         g_VoiceBlocked[client][i] = false;
