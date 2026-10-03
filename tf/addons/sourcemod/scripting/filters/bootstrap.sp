@@ -33,6 +33,7 @@ public void OnPluginStart()
     Filters_NameHistoryInit();
     LoadTranslations("common.phrases");
     FiltersBaseComm_Initialize();
+    FiltersDeafen_Initialize();
     Filters_EnsureCollections();
     LoadFilterConfig();
     Filters_CreateConVars();

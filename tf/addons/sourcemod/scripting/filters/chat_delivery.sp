@@ -177,7 +177,7 @@ void Filters_UpdateVoiceOverrides()
             }
 
             bool shouldBlock = false;
-            if (g_MuteDeafened[receiver])
+            if (g_MuteDeafened[receiver] || FiltersDeafen_IsClientDeafened(receiver))
             {
                 shouldBlock = true;
             }

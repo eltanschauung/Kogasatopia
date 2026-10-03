@@ -202,13 +202,14 @@ public Plugin myinfo =
     name = "filters",
     author = "Hombre, Dr. McKay, AlliedModders LLC",
     description = "Chat management, filtering, web relay, and BaseComm controls",
-    version = "1.1.2",
+    version = "1.1.3",
     url = "https://kogasa.tf"
 };
 
 // Configuration/registration are separate from the asynchronous relay implementation.
 // Existing tidychat integration retains credit to pheadxdll.
 #include "filters/basecomm.sp"
+#include "filters/deafen.sp"
 #include "filters/bootstrap.sp"
 #include "filters/common_state.sp"
 #include "filters/tidychat.sp"

@@ -130,6 +130,7 @@ void ProcessCookies(int client)
     }
 
     g_PlayerState[client].cookiesProcessed = true;
+    FiltersDeafen_LoadCookie(client);
 
     char cookie[32];
 
@@ -442,6 +443,7 @@ public void Filters_OnMemomanChanged(ConVar convar, const char[] oldValue, const
 
 public void OnClientConnected(int client)
 {
+    FiltersDeafen_ResetClient(client);
     g_iVoiceGroup[client] = 0;
 }
 
@@ -466,6 +468,7 @@ public void OnClientDisconnect(int client)
     Filters_ClearClientState(client);
     Filters_ResetExternalStats(client);
     g_MuteDeafened[client] = false;
+    FiltersDeafen_ResetClient(client);
     g_iVoiceGroup[client] = 0;
     for (int i = 1; i <= MaxClients; i++)
     {
