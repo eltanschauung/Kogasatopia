@@ -63,7 +63,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.2.3" ... VERSION_SUFFIX,
+    version = "7.2.4" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -157,7 +157,6 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
 public void OnPluginStart()
 {
     WeaponsCustomAttributes_OnPluginStart();
-    WeaponsWhitelist_OnPluginStart();
     WeaponsMovement_OnPluginStart();
     CustomHats_OnPluginStart();
     WeaponsHatVisibility_OnPluginStart();
@@ -176,7 +175,6 @@ public void OnPluginStart()
         delete gameConf;
         SetFailState("Failed to create required weapon loadout detours.");
     }
-    DHookEnableDetour(getLoadout, false, OnGetLoadoutItemPre);
     DHookEnableDetour(getLoadout, true, OnGetLoadoutItemPost);
     DHookEnableDetour(manageWeapons, false, OnManageRegularWeaponsPre);
     DHookEnableDetour(manageWeapons, true, OnManageRegularWeaponsPost);
@@ -317,6 +315,7 @@ void Weapons_NotifyItemRuntimeStateReadyImpl(int client, int entity)
 
 public void OnAllPluginsLoaded()
 {
+    WeaponsWhitelist_OnAllPluginsLoaded();
     BuildLoadoutSlotMenu();
     g_attrdef_AllowedInMedievalMode = TF2Econ_TranslateAttributeNameToDefinitionIndex("allowed in medieval mode");
     for (int client = 1; client <= MaxClients; client++)
@@ -345,11 +344,14 @@ public void OnLibraryAdded(const char[] name)
 
 public void OnLibraryRemoved(const char[] name)
 {
+    if (StrEqual(name, "whitelist_policy"))
+        LogMessage("Whitelist companion unloaded; retaining the last committed native policy.");
     CustomHats_OnLibraryRemoved(name);
 }
 
 public void OnMapStart()
 {
+    WhitelistPolicy_ResetTransactions();
     WeaponsBuildings_ResetAll();
     WeaponsMovement_OnMapStart();
     WeaponsCustomAttributes_OnMapStart();

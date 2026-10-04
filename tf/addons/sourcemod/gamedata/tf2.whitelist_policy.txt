@@ -1,0 +1,63 @@
+"Games"
+{
+    "tf"
+    {
+        "Offsets"
+        {
+            "Inventory"
+            {
+                "linux" "4892"
+                "linux64" "5616"
+            }
+            "GuardInventoryDisplacement"
+            {
+                "linux" "2"
+                "linux64" "3"
+            }
+            "GuardCallDisplacement"
+            {
+                "linux" "13"
+                "linux64" "14"
+            }
+        }
+        "Signatures"
+        {
+            "TFInventoryManager"
+            {
+                "library" "server"
+                "linux" "@_Z18TFInventoryManagerv"
+                "linux64" "@_Z18TFInventoryManagerv"
+            }
+            "GetItemInLoadout"
+            {
+                "library" "server"
+                "linux" "@_ZN18CTFPlayerInventory16GetItemInLoadoutEii"
+                "linux64" "@_ZN18CTFPlayerInventory16GetItemInLoadoutEii"
+            }
+            "GetBaseItemForClass"
+            {
+                "library" "server"
+                "linux" "@_ZN19CTFInventoryManager19GetBaseItemForClassEii"
+                "linux64" "@_ZN19CTFInventoryManager19GetBaseItemForClassEii"
+            }
+            "GetItemDefIndex"
+            {
+                "library" "server"
+                "linux" "@_ZNK13CEconItemView15GetItemDefIndexEv"
+                "linux64" "@_ZNK13CEconItemView15GetItemDefIndexEv"
+            }
+            "GetLoadoutItem"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer14GetLoadoutItemEiib"
+                "linux64" "@_ZN9CTFPlayer14GetLoadoutItemEiib"
+            }
+            "InventoryOffsetGuard"
+            {
+                "library" "server"
+                "linux" "\x8D\x87\x1C\x13\x00\x00\x83\xEC\x04\x56\x53\x50\xE8"
+                "linux64" "\x49\x8D\xBE\xF0\x15\x00\x00\x44\x89\xEA\x44\x89\xE6\xE8"
+            }
+        }
+    }
+}

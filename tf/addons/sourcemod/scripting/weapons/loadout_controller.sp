@@ -278,14 +278,6 @@ void Weapons_ApplyLoadoutPass(int client, int playerClass, int serial)
     }
 }
 
-MRESReturn OnGetLoadoutItemPre(int client, DHookReturn hReturn, DHookParam hParams)
-{
-    int profile = KogasaPerfBegin();
-    MRESReturn result = WeaponsWhitelist_OnGetLoadoutItemPre(client, hReturn, hParams);
-    WeaponsPerf_EndClient(profile, "GetLoadoutItem/pre", client);
-    return result;
-}
-
 MRESReturn OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams)
 {
     int profile = KogasaPerfBegin();
@@ -301,20 +293,21 @@ MRESReturn OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hPar
 
 MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams)
 {
-    MRESReturn whitelistResult = WeaponsWhitelist_ApplyLoadoutRule(client, hReturn, hParams);
-    if (whitelistResult == MRES_Supercede)
+    bool blocksCustom;
+    MRESReturn whitelistResult = WeaponsWhitelist_ApplyLoadoutRule(client, hReturn, hParams, blocksCustom);
+    if (blocksCustom)
     {
         return whitelistResult;
     }
     if (!Weapons_LoadoutClientValid(client) || !sm_weapons_enable_loadout.BoolValue)
     {
-        return MRES_Ignored;
+        return whitelistResult;
     }
     int playerClass = hParams.Get(1);
     int slot = hParams.Get(2);
     if (!Weapons_LoadoutClassValid(playerClass) || slot < 0 || slot >= NUM_ITEMS)
     {
-        return MRES_Ignored;
+        return whitelistResult;
     }
     int storedItem = EntRefToEntIndex(g_CurrentLoadout[client][playerClass][slot].entity);
     if (!g_CurrentLoadout[client][playerClass][slot].IsEmpty())
@@ -326,7 +319,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
         {
             // Leave TF2's original econ item view intact. Spawn suppression owns
             // stock tools, and the deferred reconciler owns existing entities.
-            return MRES_Ignored;
+            return whitelistResult;
         }
         if (!hasDefinition || !CanPlayerEquipItemForClass(client, playerClass, item))
         {
@@ -335,7 +328,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
                 RemoveEntity(storedItem);
                 g_CurrentLoadout[client][playerClass][slot].entity = INVALID_ENT_REFERENCE;
             }
-            return MRES_Ignored;
+            return whitelistResult;
         }
     }
     if (storedItem <= MaxClients || !IsValidEntity(storedItem)
@@ -343,7 +336,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
     {
         if (g_CurrentLoadout[client][playerClass][slot].IsEmpty())
         {
-            return MRES_Ignored;
+            return whitelistResult;
         }
         // TF2 expects a non-null CEconItemView even while custom equip is deferred.
         static int defaultItemRef = INVALID_ENT_REFERENCE;
@@ -353,7 +346,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
             storedItem = TF2_SpawnWearable();
             if (storedItem <= MaxClients || !IsValidEntity(storedItem))
             {
-                return MRES_Ignored;
+                return whitelistResult;
             }
             defaultItemRef = EntIndexToEntRef(storedItem);
             // Intentional: RemoveEntity is deferred by the engine until after this call.
@@ -363,7 +356,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
     int offset = GetEntSendPropOffs(storedItem, "m_Item", true);
     if (offset <= 0)
     {
-        return MRES_Ignored;
+        return whitelistResult;
     }
     hReturn.Value = GetEntityAddress(storedItem) + view_as<Address>(offset);
     return MRES_Supercede;
@@ -380,6 +373,7 @@ MRESReturn OnManageRegularWeaponsPre(int client, Handle hParams)
         g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth] = KogasaPerfBegin();
     g_WeaponsInventoryProfileDepth++;
     WeaponsBuildings_BeginInventory(client);
+    WhitelistPolicy_BeginInventory(client);
     int profile = KogasaPerfBegin();
     MRESReturn result = WeaponsProfiled_OnManageRegularWeaponsPre(client);
     WeaponsPerf_EndClient(profile, "ManageRegularWeapons/pre", client);
@@ -429,6 +423,7 @@ MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams)
         }
     }
     WeaponsBuildings_EndInventory(client);
+    WhitelistPolicy_EndInventory(client);
     return result;
 }
 
