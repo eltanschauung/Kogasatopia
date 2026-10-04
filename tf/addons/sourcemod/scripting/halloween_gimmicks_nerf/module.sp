@@ -260,7 +260,7 @@ bool HalloweenGimmicksNerf_IsHalloweenBoss(int entity)
     char classname[64];
     GetEntityClassname(entity, classname, sizeof(classname));
 
-    return (StrEqual(classname, "eyeball_boss") 
-         || StrEqual(classname, "headless_hatman") 
+    return (StrEqual(classname, "eyeball_boss")
+         || StrEqual(classname, "headless_hatman")
          || StrEqual(classname, "merasmus"));
 }
