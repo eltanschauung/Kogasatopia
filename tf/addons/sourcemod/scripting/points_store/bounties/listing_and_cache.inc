@@ -10,57 +10,43 @@ public Action Command_ShowBounties(int client, int args)
         return Plugin_Handled;
     }
 
-    char query[1024];
-    FormatEx(query, sizeof(query),
-        "SELECT target_steamid64, MAX(target_name), SUM(amount + bonus_amount) AS total_amount, MIN(expires_at) "
-        ... "FROM %s WHERE status = 'active' AND expires_at > %d "
-        ... "GROUP BY target_steamid64 ORDER BY total_amount DESC, MAX(target_name) ASC LIMIT 100",
-        BOUNTY_TABLE,
-        GetTime());
-    g_Database.Query(SQL_OnBountyListLoaded, query, GetClientUserId(client));
+    if (!g_BountyListCacheReady)
+    {
+        CPrintToChat(client, "%s Bounties are still loading. Please try again shortly.", g_BountyPrefix);
+        return Plugin_Handled;
+    }
+
+    Menu menu = BuildBountyListMenu();
+    menu.Display(client, MENU_TIME_FOREVER);
     return Plugin_Handled;
 }
 
-public void SQL_OnBountyListLoaded(Database db, DBResultSet rows, const char[] error, any userId)
+int GetBountyListRemainingMinutes(BountyListEntry entry, int now)
 {
-    int client = GetClientOfUserId(userId);
-    if (!Client_IsHumanInGame(client))
-    {
-        return;
-    }
-    if (error[0] != '\0')
-    {
-        LogError("[points_store] Bounty list failed: %s", error);
-        CPrintToChat(client, "%s Failed to load bounties.", g_BountyPrefix);
-        return;
-    }
+    int seconds = GetBountyPlaytimeLimitSeconds() - entry.qualifyingPlaytime;
+    int wallSeconds = entry.expiresAt - now;
+    if (wallSeconds < seconds)
+        seconds = wallSeconds;
+    return seconds > 0 ? (seconds + 59) / 60 : 0;
+}
 
+Menu BuildBountyListMenu()
+{
     Menu menu = new Menu(MenuHandler_BountyList);
     menu.SetTitle("Bounties");
-    char steamId[BOUNTY_STEAMID_MAX];
-    char name[BOUNTY_NAME_MAX];
     char display[256];
     char currencyLong[BP_CURRENCY_LONG_MAX];
     GetCurrencyLongLabel(currencyLong, sizeof(currencyLong));
     int count = 0;
-    while (rows != null && rows.FetchRow())
+    int now = GetTime();
+    BountyListEntry entry;
+    for (int i = 0; g_BountyListCache != null && i < g_BountyListCache.Length && count < BOUNTY_LIST_MAX_TARGETS; i++)
     {
-        rows.FetchString(0, steamId, sizeof(steamId));
-        rows.FetchString(1, name, sizeof(name));
-        int amount = rows.FetchInt(2);
-        // Stacked bounties can expire separately: show the next expiry, when
-        // the displayed total will change, instead of overstating its lifetime.
-        int seconds = rows.FetchInt(3) - GetTime();
-        if (seconds <= 0)
-            continue;
-        int target = Kogasa_FindClientBySteamId64(steamId);
-        if (target > 0)
-        {
-            GetClientName(target, name, sizeof(name));
-        }
-        int minutes = (seconds + 59) / 60;
-        FormatEx(display, sizeof(display), "%s (%s %d) (%dm)", name, currencyLong, amount, minutes);
-        menu.AddItem(steamId, display, ITEMDRAW_DISABLED);
+        g_BountyListCache.GetArray(i, entry, sizeof(entry));
+        int minutes = GetBountyListRemainingMinutes(entry, now);
+        if (minutes == 0) continue;
+        FormatEx(display, sizeof(display), "%s (%s %d) (%dm)", entry.name, currencyLong, entry.amount, minutes);
+        menu.AddItem(entry.steamId, display, ITEMDRAW_DISABLED);
         count++;
     }
     if (count == 0)
@@ -68,7 +54,7 @@ public void SQL_OnBountyListLoaded(Database db, DBResultSet rows, const char[] e
         menu.AddItem("none", "No active bounties", ITEMDRAW_DISABLED);
     }
     menu.ExitButton = true;
-    menu.Display(client, MENU_TIME_FOREVER);
+    return menu;
 }
 
 public int MenuHandler_BountyList(Menu menu, MenuAction action, int client, int item)
@@ -116,40 +102,102 @@ void RefreshActiveBountyTargets()
         return;
     }
 
-    char query[512];
-    FormatEx(query, sizeof(query),
-        "SELECT target_steamid64, COUNT(*) FROM %s WHERE status = 'active' AND expires_at > %d GROUP BY target_steamid64",
+    g_BountyTargetCacheRefreshQueued = true;
+    if (g_BountyTargetCachePending || g_BountyTargetCacheRefreshTimer != null)
+        return;
+
+    float elapsed = GetEngineTime() - g_BountyTargetCacheLastRequest;
+    if (g_BountyTargetCacheLastRequest >= 0.0 && elapsed < BOUNTY_CACHE_REFRESH_INTERVAL)
+    {
+        g_BountyTargetCacheRefreshTimer = CreateTimer(
+            BOUNTY_CACHE_REFRESH_INTERVAL - elapsed, Timer_RefreshBountyCache);
+        return;
+    }
+    StartActiveBountyCacheRefresh();
+}
+
+void Bounties_OnDatabaseDisconnected()
+{
+    g_BountyTargetCacheGeneration++;
+    g_BountyListCacheReady = false;
+    g_BountyTargetCachePending = false;
+    g_BountyTargetCacheRefreshQueued = false;
+    g_BountyTargetCacheLastRequest = -1.0;
+    delete g_BountyTargetCacheRefreshTimer;
+    g_BountyTargetCacheRefreshTimer = null;
+}
+
+public Action Timer_RefreshBountyCache(Handle timer)
+{
+    g_BountyTargetCacheRefreshTimer = null;
+    if (g_BountyTargetCacheRefreshQueued && g_BountyDatabaseReady && g_Database != null)
+        StartActiveBountyCacheRefresh();
+    return Plugin_Stop;
+}
+
+void BuildActiveBountyCacheQuery(char[] query, int maxlen)
+{
+    // The furthest-progressed stack expires first; the week-long expiry is only a backstop.
+    FormatEx(query, maxlen,
+        "SELECT target_steamid64, MAX(target_name), SUM(amount + bonus_amount) AS total_amount, "
+        ... "MAX(qualifying_playtime_seconds), MIN(expires_at) "
+        ... "FROM %s WHERE status = 'active' AND expires_at > %d "
+        ... "GROUP BY target_steamid64 ORDER BY total_amount DESC, MAX(target_name) ASC, target_steamid64 ASC",
         BOUNTY_TABLE,
         GetTime());
+}
 
-    g_BountyTargetCacheGeneration++;
+void StartActiveBountyCacheRefresh()
+{
+    char query[1024];
+    BuildActiveBountyCacheQuery(query, sizeof(query));
+    g_BountyTargetCachePending = true;
+    g_BountyTargetCacheRefreshQueued = false;
+    g_BountyTargetCacheLastRequest = GetEngineTime();
     g_Database.Query(SQL_OnActiveBountyTargetsLoaded, query, g_BountyTargetCacheGeneration);
 }
 
 public void SQL_OnActiveBountyTargetsLoaded(Database db, DBResultSet rows, const char[] error, any generation)
 {
+    if (!g_BountyDatabaseReady || g_Database == null || db == null || !db.IsSameConnection(g_Database))
+        return;
+    g_BountyTargetCachePending = false;
     if (error[0] != '\0')
     {
         LogError("[points_store] Active bounty target cache refresh failed: %s", error);
+        RefreshActiveBountyTargets();
         return;
     }
     if (generation != g_BountyTargetCacheGeneration)
     {
+        RefreshActiveBountyTargets();
         return;
     }
 
     StringMap refreshedTargets = new StringMap();
-    char steamId[BOUNTY_STEAMID_MAX];
+    ArrayList refreshedList = new ArrayList(sizeof(BountyListEntry));
+    BountyListEntry entry;
     int activeCount = 0;
     while (rows != null && rows.FetchRow())
     {
-        rows.FetchString(0, steamId, sizeof(steamId));
-        refreshedTargets.SetValue(steamId, 1, true);
+        rows.FetchString(0, entry.steamId, sizeof(entry.steamId));
+        rows.FetchString(1, entry.name, sizeof(entry.name));
+        entry.amount = rows.FetchInt(2);
+        entry.qualifyingPlaytime = rows.FetchInt(3);
+        entry.expiresAt = rows.FetchInt(4);
+        int target = Kogasa_FindClientBySteamId64(entry.steamId);
+        if (target > 0)
+            GetClientName(target, entry.name, sizeof(entry.name));
+        refreshedTargets.SetValue(entry.steamId, 1, true);
+        refreshedList.PushArray(entry, sizeof(entry));
         activeCount++;
     }
 
     delete g_ActiveBountyTargets;
     g_ActiveBountyTargets = refreshedTargets;
+    delete g_BountyListCache;
+    g_BountyListCache = refreshedList;
+    g_BountyListCacheReady = true;
     g_ActiveBountyCount = activeCount;
 
     for (int client = 1; client <= MaxClients; client++)
@@ -159,5 +207,7 @@ public void SQL_OnActiveBountyTargetsLoaded(Database db, DBResultSet rows, const
             g_BountyMedicAssistsLife[client] = 0;
         }
     }
+    if (g_BountyTargetCacheRefreshQueued)
+        RefreshActiveBountyTargets();
 }
 

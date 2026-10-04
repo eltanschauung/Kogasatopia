@@ -13,6 +13,8 @@
 #define BOUNTY_KILL_GROWTH_AMOUNT 5
 #define BOUNTY_MEDIC_ASSISTS_PER_GROWTH 2
 #define BOUNTY_MAINTENANCE_INTERVAL 60.0
+#define BOUNTY_CACHE_REFRESH_INTERVAL 5.0
+#define BOUNTY_LIST_MAX_TARGETS 100
 #define BOUNTY_DISCONNECT_GRACE_SECONDS 300
 #define BOUNTY_PLACEMENT_COOLDOWN_SECONDS 900
 #define BOUNTY_MAX_ACTIVE 3
@@ -32,12 +34,27 @@ enum struct BountySearchResult
     bool connected;
 }
 
+enum struct BountyListEntry
+{
+    char steamId[BOUNTY_STEAMID_MAX];
+    char name[BOUNTY_NAME_MAX];
+    int amount;
+    int qualifyingPlaytime;
+    int expiresAt;
+}
+
 bool g_BountyDatabaseReady = false;
 bool g_BountyExpiryPending = false;
 bool g_BountyProgressPending = false;
 bool g_BountyDisconnectRefundPending = false;
 StringMap g_ActiveBountyTargets = null;
 int g_BountyTargetCacheGeneration = 0;
+ArrayList g_BountyListCache = null;
+bool g_BountyListCacheReady = false;
+bool g_BountyTargetCachePending = false;
+bool g_BountyTargetCacheRefreshQueued = false;
+float g_BountyTargetCacheLastRequest = -1.0;
+Handle g_BountyTargetCacheRefreshTimer = null;
 int g_ActiveBountyCount = 0;
 bool g_BountyPlacementPending[MAXPLAYERS + 1];
 ArrayList g_BountySearchResults[MAXPLAYERS + 1];

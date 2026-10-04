@@ -293,8 +293,8 @@ public void SQLTxn_OnBountiesSurvived(Database db, any data, int numQueries, DBR
     if (resolvedAny)
     {
         PlayBountySaySound(BOUNTY_EVENT_SOUND);
-        RefreshActiveBountyTargets();
     }
+    RefreshActiveBountyTargets();
 }
 
 public void SQLTxn_OnBountyProgressFailed(Database db, any data, int numQueries, const char[] error, int failIndex, any[] queryData)

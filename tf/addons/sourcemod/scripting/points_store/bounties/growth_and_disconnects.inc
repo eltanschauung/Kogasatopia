@@ -143,6 +143,7 @@ public void SQL_OnBountyKillGrowth(Database db, DBResultSet results, const char[
     int bountyCount = results != null ? results.AffectedRows : 0;
     if (bountyCount > 0)
     {
+        RefreshActiveBountyTargets();
         LogPointsStoreEvent(
             "event=bounty_kill_growth|time=%d|target=%s|client=%d|bounties=%d|growth_amount=%d|source=%s",
             GetTime(), attackerSteamId, attacker, bountyCount, BOUNTY_KILL_GROWTH_AMOUNT,

@@ -177,6 +177,10 @@ public Action Command_BountyHelp(int client, int args)
 void Bounties_OnPluginEnd()
 {
     delete g_BountyMaintenanceTimer;
+    delete g_BountyTargetCacheRefreshTimer;
+    g_BountyTargetCacheRefreshTimer = null;
+    delete g_BountyListCache;
+    g_BountyListCache = null;
     delete g_ActiveBountyTargets;
     g_ActiveBountyTargets = null;
     for (int client = 1; client <= MaxClients; client++)

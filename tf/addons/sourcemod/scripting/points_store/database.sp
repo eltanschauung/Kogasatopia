@@ -8,6 +8,7 @@ void ConnectDatabase()
     g_PerMapAwardsReady = false;
     g_PerMapSchemaReady = false;
     g_BountyDatabaseReady = false;
+    Bounties_OnDatabaseDisconnected();
     g_BountyExpiryPending = false;
     g_BountyProgressPending = false;
     g_BountyDisconnectRefundPending = false;
@@ -57,6 +58,7 @@ void ScheduleDatabaseReconnect(float delay = DB_RECONNECT_DELAY)
     g_DatabaseReady = false;
     g_IdempotentAwardsReady = false;
     g_BountyDatabaseReady = false;
+    Bounties_OnDatabaseDisconnected();
     if (g_hDatabaseReconnectTimer == null)
     {
         g_hDatabaseReconnectTimer = CreateTimer(delay, Timer_ReconnectDatabase, _, TIMER_FLAG_NO_MAPCHANGE);
