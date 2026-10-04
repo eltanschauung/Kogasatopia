@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <sdktools>
 
 #include <sdkhooks>
 
@@ -9,16 +10,14 @@
 #include <tf2_stocks>
 #include <tf2attributes>
 
-#define PLUGIN_VERSION "1.1"
+#define PLUGIN_VERSION "1.2"
 #define HALLOWEEN_CLEANUP_STUNS 0
-#define HALLOWEEN_CLEANUP_SPELLS 1
-#define HALLOWEEN_CLEANUP_PUMPKINS 2
-#define HALLOWEEN_CLEANUP_COUNT 3
+#define HALLOWEEN_CLEANUP_PUMPKINS 1
+#define HALLOWEEN_CLEANUP_COUNT 2
 
 static const char g_HalloweenCleanupClassnames[][] =
 {
     "trigger_stun",
-    "tf_spell_pickup",
     "tf_pumpkin_bomb"
 };
 
@@ -30,6 +29,7 @@ ConVar g_cvBossNerfScale;
 ConVar g_cvBetterPumpkins;
 ConVar g_cvNoPumpkins;
 ConVar g_cvHalloween;
+bool g_SpellCleanupQueued;
 
 public Plugin myinfo = {
     name = "Halloween Gimmick Limiter",
@@ -42,6 +42,7 @@ public Plugin myinfo = {
 public void OnPluginStart()
 {
     g_cvDisableSpells = CreateConVar("sm_nospells", "1", "Disable spells", _, true, 0.0, true, 1.0);
+    g_cvDisableSpells.AddChangeHook(OnSpellSettingChanged);
     g_cvDisableStuns = CreateConVar("sm_noghoststuns", "1", "Attempt to disable trigger_stuns (halloween ghost stun), doesn't work on Viaduct Event", _, true, 0.0, true, 1.0);
     g_cvMiniCrump = CreateConVar("sm_minicrumps", "1", "Replace crit pumpkin boost with mini crits", _, true, 0.0, true, 1.0);
     g_cvBetterPumpkins = CreateConVar("sm_betterpumpkins", "1", "Limit pumpkin bomb damage while maintaining launch velocity", _, true, 0.0, true, 1.0);
@@ -52,6 +53,15 @@ public void OnPluginStart()
     AutoExecConfig(true, "nerfhalloweengimmicks");
     CheckHalloweenStatus(); // This appears 3 times total for certainty
     HookEvent("teamplay_round_active", Event_RoundActive, EventHookMode_Post);
+    HookEvent("teamplay_round_start", Event_CleanupSpellPickups, EventHookMode_PostNoCopy);
+    QueueSpellPickupCleanup();
+}
+
+public void OnMapStart()
+{
+    g_SpellCleanupQueued = false;
+    CheckHalloweenStatus();
+    QueueSpellPickupCleanup();
 }
 
 public void OnClientPutInServer(int client)
@@ -62,6 +72,7 @@ public void OnClientPutInServer(int client)
 public void OnConfigsExecuted()
 {
     CheckHalloweenStatus(); // This was missing
+    QueueSpellPickupCleanup();
 }
 
 // Entity creation checks
@@ -69,6 +80,15 @@ public void OnConfigsExecuted()
 public void OnEntityCreated(int entity, const char[] classname)
 {
     if (!IsValidEntity(entity)) return;
+
+    // Spell drops can exist on ordinary maps without Halloween marker entities.
+    if (StrEqual(classname, "tf_spell_pickup", false))
+    {
+        SDKHook(entity, SDKHook_StartTouch, SpellPickup_BlockTouch);
+        SDKHook(entity, SDKHook_Touch, SpellPickup_BlockTouch);
+        SDKHook(entity, SDKHook_SpawnPost, SpellPickup_OnSpawnPost);
+        return;
+    }
 
     if (IsHalloweenBoss(entity))
     {
@@ -81,10 +101,6 @@ public void OnEntityCreated(int entity, const char[] classname)
     if (g_cvDisableStuns.BoolValue && StrEqual(classname, g_HalloweenCleanupClassnames[HALLOWEEN_CLEANUP_STUNS], false))
     {
         cleanupType = HALLOWEEN_CLEANUP_STUNS;
-    }
-    else if (g_cvDisableSpells.BoolValue && StrEqual(classname, g_HalloweenCleanupClassnames[HALLOWEEN_CLEANUP_SPELLS], false))
-    {
-        cleanupType = HALLOWEEN_CLEANUP_SPELLS;
     }
     else if (g_cvNoPumpkins.BoolValue && StrEqual(classname, g_HalloweenCleanupClassnames[HALLOWEEN_CLEANUP_PUMPKINS], false))
     {
@@ -144,6 +160,7 @@ void Frame_RemovePumpkinDamageReduction(any entityRef)
 public void Event_RoundActive(Event event, const char[] name, bool dontBroadcast)
 {
     CheckHalloweenStatus();
+    QueueSpellPickupCleanup();
     if (g_cvHalloween.BoolValue)
     {
         if (g_cvDisableStuns.BoolValue)
@@ -151,15 +168,58 @@ public void Event_RoundActive(Event event, const char[] name, bool dontBroadcast
             CreateTimer(0.1, Timer_RemoveHalloweenEntities, HALLOWEEN_CLEANUP_STUNS, TIMER_FLAG_NO_MAPCHANGE);
         }
 
-        if (g_cvDisableSpells.BoolValue)
-        {
-            CreateTimer(0.1, Timer_RemoveHalloweenEntities, HALLOWEEN_CLEANUP_SPELLS, TIMER_FLAG_NO_MAPCHANGE);
-        }
         if (g_cvNoPumpkins.BoolValue)
         {
             CreateTimer(0.1, Timer_RemoveHalloweenEntities, HALLOWEEN_CLEANUP_PUMPKINS, TIMER_FLAG_NO_MAPCHANGE);
         }
     }
+}
+
+public void Event_CleanupSpellPickups(Event event, const char[] name, bool dontBroadcast)
+{
+    QueueSpellPickupCleanup();
+}
+
+public void OnSpellSettingChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    QueueSpellPickupCleanup();
+}
+
+void QueueSpellPickupCleanup()
+{
+    if (!g_cvDisableSpells.BoolValue || g_SpellCleanupQueued) return;
+    g_SpellCleanupQueued = true;
+    RequestFrame(Frame_RemoveSpellPickups);
+}
+
+public void Frame_RemoveSpellPickups(any data)
+{
+    g_SpellCleanupQueued = false;
+    if (!g_cvDisableSpells.BoolValue) return;
+    int entity = -1;
+    while ((entity = FindEntityByClassname(entity, "tf_spell_pickup")) != -1)
+        RemoveEntity(entity);
+}
+
+public Action SpellPickup_BlockTouch(int entity, int other)
+{
+    return g_cvDisableSpells.BoolValue ? Plugin_Handled : Plugin_Continue;
+}
+
+public void SpellPickup_OnSpawnPost(int entity)
+{
+    if (g_cvDisableSpells.BoolValue)
+    {
+        // DropSpellPickup still uses the object after DispatchSpawn returns.
+        RequestFrame(Frame_RemoveSpellPickup, EntIndexToEntRef(entity));
+    }
+}
+
+public void Frame_RemoveSpellPickup(any entityRef)
+{
+    int entity = EntRefToEntIndex(entityRef);
+    if (g_cvDisableSpells.BoolValue && entity != INVALID_ENT_REFERENCE && IsValidEntity(entity))
+        RemoveEntity(entity);
 }
 
 public void CheckHalloweenStatus()
