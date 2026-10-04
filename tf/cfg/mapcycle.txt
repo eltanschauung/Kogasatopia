@@ -2,9 +2,11 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
-pl_aridpass_event
-koth_oilchange_rc3b
+koth_dusker
+koth_harvest_event
+cp_sunshine_event
 koth_eivent_final
+koth_oilchange_rc3b
 ctf_medi_evil
 cp_holyhell
 cp_wildcat_event
@@ -317,7 +319,6 @@ cp_overgrown
 cp_snowplow
 cp_spookeyridge
 cp_standin_final
-cp_sunshine_event
 cp_upland_rc4
 ctf_2fort_invasion
 ctf_foundry
@@ -331,8 +332,6 @@ ctf_turbine_winter
 koth_blowout
 koth_boardwalk
 koth_cachoeira
-koth_dusker
-koth_harvest_event
 koth_krampus
 koth_los_muertos
 koth_megalo
