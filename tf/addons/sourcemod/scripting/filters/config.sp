@@ -290,18 +290,35 @@ static void Filters_LoadWebNameOverrides(KeyValues kv)
     Filters_EndConfigSection(kv);
 }
 
-void LoadFilterConfig()
+public Action Command_FiltersRefresh(int client, int args)
+{
+    if (!LoadFilterConfig(false))
+    {
+        ReplyToCommand(client, "[Filters] Failed to reload filters.cfg; current rules were kept. Check server logs.");
+        return Plugin_Handled;
+    }
+
+    ReplyToCommand(client, "[Filters] Reloaded filters.cfg.");
+    LogAction(client, -1, "\"%L\" refreshed filters.cfg", client);
+    return Plugin_Handled;
+}
+
+bool LoadFilterConfig(bool failOnError = true)
 {
     char configPath[PLATFORM_MAX_PATH];
-    Filters_EnsureConfigFile(configPath, sizeof(configPath));
+    if (failOnError)
+        Filters_EnsureConfigFile(configPath, sizeof(configPath));
+    else
+        BuildPath(Path_SM, configPath, sizeof(configPath), "configs/filters.cfg");
 
     KeyValues kv = new KeyValues("filters");
     if (!kv.ImportFromFile(configPath))
     {
         LogError("Failed to parse config file: %s", configPath);
         delete kv;
-        SetFailState("Failed to parse filters.cfg");
-        return;
+        if (failOnError)
+            SetFailState("Failed to parse filters.cfg");
+        return false;
     }
 
     Filters_ResetLoadedConfig();
@@ -318,6 +335,7 @@ void LoadFilterConfig()
 
     PrintToServer("[Word Filter] Loaded %d filter words, %d case-insensitive filters, %d goodnight stoppers, %d blacklist words, %d blacklist_50 words, %d forced status entries, and %d commands",
                   g_FilterCount, g_CaseInsensitiveFilterCount, g_GoodnightStopperCount, g_BlacklistCount, g_Blacklist50Count, g_ForcedStatusCount, g_AllowedCommandsCount);
+    return true;
 }
 
 static bool Filters_IsTriggerWordCharacter(char value)

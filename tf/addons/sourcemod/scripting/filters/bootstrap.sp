@@ -110,6 +110,8 @@ static void Filters_RegisterCookies()
 
 static void Filters_RegisterCommands()
 {
+    RegAdminCmd("filters_refresh", Command_FiltersRefresh, ADMFLAG_CONFIG, "Reload configs/filters.cfg.");
+    RegAdminCmd("sm_filters_refresh", Command_FiltersRefresh, ADMFLAG_CONFIG, "Reload configs/filters.cfg.");
     RegAdminCmd("sm_filterwhitelist", Command_FilterWhitelist, ADMFLAG_CHAT, "sm_filterwhitelist <player> - Whitelists a player from word filters only");
     RegAdminCmd("sm_unfilterwhitelist", Command_UnFilterWhitelist, ADMFLAG_CHAT, "sm_unfilterwhitelist <player> - Removes filter whitelist from a player");
     RegAdminCmd("sm_redlist", Command_redlist, ADMFLAG_CHAT, "sm_redlist <player> - redlist a player (can't hear blacklisted clients)");
