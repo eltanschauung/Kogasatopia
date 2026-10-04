@@ -6,6 +6,16 @@ QueryCookie g_WeaponsRespawnQuery[MAXPLAYERS + 1];
 int g_WeaponsRespawnQueryClass[MAXPLAYERS + 1];
 int s_LastUpdatedClient;
 
+bool Weapons_IsApplyingLoadout(int client)
+{
+    return g_WeaponsApplyingLoadout[client];
+}
+
+int Weapons_GetLoadoutRevision(int client)
+{
+    return g_WeaponsLoadoutRevision[client];
+}
+
 // Session-local IDs only: no names, Steam IDs or private cookie data in traces.
 void WeaponsPerf_EndClient(int profile, const char[] scope, int client, const char[] detail = "")
 {
@@ -173,10 +183,12 @@ void WeaponsProfiled_ApplyClientCustomLoadout(int client)
     }
     int serial = GetClientSerial(client);
     g_WeaponsApplyingLoadout[client] = true;
+    WeaponsBuildings_PrepareCustomLoadout(client);
     Weapons_ApplyLoadoutPass(client, playerClass, serial);
     if (GetClientFromSerial(serial) == client)
     {
         g_WeaponsApplyingLoadout[client] = false;
+        WeaponsBuildings_RequestReconcile(client);
     }
 }
 
@@ -204,12 +216,18 @@ void Weapons_ApplyLoadoutPass(int client, int playerClass, int serial)
         {
             continue;
         }
+        // Keep the saved choice, but do not create or repair a prohibited PDA.
+        if (WeaponsBuildings_ShouldBlockCustomItem(client, item))
+        {
+            WeaponsBuildings_NoteSkippedCustomTool(client);
+            continue;
+        }
         int ref = g_CurrentLoadout[client][playerClass][slot].entity;
         int entity = EntRefToEntIndex(ref);
         if (g_bForceReequipItems[client] || entity <= MaxClients
             || !IsValidEntity(entity) || (GetEntityFlags(entity) & FL_KILLME))
         {
-            if (!CanPlayerEquipItem(client, item) || !IsCustomItemAllowed(client, item))
+            if (!CanPlayerEquipItem(client, item) || !Weapons_IsCustomItemAllowed(client, item))
             {
                 continue;
             }
@@ -302,8 +320,15 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
     if (!g_CurrentLoadout[client][playerClass][slot].IsEmpty())
     {
         CustomItemDefinition item;
-        if (!g_CurrentLoadout[client][playerClass][slot].GetItemDefinition(item)
-            || !CanPlayerEquipItemForClass(client, playerClass, item))
+        bool hasDefinition = g_CurrentLoadout[client][playerClass][slot].GetItemDefinition(item);
+        if (playerClass == view_as<int>(TFClass_Engineer) && hasDefinition
+            && WeaponsBuildings_ShouldBlockCustomItem(client, item))
+        {
+            // Leave TF2's original econ item view intact. Spawn suppression owns
+            // stock tools, and the deferred reconciler owns existing entities.
+            return MRES_Ignored;
+        }
+        if (!hasDefinition || !CanPlayerEquipItemForClass(client, playerClass, item))
         {
             if (storedItem > MaxClients && IsValidEntity(storedItem))
             {
@@ -354,6 +379,7 @@ MRESReturn OnManageRegularWeaponsPre(int client, Handle hParams)
     if (g_WeaponsInventoryProfileDepth < sizeof(g_WeaponsInventoryProfiles))
         g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth] = KogasaPerfBegin();
     g_WeaponsInventoryProfileDepth++;
+    WeaponsBuildings_BeginInventory(client);
     int profile = KogasaPerfBegin();
     MRESReturn result = WeaponsProfiled_OnManageRegularWeaponsPre(client);
     WeaponsPerf_EndClient(profile, "ManageRegularWeapons/pre", client);
@@ -369,6 +395,9 @@ MRESReturn WeaponsProfiled_OnManageRegularWeaponsPre(int client)
     {
         int entity = EntRefToEntIndex(g_CurrentLoadout[client][playerClass][slot].entity);
         if (entity <= MaxClients || !IsValidEntity(entity)) continue;
+        CustomItemDefinition item;
+        if (g_CurrentLoadout[client][playerClass][slot].GetItemDefinition(item)
+            && WeaponsBuildings_ShouldBlockCustomItem(client, item)) continue;
         int baseItem = FindBaseItem(playerClass, slot);
         if (baseItem == TF_ITEMDEF_DEFAULT) continue;
         int itemdef = GetEntProp(entity, Prop_Send, "m_iItemDefinitionIndex");
@@ -399,6 +428,7 @@ MRESReturn OnManageRegularWeaponsPost(int client, Handle hParams)
             WeaponsPerf_EndClient(g_WeaponsInventoryProfiles[g_WeaponsInventoryProfileDepth], scope, client);
         }
     }
+    WeaponsBuildings_EndInventory(client);
     return result;
 }
 
@@ -413,6 +443,7 @@ MRESReturn WeaponsProfiled_OnManageRegularWeaponsPost(int client)
         if (entity <= MaxClients || !IsValidEntity(entity)) continue;
         CustomItemDefinition item;
         if (!g_CurrentLoadout[client][playerClass][slot].GetItemDefinition(item)) continue;
+        if (WeaponsBuildings_ShouldBlockCustomItem(client, item)) continue;
         char classname[64];
         strcopy(classname, sizeof(classname), item.className);
         TF2Econ_TranslateWeaponEntForClass(classname, sizeof(classname), playerClass);
@@ -765,7 +796,7 @@ static bool IsPlayerAllowedToRespawnOnLoadoutChange(int client)
         && GameRules_GetRoundState() != RoundState_Stalemate;
 }
 
-static bool IsCustomItemAllowed(int client, const CustomItemDefinition item)
+bool Weapons_IsCustomItemAllowed(int client, const CustomItemDefinition item)
 {
     if (!Weapons_IsValidClient(client)) return false;
     TFClassType playerClass = TF2_GetPlayerClass(client);

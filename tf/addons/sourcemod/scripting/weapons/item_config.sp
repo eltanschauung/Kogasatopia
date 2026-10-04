@@ -326,6 +326,9 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 	if (!Weapons_IsValidClient(client)) {
 		return INVALID_ENT_REFERENCE;
 	}
+	if (WeaponsBuildings_ShouldBlockCustomItem(client, item)) {
+		return INVALID_ENT_REFERENCE;
+	}
 
 	char itemClass[128];
 	

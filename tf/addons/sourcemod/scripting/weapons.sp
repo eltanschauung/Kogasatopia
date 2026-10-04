@@ -63,7 +63,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.2.2" ... VERSION_SUFFIX,
+    version = "7.2.3" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -303,7 +303,8 @@ void Weapons_NotifyItemRuntimeStateReadyImpl(int client, int entity)
     profile = KogasaPerfBegin();
     WeaponsGameplay_OnItemRuntimeStateReady(client, entity);
     WeaponsPerf_EndClient(profile, "ItemReady/gameplay", client);
-    WeaponsBuildings_Reconcile(client);
+    if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)) return;
+    WeaponsBuildings_OnItemRuntimeStateReady(client, entity);
     if (!Weapons_LoadoutIdentityMatches(serial, client, ref, entity)
         || g_hOnItemRuntimeStateReady == null) return;
     profile = KogasaPerfBegin();
@@ -322,7 +323,7 @@ public void OnAllPluginsLoaded()
     {
         if (IsClientInGame(client))
         {
-            WeaponsBuildings_Reconcile(client);
+            WeaponsBuildings_RequestReconcile(client);
         }
     }
 }
@@ -336,7 +337,7 @@ public void OnLibraryAdded(const char[] name)
         {
             if (IsClientInGame(client))
             {
-                WeaponsBuildings_Reconcile(client);
+                WeaponsBuildings_RequestReconcile(client);
             }
         }
     }
@@ -361,6 +362,7 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+    WeaponsBuildings_ResetAll();
     RemoveAllHats();
     CustomHats_ResetParticles();
     for (int client = 1; client <= MaxClients; client++)
