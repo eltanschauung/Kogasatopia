@@ -11,6 +11,7 @@
 #include <entitylump>
 #include <tf2>
 #include <tf2_stocks>
+#include <tf2attributes>
 #include <controlpoints>
 #include <morecolors>
 #include <nativevotes>
@@ -45,7 +46,7 @@ native int FilterAlerts_MarkAutobalance(int client);
 native int FilterAlerts_SuppressTeamAlertWindow(float seconds);
 native bool Announcers_IsGroupEnabled(int client, const char[] groupName);
 
-#define PLUGIN_VERSION "5.4.1"
+#define PLUGIN_VERSION "5.5.0"
 
 // DGM state and policy.
 #define DGM_MAX_CONTROL_POINTS 8
@@ -201,7 +202,7 @@ public Plugin myinfo =
 {
     name = "WhaleScramble",
     author = "Hombre, AW 'Swixel' Stanley, Tsunami, random, Eric Zhang",
-    description = "Unified gamemode, respawn, class-limit, team-balance, AFK, and spectator-queue controller.",
+    description = "Unified gamemode, respawn, class-limit, team-balance, AFK, spectator-queue, and Halloween-rules controller.",
     version = PLUGIN_VERSION,
     url = "https://kogasa.tf"
 };
@@ -210,9 +211,10 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 {
     g_bDgmPreserveInitialMapSettings = late;
     if (FindPluginByFile("afkmanager.smx") != null
-        || FindPluginByFile("spec-when-full.smx") != null)
+        || FindPluginByFile("spec-when-full.smx") != null
+        || FindPluginByFile("nerfhalloweengimmicks.smx") != null)
     {
-        strcopy(error, errMax, "Unload retired afkmanager/spec-when-full before loading WhaleScramble.");
+        strcopy(error, errMax, "Unload retired afkmanager/spec-when-full/nerfhalloweengimmicks before loading WhaleScramble.");
         return APLRes_Failure;
     }
     DGM_RegisterPluginApi();
@@ -228,6 +230,9 @@ public void OnPluginStart()
     WhaleBalance_OnPluginStart();
     ClassLimits_OnPluginStart();
     AFK_OnPluginStart();
+    HalloweenGimmicksNerf_OnPluginStart();
+    HookEvent("teamplay_round_start", WhaleScramble_EventRoundStart);
+    HookEvent("teamplay_round_active", WhaleScramble_EventRoundActive, EventHookMode_PostNoCopy);
 }
 
 public void OnPluginEnd()
@@ -244,6 +249,7 @@ public void OnMapStart()
     WhaleBalance_OnMapStart();
     ClassLimits_OnMapStart();
     AFK_OnMapStart();
+    HalloweenGimmicksNerf_OnMapStart();
 }
 
 public void OnMapInit(const char[] mapName)
@@ -264,6 +270,7 @@ public void OnConfigsExecuted()
     WhaleBalance_OnConfigsExecuted();
     ClassLimits_OnConfigsExecuted();
     AFK_OnConfigsExecuted();
+    HalloweenGimmicksNerf_OnConfigsExecuted();
 }
 
 public void OnAllPluginsLoaded()
@@ -292,6 +299,29 @@ public void OnClientPutInServer(int client)
     DGM_OnClientPutInServer(client);
     WhaleBalance_OnClientPutInServer(client);
     ClassLimits_OnClientPutInServer(client);
+    HalloweenGimmicksNerf_OnClientPutInServer(client);
+}
+
+public void OnEntityCreated(int entity, const char[] classname)
+{
+    HalloweenGimmicksNerf_OnEntityCreated(entity, classname);
+}
+
+public void TF2_OnConditionAdded(int client, TFCond condition)
+{
+    HalloweenGimmicksNerf_OnConditionAdded(client, condition);
+}
+
+public void WhaleScramble_EventRoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    DGM_Event_RoundActive(event, name, dontBroadcast);
+    HalloweenGimmicksNerf_OnRoundStart();
+}
+
+public void WhaleScramble_EventRoundActive(Event event, const char[] name, bool dontBroadcast)
+{
+    DGM_Event_RoundFullyActive(event, name, dontBroadcast);
+    HalloweenGimmicksNerf_OnRoundActive();
 }
 
 public void OnClientDisconnect(int client)
@@ -331,6 +361,7 @@ public void OnClientSpeaking(int client)
 }
 
 #include "afkmanager/module.sp"
+#include "halloween_gimmicks_nerf/module.sp"
 
 #include "dgm/objective_pace.sp"
 #include "dgm/population_and_objectives.sp"

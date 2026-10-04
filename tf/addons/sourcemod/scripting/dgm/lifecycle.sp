@@ -74,8 +74,6 @@ void DGM_OnPluginStart()
 
     HookEvent("player_death", DGM_Event_PlayerDeath, EventHookMode_Pre);
     HookEvent("player_spawn", DGM_Event_PlayerSpawn, EventHookMode_Post);
-    HookEvent("teamplay_round_start", DGM_Event_RoundActive);
-    HookEvent("teamplay_round_active", DGM_Event_RoundFullyActive, EventHookMode_PostNoCopy);
     HookEvent("teamplay_setup_finished", DGM_Event_SetupFinished);
     HookEvent("teamplay_round_win", DGM_Event_RoundWin, EventHookMode_Pre);
     HookEvent("teamplay_point_captured", DGM_Event_PointCaptured, EventHookMode_Post);
