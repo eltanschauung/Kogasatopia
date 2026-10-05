@@ -2,6 +2,8 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
+htf_marshlands
+cp_darkmarsh
 koth_dusker
 koth_harvest_event
 cp_sunshine_event
@@ -10,7 +12,7 @@ koth_oilchange_rc3b
 ctf_medi_evil
 cp_holyhell
 cp_wildcat_event
-koth_dolls_playground_a6
+koth_dolls_playground_a7b
 workshop/ctf_mandrillmaze_b2.ugc2908762556
 workshop/koth_spillway_rc3a.ugc1962574007
 workshop/pl_harpyhills_b8.ugc3758709084
