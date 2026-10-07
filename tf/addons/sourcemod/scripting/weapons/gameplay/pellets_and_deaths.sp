@@ -102,6 +102,7 @@ int Accuracy_GetClassSubtractionValue(int client)
 
 public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
+	WeaponsSound_CancelDeployFinish(GetClientOfUserId(event.GetInt("userid")));
 	if (!WeaponsGameplay_IsEnabled())
 	{
 		return Plugin_Continue;

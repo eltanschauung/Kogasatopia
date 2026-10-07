@@ -5,6 +5,7 @@
  */
 #define Weapons_ATTR_REPLACE_SOUND "replace sound"
 #define Weapons_ATTR_CUSTOM_DEPLOY_SOUND "custom deploy sound"
+#define Weapons_ATTR_CUSTOM_DEPLOY_FINISHED_SOUND "custom deploy finished sound"
 #define Weapons_ATTR_EMIT_SOUND_ON_HIT "emit sound on hit"
 #define Weapons_ATTR_EMIT_SOUND_ON_KILL "emit sound on kill"
 #define Weapons_ATTR_EMIT_LOUD_SOUND_ON_KILL "emit loud sound on kill"
@@ -27,6 +28,9 @@ bool g_WeaponsSoundPendingSwing[WEAPONS_SOUND_MAX_ENTITIES];
 int g_iWeaponsSoundWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
 char g_sWeaponsSoundGroup[MAXPLAYERS + 1][64];
 float g_flWeaponsNextDeploySoundTime[MAXPLAYERS + 1][WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT];
+float g_flWeaponsNextDeployFinishedSoundTime[MAXPLAYERS + 1][WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT];
+
+#include "deploy_finished_sound.sp"
 
 static const char g_WeaponsSoundBatSaberSwingSamples[][] =
 {
@@ -61,12 +65,14 @@ void WeaponsSound_OnPluginStart(GameData gameConf)
 	}
 
 	RegServerCmd("sm_weapons_reload_sounds", WeaponsSound_CommandReload);
+	WeaponsSound_InitDeployFinishedHooks();
 	AddNormalSoundHook(WeaponsSound_Hook);
 	WeaponsSound_HookExistingWeaponEntities();
 }
 
 void WeaponsSound_OnPluginEnd()
 {
+	WeaponsSound_ShutdownDeployFinishedHooks();
 	RemoveNormalSoundHook(WeaponsSound_Hook);
 	delete g_WeaponsSoundPrimaryAttackHook;
 	g_WeaponsSoundPrimaryAttackHook = null;
@@ -108,6 +114,7 @@ static void WeaponsSound_HookWeaponEntity(int weapon, const char[] className)
 		Hook_Pre, weapon, WeaponsSound_PrimaryAttackPre);
 	g_WeaponsSoundPrimaryAttackHook.HookEntity(
 		Hook_Post, weapon, WeaponsSound_PrimaryAttackPost);
+	WeaponsSound_HookDeployFinishedWeapon(weapon);
 }
 
 public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)
@@ -196,11 +203,14 @@ public Action WeaponsSound_Hook(
 
 void WeaponsSound_OnWeaponSwitchPost(int client, int weapon)
 {
+	if (Weapons_IsValidClient(client))
+		WeaponsSound_CancelOtherDeploy(client,
+			GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon"));
 	WeaponsSound_UpdateClientWeapon(client, weapon);
 	WeaponsSound_PlayCustomDeploySound(client, weapon);
 }
 
-static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
+static void WeaponsSound_PlayCustomDeploySound(int client, int weapon, bool finished = false)
 {
 	if (!Weapons_IsValidClient(client) || !Weapons_IsValidWeaponEntity(weapon)
 		|| !TF2Util_IsEntityWeapon(weapon))
@@ -220,17 +230,29 @@ static void WeaponsSound_PlayCustomDeploySound(int client, int weapon)
 	}
 
 	float now = GetGameTime();
-	if (now < g_flWeaponsNextDeploySoundTime[client][slot])
+	float nextSound = finished ? g_flWeaponsNextDeployFinishedSoundTime[client][slot]
+		: g_flWeaponsNextDeploySoundTime[client][slot];
+	if (now < nextSound)
 	{
 		return;
 	}
 
 	if (WeaponsSound_EmitCustomAttribute(client, weapon,
-			Weapons_ATTR_CUSTOM_DEPLOY_SOUND, "custom deploy"))
+			finished ? Weapons_ATTR_CUSTOM_DEPLOY_FINISHED_SOUND : Weapons_ATTR_CUSTOM_DEPLOY_SOUND,
+			finished ? "custom deploy finished" : "custom deploy"))
 	{
-		g_flWeaponsNextDeploySoundTime[client][slot] =
-			now + WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN;
+		if (finished)
+			g_flWeaponsNextDeployFinishedSoundTime[client][slot] =
+				now + WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN;
+		else
+			g_flWeaponsNextDeploySoundTime[client][slot] =
+				now + WEAPONS_CUSTOM_DEPLOY_SOUND_COOLDOWN;
 	}
+}
+
+void WeaponsSound_OnWeaponFinishedDeploy(int client, int weapon)
+{
+	WeaponsSound_PlayCustomDeploySound(client, weapon, true);
 }
 
 void WeaponsSound_PlayOnHit(int victim, int weapon)
@@ -433,9 +455,11 @@ void WeaponsSound_ResetClient(int client, bool resetDeployCooldown = false)
 	g_sWeaponsSoundGroup[client][0] = '\0';
 	if (resetDeployCooldown)
 	{
+		WeaponsSound_CancelDeployFinish(client);
 		for (int slot = 0; slot < WEAPONS_DEPLOY_COOLDOWN_SLOT_COUNT; slot++)
 		{
 			g_flWeaponsNextDeploySoundTime[client][slot] = 0.0;
+			g_flWeaponsNextDeployFinishedSoundTime[client][slot] = 0.0;
 		}
 	}
 }

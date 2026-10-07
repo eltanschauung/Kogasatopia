@@ -584,6 +584,7 @@ void WeaponsGameplay_OnEntityCreated(int entity, const char[] class) {
 
 public void OnEntityDestroyed(int entity)
 {
+	WeaponsSound_DeployFinishEntityDestroyed(entity);
 	CustomHats_RemoveWearableParticle(entity);
 	if (entity > 0 && entity < MAX_TRACKED_ENTITIES)
 	{

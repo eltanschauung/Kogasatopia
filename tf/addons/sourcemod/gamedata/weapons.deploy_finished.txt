@@ -1,0 +1,37 @@
+"Games"
+{
+    "tf"
+    {
+        "Offsets"
+        {
+            // Verified in CTFWeaponBase vtables, TF2 build 11087207.
+            "CTFWeaponBase::Deploy"
+            {
+                "linux" "268"
+                "linux64" "268"
+            }
+            "CTFWeaponBase::ItemPostFrame"
+            {
+                "linux" "279"
+                "linux64" "279"
+            }
+        }
+        "Functions"
+        {
+            "CTFWeaponBase::Deploy"
+            {
+                "offset" "CTFWeaponBase::Deploy"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "bool"
+            }
+            "CTFWeaponBase::ItemPostFrame"
+            {
+                "offset" "CTFWeaponBase::ItemPostFrame"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "void"
+            }
+        }
+    }
+}
