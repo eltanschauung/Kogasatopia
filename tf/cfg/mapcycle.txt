@@ -2,6 +2,7 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
+koth_product_rcx
 koth_dolls_playground_a7a
 htf_marshlands
 cp_darkmarsh
@@ -33,7 +34,6 @@ workshop/pl_drawpu.ugc1625449436
 workshop/ctf_2fort_classic_halloween_10.ugc2421392181
 workshop/ctf_circusfunny.ugc3244888924
 workshop/plr_dogbread_b3.ugc480152564
-workshop/koth_product_final.ugc454272353
 workshop/koth_sneed.ugc2188478353
 workshop/2999312075
 cp_entropy_b5
