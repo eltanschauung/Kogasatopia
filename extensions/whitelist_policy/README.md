@@ -7,8 +7,10 @@ GPL-3.0-or-later; the SourceMod SDK retains its own linking exception.
 
 ## Ownership and behavior
 
-Weapons remains the sole owner of its GetLoadoutItem detour. Its post hook calls
-one native policy evaluator. There is no extra inventory/loadout detour and no
+The existing extension is now Weapons' sole GetLoadoutItem detour owner. Weapons
+binds a cold custom-slot resolver and a denial-notice callback; its old DHooks
+GetLoadoutItem pre/post callbacks are removed. Whitelist and custom selection
+share this one native path. There is no second extension/loadout detour and no
 mp_tournament mutation, flag manipulation, or global tournament-mode override.
 The engine still performs its normal inventory generation.
 
@@ -26,8 +28,24 @@ The raw Demoman wearable + shield + sword/katana combination still denies all
 three slots and takes precedence over custom replacements. Optional notices
 remain coalesced and session-safe.
 
-Only a boolean combo decision is cached inside a paired
-ManageRegularWeapons inventory transaction. No CEconItemView pointer is retained.
+The boolean combo decision and resolved custom-slot entity references are cached
+inside a paired ManageRegularWeapons inventory transaction. No CEconItemView
+pointer is retained. Unselected slots never enter SourcePawn. Selected slots
+enter it once per outer transaction, then reuse a serial-checked entity reference.
+Removed/recycled entities force resolution again. The deferred blank wearable
+placeholder retains the existing engine-deferred deletion behavior; it is not a
+persistent native item allocation. Ordinary entities newly marked FL_KILLME are
+not reused. Failed resolutions are cached only inside the same transaction.
+Outside a transaction, custom permissions are checked on every lookup.
+
+Weapons publishes selection bits on cookies, equip/unequip/native overrides,
+connect and map/config load. Entity publication, building-policy changes and
+sm_weapons_enable_loadout changes invalidate the native cache. A revision change
+during a reentrant resolver discards its result. Client disconnect, plugin
+pause/unload and policy rebuild invalidate transactions and cached references;
+unload clears callback ownership before script memory can disappear.
+Unexpected worker-thread calls pass through the engine without entering
+SourcePawn or mutable caches; normal inventory interception is game-thread-only.
 The first relevant lookup reads all three raw selected items; subsequent ones
 reuse that result. Outside a transaction it is recomputed, avoiding stale
 Steam-inventory/loadout decisions. Transactions reset on disconnect, map start,
@@ -46,13 +64,19 @@ Do not leave enablewhitelist.smx active: its old tournament-toggle detours must
 not compete with this policy. The old tf2.enablewhitelist gamedata is retired.
 Binaries are deployed separately, not tracked in Git.
 
-Use a server restart for the initial migration: the old plugin changed convar
-flags, and old code/detours may still be loaded in another server process.
+Use a server restart for migration to 1.1.0. Install the matching extension and
+Weapons binary together; never layer the native hook over the old SourcePawn
+GetLoadoutItem hook. Do not unload an extension while its engine callback is on
+the stack. The old whitelist companion remains a cold configuration loader;
+no extra extension or recurring timer is introduced.
 
 Commands:
 
 - sm_whitelist_reload: root-admin reload after editing the whitelist or schema.
 - sm_whitelist_status: readiness, policy generation, lookups, combo scans, denials.
+- sm_weapons_loadout_status: hook/owner status and native fast-path counters.
+- WeaponsLoadout_GetStats: hook bound, owner present, engine lookups, resolver
+  callbacks, transaction-cache hits and unselected-slot fast paths (six cells).
 
 The plugin reloads on startup, map start, configs executed, and whitelist-path
 changes. There is no file-watch timer. After a mid-map schema/file edit, run
@@ -72,13 +96,23 @@ SM_SDK=/path/to/sourcemod TARGET_ARCH=x86_64 bash src/build.sh src/build/x64
 bash tests/run.sh
 ```
 
-Requires g++ and multilib development libraries for x86. The build is native-only;
-it does not download dependencies or require an HL2SDK/Metamod toolchain.
+Requires g++ and multilib development libraries for x86, plus the pinned SDK's
+initialized safetyhook submodule. SafetyHook is linked into this extension,
+not installed separately. The build is serial and does not download dependencies
+or require an HL2SDK/Metamod toolchain. Run it with nice and a bounded memory limit.
 The deployment build used SourceMod SDK fa56d42535171c3298cdb119fb95502a7076d7cc,
 tested against the live SourceMod 1.12.0.7219 Linux x86 runtime.
 
 The unit tests cover combo classifications, normal/other quality exemption,
 denial priority, and nested transaction reset. The repository's
+`tests/loadout_cache_test.cpp` covers transaction-only cache reuse, nested
+boundaries, revision changes during callbacks, miss caching and client reuse.
+`tests/loadout_probe.sp` provides a bounded console-only A/B benchmark and
+regression checks using one disposable fake client on an empty MGE server.
+It compares equal SDKCall overhead, nested custom cache reuse, selection changes
+and uncached lookups outside inventory transactions. Do not deploy it permanently.
+
+The repository's
 tools/tests/weapons/whitelist_policy_probe.sp validates stock view fields and
 compares native decisions with raw engine inventory/classification calls.
 Its default command is read-only; the server-console-only
@@ -86,6 +120,23 @@ Its default command is read-only; the server-console-only
 fake client to exercise the native inventory path on an empty test server.
 That probe assumes the current live allow-all whitelist. It is not installed
 as an active production plugin.
+
+### Bounded x86 MGE validation (2026-10-10)
+
+SourceMod 1.12: 576 policy checks + 284 cache checks passed; the in-engine probe
+passed 14 checks including nested transactions, selection removal, uncached
+out-of-transaction permissions, placeholder addresses and a real Halo Sniper
+custom entity's m_Item address. Three 1,000-call samples per case, including
+identical SDKCall overhead, measured:
+
+| Lookup | Prior SourcePawn hook | Unified native hook |
+| --- | ---: | ---: |
+| Stock slot | 6.639–7.302 µs | 0.635–0.781 µs |
+| Warm custom slot in inventory | 8.130–8.538 µs | 0.648–0.785 µs |
+
+The 3,002 custom lookups required one resolver callback and 3,001 native cache
+hits. This benchmarks lookup dispatch, not inventory generation/model loading,
+and is not evidence that the previously investigated 50–140 ms stalls are fixed.
 
 ## ABI safety / limitations
 
@@ -98,5 +149,9 @@ stock item views. Spy's unused primary slot correctly has an invalid stock view.
 TF2 updates can change these private bindings. Update gamedata if the guard
 fails; never disable it simply to make the extension load. The x86-64 binary
 build is provided, but the actual deployment/runtime checks target x86.
-This removes the old hot-path convar writes and SourcePawn SDKCall/string work;
+This removes the old hot-path convar writes, SourcePawn SDKCall/string work and
+ordinary GetLoadoutItem VM dispatches. Native counters have no clock sampling.
+CheckLag still profiles ManageRegularWeapons (engine plus hooks) and cold
+custom resolution; the retired SourcePawn GetLoadoutItem pre/post timing spans
+are intentionally gone.
 it does not eliminate the engine's own inventory-generation costs.

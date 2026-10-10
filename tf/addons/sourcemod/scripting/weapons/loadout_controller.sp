@@ -67,6 +67,7 @@ public void OnClientConnected(int client)
             g_CurrentLoadout[client][playerClass][slot].Clear(.initialize = true);
         }
     }
+    WeaponsNative_PublishClientSelections(client);
     CustomHats_OnClientConnected(client);
 }
 
@@ -99,6 +100,7 @@ public void OnClientCookiesCached(int client)
         }
     }
     g_bRetrievedLoadout[client] = true;
+    WeaponsNative_PublishClientSelections(client);
     WeaponsStats_MirrorClientSavedLoadout(client);
     if (!wasRetrieved && IsClientInGame(client))
     {
@@ -253,6 +255,7 @@ void Weapons_ApplyLoadoutPass(int client, int playerClass, int serial)
                 continue;
             }
             g_CurrentLoadout[client][playerClass][slot].entity = EntIndexToEntRef(entity);
+            WeaponsLoadout_InvalidateClient(client);
         }
         else
         {
@@ -278,36 +281,58 @@ void Weapons_ApplyLoadoutPass(int client, int playerClass, int serial)
     }
 }
 
-MRESReturn OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams)
+void WeaponsNative_PublishClassSelection(int client, int playerClass)
 {
-    int profile = KogasaPerfBegin();
-    MRESReturn result = WeaponsProfiled_OnGetLoadoutItemPost(client, hReturn, hParams);
-    if (profile >= 0)
-    {
-        char detail[64];
-        FormatEx(detail, sizeof(detail), "requested_class=%d;slot=%d", hParams.Get(1), hParams.Get(2));
-        WeaponsPerf_EndClient(profile, "GetLoadoutItem/post", client, detail);
-    }
-    return result;
+    bool selected[NUM_ITEMS];
+    for (int slot = 0; slot < NUM_ITEMS; slot++)
+        selected[slot] = !g_CurrentLoadout[client][playerClass][slot].IsEmpty()
+            || g_CurrentLoadout[client][playerClass][slot].entity != INVALID_ENT_REFERENCE;
+    WeaponsLoadout_PublishSelection(client, playerClass, selected);
+}
+void WeaponsNative_PublishClientSelections(int client)
+{
+    for (int playerClass = 1; playerClass < NUM_PLAYER_CLASSES; playerClass++)
+        WeaponsNative_PublishClassSelection(client, playerClass);
+}
+void WeaponsNative_PublishAllSelections()
+{
+    for (int client = 1; client <= MaxClients; client++)
+        if (IsClientConnected(client)) WeaponsNative_PublishClientSelections(client);
+}
+void WeaponsNative_OnEnabledChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    for (int client = 1; client <= MaxClients; client++)
+        WeaponsLoadout_InvalidateClient(client);
+}
+public Action WeaponsNative_CommandStatus(int client, int args)
+{
+    int stats[6];
+    WeaponsLoadout_GetStats(stats);
+    ReplyToCommand(client, "[WeaponsLoadout] hook=%d owner=%d lookups=%d resolver_calls=%d cache_hits=%d stock_fast_paths=%d",
+        stats[0], stats[1], stats[2], stats[3], stats[4], stats[5]);
+    return Plugin_Handled;
 }
 
-MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn, DHookParam hParams)
+// Only selected custom slots enter SourcePawn, once per inventory transaction.
+// Outside inventory generation permissions are rechecked on every lookup.
+public int WeaponsNative_ResolveCustomItem(int client, int playerClass, int slot)
 {
-    bool blocksCustom;
-    MRESReturn whitelistResult = WeaponsWhitelist_ApplyLoadoutRule(client, hReturn, hParams, blocksCustom);
-    if (blocksCustom)
+    int profile = KogasaPerfBegin();
+    int reference = WeaponsNative_ResolveCustomItemImpl(client, playerClass, slot);
+    WeaponsPerf_EndClient(profile, "GetLoadoutItem/resolve_custom", client);
+    return reference;
+}
+
+int WeaponsNative_ResolveCustomItemImpl(int client, int playerClass, int slot)
+{
+    if (!Weapons_LoadoutClientValid(client) || sm_weapons_enable_loadout == null
+        || !sm_weapons_enable_loadout.BoolValue)
     {
-        return whitelistResult;
+        return INVALID_ENT_REFERENCE;
     }
-    if (!Weapons_LoadoutClientValid(client) || !sm_weapons_enable_loadout.BoolValue)
-    {
-        return whitelistResult;
-    }
-    int playerClass = hParams.Get(1);
-    int slot = hParams.Get(2);
     if (!Weapons_LoadoutClassValid(playerClass) || slot < 0 || slot >= NUM_ITEMS)
     {
-        return whitelistResult;
+        return INVALID_ENT_REFERENCE;
     }
     int storedItem = EntRefToEntIndex(g_CurrentLoadout[client][playerClass][slot].entity);
     if (!g_CurrentLoadout[client][playerClass][slot].IsEmpty())
@@ -319,7 +344,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
         {
             // Leave TF2's original econ item view intact. Spawn suppression owns
             // stock tools, and the deferred reconciler owns existing entities.
-            return whitelistResult;
+            return INVALID_ENT_REFERENCE;
         }
         if (!hasDefinition || !CanPlayerEquipItemForClass(client, playerClass, item))
         {
@@ -328,7 +353,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
                 RemoveEntity(storedItem);
                 g_CurrentLoadout[client][playerClass][slot].entity = INVALID_ENT_REFERENCE;
             }
-            return whitelistResult;
+            return INVALID_ENT_REFERENCE;
         }
     }
     if (storedItem <= MaxClients || !IsValidEntity(storedItem)
@@ -336,7 +361,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
     {
         if (g_CurrentLoadout[client][playerClass][slot].IsEmpty())
         {
-            return whitelistResult;
+            return INVALID_ENT_REFERENCE;
         }
         // TF2 expects a non-null CEconItemView even while custom equip is deferred.
         static int defaultItemRef = INVALID_ENT_REFERENCE;
@@ -346,7 +371,7 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
             storedItem = TF2_SpawnWearable();
             if (storedItem <= MaxClients || !IsValidEntity(storedItem))
             {
-                return whitelistResult;
+                return INVALID_ENT_REFERENCE;
             }
             defaultItemRef = EntIndexToEntRef(storedItem);
             // Intentional: RemoveEntity is deferred by the engine until after this call.
@@ -356,10 +381,9 @@ MRESReturn WeaponsProfiled_OnGetLoadoutItemPost(int client, DHookReturn hReturn,
     int offset = GetEntSendPropOffs(storedItem, "m_Item", true);
     if (offset <= 0)
     {
-        return whitelistResult;
+        return INVALID_ENT_REFERENCE;
     }
-    hReturn.Value = GetEntityAddress(storedItem) + view_as<Address>(offset);
-    return MRES_Supercede;
+    return EntIndexToEntRef(storedItem);
 }
 
 // This span includes the engine's inventory generation as well as plugin hooks.
@@ -657,6 +681,7 @@ bool SetClientCustomLoadoutItem(int client, int playerClass, const char[] uid, i
     {
         g_CurrentLoadout[client][playerClass][slot].SetOverloadItemUID(uid);
     }
+    WeaponsNative_PublishClassSelection(client, playerClass);
     if (flags & LOADOUT_FLAG_ATTEMPT_REGEN) OnClientCustomLoadoutItemModified(client, playerClass);
     return true;
 }
@@ -685,6 +710,7 @@ void UnsetClientCustomLoadoutItem(int client, int playerClass, int slot, int fla
     {
         g_CurrentLoadout[client][playerClass][slot].SetOverloadItemUID("");
     }
+    WeaponsNative_PublishClassSelection(client, playerClass);
     if (flags & LOADOUT_FLAG_ATTEMPT_REGEN) OnClientCustomLoadoutItemModified(client, playerClass);
 }
 

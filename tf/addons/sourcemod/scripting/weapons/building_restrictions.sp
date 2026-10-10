@@ -139,6 +139,7 @@ static void WeaponsBuildings_Prepare(int client, bool incomingInventory)
             || WeaponsBuildings_CheckRestriction(client, incomingInventory));
     g_EngineerBuildingPolicy[client].prepared = engineer;
     g_EngineerBuildingPolicy[client].suppressTools = restricted;
+    WeaponsLoadout_InvalidateClient(client);
     char detail[48];
     FormatEx(detail, sizeof(detail), "inventory=%d;suppress=%d", incomingInventory, restricted);
     WeaponsPerf_EndClient(profile, "EngineerBuildings/prepare", client, detail);
@@ -207,6 +208,7 @@ void WeaponsBuildings_OnItemRuntimeStateReady(int client, int entity)
         // Covers direct/native equips too, without deleting their inventory.
         g_EngineerBuildingPolicy[client].prepared = true;
         g_EngineerBuildingPolicy[client].suppressTools = true;
+        WeaponsLoadout_InvalidateClient(client);
         g_EngineerBuildingPolicy[client].failedPlanRevision = -1;
     }
     WeaponsBuildings_RequestReconcile(client);

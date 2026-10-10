@@ -20,29 +20,19 @@ void WeaponsWhitelist_OnClientDisconnect(int client)
     g_WeaponsWhitelistNoticeReason[client] = WhitelistPolicy_Allowed;
 }
 
-MRESReturn WeaponsWhitelist_ApplyLoadoutRule(int client, DHookReturn hReturn, DHookParam hParams, bool &blocksCustom)
+public void WeaponsWhitelist_QueueNotice(int client, WhitelistPolicyReason reason)
 {
-    blocksCustom = false;
-    if (client < 1 || client > MaxClients || !IsClientInGame(client))
-        return MRES_Ignored;
-    Address replacement;
-    WhitelistPolicyReason reason = WhitelistPolicy_Evaluate(client, hParams.Get(1), hParams.Get(2), replacement);
-    if (reason == WhitelistPolicy_Allowed) return MRES_Ignored;
-    blocksCustom = reason == WhitelistPolicy_DemoCombination;
-    hReturn.Value = replacement;
-    if (hParams.Get(3))
+    if (client < 1 || client > MaxClients || !IsClientInGame(client)
+        || reason == WhitelistPolicy_Allowed) return;
+    // Preserve the priority of combo denial over ordinary item notices.
+    if (reason == WhitelistPolicy_DemoCombination
+        || g_WeaponsWhitelistNoticeReason[client] == WhitelistPolicy_Allowed)
+        g_WeaponsWhitelistNoticeReason[client] = reason;
+    if (!g_WeaponsWhitelistNoticePending[client])
     {
-        // Preserve the priority of combo denial over ordinary item notices.
-        if (reason == WhitelistPolicy_DemoCombination
-            || g_WeaponsWhitelistNoticeReason[client] == WhitelistPolicy_Allowed)
-            g_WeaponsWhitelistNoticeReason[client] = reason;
-        if (!g_WeaponsWhitelistNoticePending[client])
-        {
-            g_WeaponsWhitelistNoticePending[client] = true;
-            RequestFrame(WeaponsWhitelist_SendNotice, GetClientSerial(client));
-        }
+        g_WeaponsWhitelistNoticePending[client] = true;
+        RequestFrame(WeaponsWhitelist_SendNotice, GetClientSerial(client));
     }
-    return MRES_Supercede;
 }
 
 void WeaponsWhitelist_SendNotice(any serial)

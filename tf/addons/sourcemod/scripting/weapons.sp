@@ -63,7 +63,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.2.4" ... VERSION_SUFFIX,
+    version = "7.2.5" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -168,14 +168,15 @@ public void OnPluginStart()
     {
         SetFailState("Failed to load gamedata (weapons.txt).");
     }
-    Handle getLoadout = DHookCreateFromConf(gameConf, "CTFPlayer::GetLoadoutItem()");
     Handle manageWeapons = DHookCreateFromConf(gameConf, "CTFPlayer::ManageRegularWeapons()");
-    if (getLoadout == null || manageWeapons == null)
+    if (manageWeapons == null)
     {
         delete gameConf;
         SetFailState("Failed to create required weapon loadout detours.");
     }
-    DHookEnableDetour(getLoadout, true, OnGetLoadoutItemPost);
+    // The existing native whitelist extension now owns the sole loadout hook.
+    // ManageRegularWeapons remains the cold inventory/reconciliation boundary.
+    WeaponsLoadout_Bind(WeaponsNative_ResolveCustomItem, WeaponsWhitelist_QueueNotice);
     DHookEnableDetour(manageWeapons, false, OnManageRegularWeaponsPre);
     DHookEnableDetour(manageWeapons, true, OnManageRegularWeaponsPost);
     WeaponsGameplay_OnPluginStart(gameConf);
@@ -187,6 +188,7 @@ public void OnPluginStart()
     WeaponsBuildings_OnPluginStart();
     CreateVersionConVar("sm_weapons_version", "Unified weapons plugin version.");
     sm_weapons_enable_loadout = CreateConVar("sm_weapons_enable_loadout", "1", "Allows players to receive custom items they have selected.");
+    sm_weapons_enable_loadout.AddChangeHook(WeaponsNative_OnEnabledChanged);
     sm_weapons_statistics = CreateConVar("sm_weapons_statistics", "1", "Record custom weapons equip/unequip popularity statistics.", _, true, 0.0, true, 1.0);
     sm_weapons_statistics_database = CreateConVar("sm_weapons_statistics_database", WEAPONS_STATS_DB_CONFIG_DEFAULT, "Database config used for custom weapon popularity statistics.");
     sm_weapons_validate_debug = CreateConVar("sm_weapons_validate_debug", "0", "Log m_bValidatedAttachedEntity state after custom item creation and equip.", _, true, 0.0, true, 1.0);
@@ -199,6 +201,7 @@ public void OnPluginStart()
     ConnectWeaponsStatisticsDatabase();
     g_hOnItemRuntimeStateReady = CreateGlobalForward("Weapons_OnItemRuntimeStateReady", ET_Ignore, Param_Cell, Param_Cell);
     RegAdminCmd("sm_weapons_export", ExportActiveWeapon, ADMFLAG_ROOT);
+    RegAdminCmd("sm_weapons_loadout_status", WeaponsNative_CommandStatus, ADMFLAG_GENERIC);
     RegAdminCmd("sm_cw", DisplayItems, 0);
     RegAdminCmd("sm_cwc", DisplayItems, 0);
     RegAdminCmd("sm_cwx", DisplayItems, 0);
@@ -249,6 +252,7 @@ public void OnPluginStart()
 
 public void OnPluginEnd()
 {
+    WeaponsLoadout_Unbind();
     CustomHats_OnPluginEnd();
     WeaponsGameplay_OnPluginEnd();
     WeaponsModels_OnPluginEnd();
@@ -358,6 +362,7 @@ public void OnMapStart()
     WeaponsModels_OnMapStart();
     CustomHats_OnMapStart();
     LoadWeaponsConfig();
+    WeaponsNative_PublishAllSelections();
     PrecacheMenuResources();
     WeaponsGameplay_OnMapStart();
 }
