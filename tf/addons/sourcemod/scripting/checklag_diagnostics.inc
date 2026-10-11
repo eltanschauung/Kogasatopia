@@ -31,10 +31,12 @@ char g_LagSlowContext[CHECKLAG_SLOW_CALL_LIMIT][CHECKLAG_CONTEXT_LENGTH];
 int g_LagSlowCount, g_LagSlowCursor;
 int g_LagSlowStartTick[CHECKLAG_SLOW_CALL_LIMIT], g_LagSlowSpan[CHECKLAG_SLOW_CALL_LIMIT];
 int g_LagSlowParent[CHECKLAG_SLOW_CALL_LIMIT], g_LagSlowOverwritten;
+int g_LagSlowBoundary[CHECKLAG_SLOW_CALL_LIMIT];
 float g_LagSlowChildren[CHECKLAG_SLOW_CALL_LIMIT];
 float g_LagFrameGap[CHECKLAG_FRAME_LIMIT], g_LagFrameAt[CHECKLAG_FRAME_LIMIT];
 int g_LagFrameTick[CHECKLAG_FRAME_LIMIT], g_LagFrameCount, g_LagFrameCursor;
 int g_LagFrameStartTick[CHECKLAG_FRAME_LIMIT], g_LagFrameHost[CHECKLAG_FRAME_LIMIT];
+int g_LagFrameBoundary[CHECKLAG_FRAME_LIMIT], g_LagBoundary;
 int g_LastFrameTick;
 Profiler g_LagFrameClock;
 char g_LastLagScopeLines[CHECKLAG_SNAPSHOT_SCOPE_LIMIT][384];
@@ -151,6 +153,7 @@ void CheckLag_RecordScopeFields(const char[] filename, char scope[72], float dur
         g_LagSlowStartTick[row] = startTick;
         g_LagSlowSpan[row] = span;
         g_LagSlowParent[row] = parent;
+        g_LagSlowBoundary[row] = g_LagBoundary;
         g_LagSlowChildren[row] = children;
         strcopy(g_LagSlowContext[row], sizeof(g_LagSlowContext[]), context);
         g_LagSlowCursor = (row + 1) % CHECKLAG_SLOW_CALL_LIMIT;
@@ -163,6 +166,9 @@ public void OnGameFrame()
     if (g_CheckLagMode != 2) return;
     int self = CheckLag_SelfBegin(Self_Frame);
     CheckLag_GameFrameImpl();
+    // SourceMod timers can run BEFORE OnGameFrame at the SAME tick number.
+    // Callback completion belongs to the interval closed by this boundary.
+    g_LagBoundary++;
     CheckLag_SelfEnd(self);
 }
 
@@ -183,6 +189,7 @@ void CheckLag_GameFrameImpl()
     g_LagFrameAt[row] = now;
     g_LagFrameTick[row] = GetGameTickCount();
     g_LagFrameStartTick[row] = previousTick;
+    g_LagFrameBoundary[row] = g_LagBoundary;
     g_LagFrameHost[row] = host;
     g_LagFrameCursor = (row + 1) % CHECKLAG_FRAME_LIMIT;
     if (g_LagFrameCount < CHECKLAG_FRAME_LIMIT) g_LagFrameCount++;
@@ -203,8 +210,7 @@ int CheckLag_FrameMeasuredCall(int frame)
     if (frame < 0) return -1;
     int best = -1;
     for (int row = 0; row < g_LagSlowCount; row++)
-        if (CheckLag_FrameMatchesCall(g_LagFrameStartTick[frame], g_LagFrameTick[frame],
-                g_LagSlowStartTick[row], g_LagSlowTick[row])
+        if (g_LagSlowBoundary[row] == g_LagFrameBoundary[frame]
             && (best < 0 || g_LagSlowDuration[row] > g_LagSlowDuration[best])) best = row;
     return best;
 }
