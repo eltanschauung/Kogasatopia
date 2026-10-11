@@ -25,7 +25,7 @@ float CheckLag_CounterDelta(const int newer[2], const int older[2], bool nanos =
         : float(high) * 1000000000.0 + float(low);
 }
 
-bool CheckLag_FrameMatchesCall(int previousTick, int endTick, int callStartTick, int callEndTick)
+stock bool CheckLag_FrameMatchesCall(int previousTick, int endTick, int callStartTick, int callEndTick)
 {
     // OnGameFrame observes work from the preceding tick. Do not associate a
     // call elsewhere in the five-second window, or subsequent same-tick work.
