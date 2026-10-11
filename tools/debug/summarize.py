@@ -10,12 +10,14 @@ def fields(line):
     return parts[0], dict(p.split("=", 1) for p in parts[1:] if "=" in p)
 
 def summarize(path):
-    start, summary, domains, samples, slow, coverage = {}, {}, {}, [], [], []
+    start, summary, domains, samples, slow, coverage, observer, operations = {}, {}, {}, [], [], [], [], []
     for line in Path(path).read_text().splitlines():
         kind, values = fields(line)
         if kind == "start": start = values
         elif kind == "domains": domains = values
         elif kind == "coverage": coverage.append(values)
+        elif kind == "observer": observer.append(values)
+        elif kind == "slow_operation": operations.append(values)
         elif kind == "summary": summary = values
         elif kind == "sample": samples.append(values)
         elif kind == "slow_frame": slow.append(values)
@@ -30,6 +32,9 @@ def summarize(path):
                                  for k in ("native_total", "native_engine", "native_policy", "native_resolver", "native_sp")},
             "native_peaks_ms": {k: max((float(s[k]) for s in samples), default=0)
                                  for k in ("peak_total", "peak_engine", "peak_policy", "peak_resolver", "peak_sp")},
+            "observer": {"mean_ms_per_second": round(statistics.mean(float(s['root_ms']) for s in observer), 3) if observer else None,
+                         "peak_tick_ms": max((float(s['tick_peak_ms']) for s in observer), default=0)},
+            "worst_operations": sorted(operations, key=lambda r: float(r["ms"]), reverse=True)[:5],
             "worst_frames": sorted(slow, key=lambda r: float(r["ms"]), reverse=True)[:10]}
 
 if __name__ == "__main__":

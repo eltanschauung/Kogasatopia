@@ -8,6 +8,9 @@ task_build="$(mktemp -d /tmp/whitelist-policy-tests.XXXXXX)"
 "${CXX:-g++}" -std=c++17 -O2 -Wall -Wextra -Werror \
   "$task_dir/loadout_cache_test.cpp" -o "$task_build/loadout_cache_test"
 "$task_build/loadout_cache_test"
+"${CXX:-g++}" -std=c++17 -O2 -Wall -Wextra -Werror \
+  "$task_dir/debug_timing_test.cpp" -o "$task_build/debug_timing_test"
+"$task_build/debug_timing_test"
 task_root="$(cd "$task_dir/../../.." && pwd)"
 task_controller="$task_root/tf/addons/sourcemod/scripting/weapons/loadout_controller.sp"
 if rg -q 'WeaponsWhitelist_OnGetLoadoutItemPre|WeaponsWhitelistGetItemInLoadout|g_WeaponsWhitelistTournament' \

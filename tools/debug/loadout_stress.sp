@@ -89,6 +89,7 @@ public Action StartTrial(int client,int args)
     if (g_Running || g_Preparing || args<1) { ReplyToCommand(client,"[Stress] Trial active or label missing."); return Plugin_Handled; }
     GetCmdArg(1,g_Label,sizeof(g_Label));
     if (!ValidLabel(g_Label)) { ReplyToCommand(client,"[Stress] Invalid label."); return Plugin_Handled; }
+    g_OriginalHumanSerial=0;
     int humans;
     for (int target=1;target<=MaxClients;target++) if (IsClientConnected(target)&&!IsFakeClient(target)) { humans++; g_OriginalHumanSerial=GetClientSerial(target); }
     if (humans>1 || GetClientCount(false)+STRESS_PLAYERS>MaxClients) { ReplyToCommand(client,"[Stress] Refused: population/capacity unsafe."); return Plugin_Handled; }
@@ -111,6 +112,11 @@ public Action StartTrial(int client,int args)
     g_Output=OpenFile(path,"wt");
     if (g_Output==null) { delete g_Profiles; ReplyToCommand(client,"[Stress] Private output directory unavailable."); return Plugin_Handled; }
     SetFilePermissions(path,384); // SourcePawn numeric literals are decimal: 0600 is NOT octal.
+    // A setup abort must never inherit the preceding trial's measurements.
+    g_StartTick=GetGameTickCount();g_EndTick=g_StartTick;
+    g_FrameCount=0;g_Operations=0;g_InventoryEvents=0;g_SlowCount=0;g_SlowOperationCount=0;
+    g_TotalGap=0.0;g_PeakGap=0.0;g_OperationPeak=0.0;
+    g_OverBudget=0;g_Over30=0;g_Over60=0;g_Over100=0;
     g_Preparing=true; g_Duration=duration;
     g_PrepareNextBot=0;
     g_PreviousZombie=stopBots.IntValue; stopBots.IntValue=1;

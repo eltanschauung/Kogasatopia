@@ -1,5 +1,5 @@
-// Debug-branch-only test API. Never writes real-client cookies or bypasses
-// entitlement/whitelist checks. Every mutating target must be a normal bot.
+// Debug-branch-only test API. Never writes real-client cookies or grants
+// real-client entitlements. Lab grants are serial-bound; whitelist stays intact.
 native void WeaponsLoadout_DebugEnable(bool enable);
 native void WeaponsLoadout_DebugStats(float[] totals, float[] peaks, int size);
 Handle g_WeaponsDebugNativeTimer;

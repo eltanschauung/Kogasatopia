@@ -45,6 +45,12 @@ and fixtures must be private (0700 directories / 0600 files).
   CheckLag modes. Its bounded frame ring is written only after the trial. Native
   aggregate samples are written once per second. This permits equivalent mode
   0/1/2 comparisons even when CheckLag itself is disabled.
+  CheckLag's completed root observer costs are sampled separately; overlapping
+  categories must not be summed. Scope collection uses observer-boundary
+  sequences: SourceMod timers can run before `OnGameFrame` at the same game
+  tick, so tick numbers alone cannot correctly associate a call with a frame.
+  Dense bursts have a 4096-call ring. Slow operation records contain only
+  anonymous profile number/class/tick, never donor identity.
 
 ## Bounds and cleanup
 
@@ -102,6 +108,12 @@ Restore exactly those files for sig-on trials. Leave the fork repository alone.
 Repeat in reverse order if comparing cold/warm model caches. Compare CheckLag
 modes 0, 1 and 2, first staggered, then batch 16 with forced custom recreation.
 Keep `sv_parallel_sendsnapshot` identical in all sig comparisons.
+Disable `sig_perf_idle_optimize` for representative sig-on bot tests, saving
+and later restoring its original value. Bots alone can leave the server
+hibernated; frame batching then creates large inter-frame gaps without a
+corresponding sustained tickrate drop. That is a separate idle-mode experiment,
+not proof of player-visible inventory lag. TF2 here does not expose the similarly
+named `sv_hibernate_when_empty` cvar found in some other Source games.
 
 Use `summarize.py` on finished trial files. Independent observed rate and frame
 counts are not the same statistic as PluginStats' smoothed tickrate. High batch
