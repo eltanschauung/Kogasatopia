@@ -27,9 +27,9 @@ int CheckLag_SelfBegin(CheckLagSelfCategory category)
     return slot;
 }
 
-void CheckLag_SelfEnd(int slot)
+float CheckLag_SelfEnd(int slot)
 {
-    if (slot < 0 || slot >= g_SelfDepth) return;
+    if (slot < 0 || slot >= g_SelfDepth) return 0.0;
     g_SelfClocks[slot].Stop();
     float ms = g_SelfClocks[slot].Time * 1000.0;
     g_SelfDepth = slot;
@@ -50,11 +50,12 @@ void CheckLag_SelfEnd(int slot)
     g_SelfMs[row][category] += ms;
     g_SelfCalls[row][category]++;
     if (slot == 0) g_SelfTotal[row] += ms;
+    return ms;
 }
 
 void CheckLag_SelfReset()
 {
-    g_SelfCount = 0; g_SelfCursor = 0; g_SelfOverflow = 0;
+    g_SelfCount = 0; g_SelfCursor = 0; g_SelfOverflow = 0; g_SelfDepth = 0;
 }
 
 void CheckLag_SelfShutdown()
@@ -102,13 +103,11 @@ public Action Command_LagSelf(int client, int args)
 void CheckLag_SelfEmission(int started)
 {
     if (started < 0 || started >= g_SelfDepth) return;
-    // Read while running, then end the root so subsequent frames include it.
-    g_SelfClocks[started].Stop();
-    float elapsed = g_SelfClocks[started].Time * 1000.0;
+    // Stop exactly once; SourceMod rejects a second Stop on the same sample.
+    float elapsed = CheckLag_SelfEnd(started);
     char message[192];
     FormatEx(message, sizeof(message), "v=1|mode=%d|emit_tick=%d|alert_pipeline_ms=%.3f|note=excludes_this_summary",
         g_CheckLagMode, GetGameTickCount(), elapsed);
-    CheckLag_SelfEnd(started);
     PluginStats_Record("lag_self_emission", message);
     LogMessage("[CheckLag][SelfEmission] %s", message);
 }
