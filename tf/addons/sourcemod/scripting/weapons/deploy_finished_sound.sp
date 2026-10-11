@@ -77,8 +77,10 @@ static int WeaponsSound_AddDeployFinishHook(int weapon)
 {
     if (g_iWeaponsDeployFrameHook[weapon] == INVALID_HOOK_ID)
     {
+        int profile = KogasaPerfBegin();
         g_iWeaponsDeployFrameHook[weapon] = g_WeaponsSoundDeployFinishFrameHook.HookEntity(
             Hook_Pre, weapon, WeaponsSound_ItemPostFramePre, WeaponsSound_DeployFinishHookRemoved);
+        KogasaPerfEnd(profile, "EntityHooks/deploy_frame_add");
     }
     return g_iWeaponsDeployFrameHook[weapon];
 }

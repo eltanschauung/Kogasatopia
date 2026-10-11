@@ -110,11 +110,13 @@ static void WeaponsSound_HookWeaponEntity(int weapon, const char[] className)
 		return;
 	}
 
+	int profile = KogasaPerfBegin();
 	g_WeaponsSoundPrimaryAttackHook.HookEntity(
 		Hook_Pre, weapon, WeaponsSound_PrimaryAttackPre);
 	g_WeaponsSoundPrimaryAttackHook.HookEntity(
 		Hook_Post, weapon, WeaponsSound_PrimaryAttackPost);
 	WeaponsSound_HookDeployFinishedWeapon(weapon);
+	KogasaPerfEnd(profile, "EntityHooks/weapon_sound");
 }
 
 public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)

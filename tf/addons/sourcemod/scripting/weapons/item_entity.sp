@@ -188,6 +188,13 @@ bool Weapons_GetItemMetadataOffsets(int entity, int offsets[2]) {
 
 /** Creates an item; returns an entity index, or -1 on failure. */
 stock int TF2_CreateItem(int defindex, const char[] itemClass) {
+    int profile = KogasaPerfBegin();
+    int result = WeaponsDebug_CreateItem(defindex, itemClass);
+    KogasaPerfEnd(profile, "Item/CreateAndSpawn", itemClass);
+    return result;
+}
+
+int WeaponsDebug_CreateItem(int defindex, const char[] itemClass) {
     int weapon = CreateEntityByName(itemClass);
     if (weapon <= MaxClients || !IsValidEntity(weapon)) {
         return -1;

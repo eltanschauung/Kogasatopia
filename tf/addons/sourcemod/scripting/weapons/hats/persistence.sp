@@ -1,4 +1,4 @@
-static void LoadStableHatStateChunk(int client, const char[] stateValue)
+void LoadStableHatStateChunk(int client, const char[] stateValue)
 {
 	char entries[32][96];
 	int entryCount = ExplodeString(stateValue, ",", entries, sizeof(entries), sizeof(entries[]));

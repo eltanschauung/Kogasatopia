@@ -355,6 +355,7 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 	SetEntProp(itemEntity, Prop_Send, "m_bOnlyIterateItemViewAttributes",
 			!item.bKeepStaticAttributes);
 	
+	int attributesProfile = KogasaPerfBegin();
 	ApplyCustomItemNativeAttributes(itemEntity, item);
 	
 	// add a stinky attribute that holds the item's uid
@@ -365,6 +366,7 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 	if (item.customAttributes) {
 		TF2CustAttr_UseKeyValues(itemEntity, item.customAttributes);
 	}
+	WeaponsPerf_EndClient(attributesProfile, "Item/Attributes", client, item.uid);
 	
 	// HACK: the stock builder and sapper needs additional fixups
 	// https://github.com/ValveSoftware/source-sdk-2013/blob/0565403b153dfcde602f6f58d8f4d13483696a13/src/game/server/tf/tf_player.cpp#L4306-L4315

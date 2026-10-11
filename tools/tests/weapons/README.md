@@ -1,3 +1,19 @@
+# Kunai backstab health cap
+
+`kunai_nerf_probe.sp` includes the production `weapons/kunai_nerf.sp` module
+with simulated player/weapon operations. It never installs the attack detour
+or changes a real player's health. Compile using the production scripting and
+include directories, load on a test server, run `sm_kunai_probe` from its
+console, then unload. Expected result: 42 checks, 0 failures.
+
+It covers the 70 -> 210 and 150 -> 190 examples, smaller rewards, existing
+health above 185, no healing, unattributed weapons, misses, non-backstab kills,
+Dead Ringer, different killers, owner/weapon/session replacement, dead players,
+non-Spies, disabled gameplay, nested attacks, bounded stack overflow and
+unpaired callbacks. The live integration must call `KunaiNerf_Init()` /
+`KunaiNerf_Shutdown()` and `KunaiNerf_RecordBackstab()` from the existing
+death handler after resolving the actual inflicting weapon.
+
 # Engineer building restrictions
 
 `building_restrictions_probe.sp` compiles the real

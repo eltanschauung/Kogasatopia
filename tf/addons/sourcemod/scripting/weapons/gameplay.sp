@@ -212,6 +212,7 @@ DynamicHook dhook_CTFWeaponBase_CanFireCriticalShot;
 DynamicHook dhook_CTFWeaponBase_PrimaryAttack;
 #include "plasma_rifle.sp"
 #include "ammo_pickups.sp"
+#include "kunai_nerf.sp"
 DynamicHook dhook_CTFWeaponBase_SecondaryAttack;
 DynamicHook dhook_CTFStunBall_ApplyBallImpactEffectOnVictim;
 Handle g_SDKCalcIsAttackCriticalHelper = null;

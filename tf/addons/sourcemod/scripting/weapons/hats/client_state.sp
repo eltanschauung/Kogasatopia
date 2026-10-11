@@ -135,7 +135,9 @@ public void ApplyHatFrame(any userid)
 	{
 		return;
 	}
+	int profile = KogasaPerfBegin();
 	UpdateHatForClient(client);
+	WeaponsPerf_EndClient(profile, "Hats/ApplyFrame", client);
 }
 
 void ResetClientHatSelections(int client)

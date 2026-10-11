@@ -125,6 +125,8 @@ int g_attrdef_AllowedInMedievalMode;
 #include "weapons/commands.sp"
 #include "weapons/equip_commands.sp"
 #include "weapons/loadout_controller.sp"
+#include "weapons/inventory_diagnostics.sp"
+#include "weapons/debug_loadout.sp"
 #include "weapons/web_loadout.sp"
 #include "weapons/statistics_persistence.sp"
 
@@ -151,6 +153,8 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
     CreateNative("Weapons_GetItemExtData", Native_GetItemExtData);
     CreateNative("Weapons_GetItemLoadoutSlot", Native_GetItemLoadoutSlot);
     CreateNative("Weapons_GetKillingWeapon", Native_GetKillingWeapon);
+    CreateNative("WeaponsDebug_ApplyHats", Native_WeaponsDebugHats);
+    CreateNative("WeaponsDebug_Reapply", Native_WeaponsDebugReapply);
     return APLRes_Success;
 }
 
@@ -179,6 +183,8 @@ public void OnPluginStart()
     WeaponsLoadout_Bind(WeaponsNative_ResolveCustomItem, WeaponsWhitelist_QueueNotice);
     DHookEnableDetour(manageWeapons, false, OnManageRegularWeaponsPre);
     DHookEnableDetour(manageWeapons, true, OnManageRegularWeaponsPost);
+    WeaponsInventoryDiagnostics_Init();
+    WeaponsDebug_Init();
     WeaponsGameplay_OnPluginStart(gameConf);
     WeaponsSound_OnPluginStart(gameConf);
     delete gameConf;
@@ -254,6 +260,8 @@ public void OnPluginEnd()
 {
     WeaponsLoadout_Unbind();
     CustomHats_OnPluginEnd();
+    WeaponsInventoryDiagnostics_Shutdown();
+    WeaponsDebug_Shutdown();
     WeaponsGameplay_OnPluginEnd();
     WeaponsModels_OnPluginEnd();
     WeaponsSound_OnPluginEnd();
@@ -423,11 +431,13 @@ void Weapons_OnWeaponSwitchPost(int client, int weapon)
 
 public void OnEntityCreated(int entity, const char[] className)
 {
+    int profile = KogasaPerfBegin();
     WeaponsCustomAttributes_OnEntityCreated(entity);
     WeaponsSound_OnEntityCreated(entity, className);
     WeaponsModels_OnEntityCreated(entity, className);
     WeaponsGameplay_OnEntityCreated(entity, className);
     WeaponsHatVisibility_OnEntityCreated(entity, className);
+    KogasaPerfEnd(profile, "EntityHooks/create", className);
 }
 
 public void TF2_OnConditionRemoved(int client, TFCond condition)

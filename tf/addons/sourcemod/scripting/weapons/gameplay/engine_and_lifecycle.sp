@@ -398,6 +398,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 		dhook_IsFixedWeaponSpreadEnabled.Enable(Hook_Pre, IsFixedWeaponSpreadEnabled_Pre);
 		WeaponsGameplay_HookExistingWeaponEntities();
 		AmmoPickups_Init();
+		KunaiNerf_Init();
 
 		// Create the patches
 		patch_RevertCozyCamper_FlinchNerf = MemoryPatch.CreateFromConf(conf, "CTFPlayer::ApplyPunchImpulseX_FakeFullyChargedCondition");
@@ -501,6 +502,7 @@ void WeaponsGameplay_OnMapEnd()
 void WeaponsGameplay_OnPluginEnd()
 {
 	AmmoPickups_Shutdown();
+	KunaiNerf_Shutdown();
 	Plasma_ClearAll();
 	g_bPluginEnding = true;
 	Escampette_RecalculateAllSpeeds();
@@ -584,6 +586,7 @@ void WeaponsGameplay_OnEntityCreated(int entity, const char[] class) {
 
 public void OnEntityDestroyed(int entity)
 {
+	int profile = KogasaPerfBegin();
 	WeaponsSound_DeployFinishEntityDestroyed(entity);
 	CustomHats_RemoveWearableParticle(entity);
 	if (entity > 0 && entity < MAX_TRACKED_ENTITIES)
@@ -594,6 +597,7 @@ public void OnEntityDestroyed(int entity)
 		g_bPlasmaHooked[entity] = false;
 		g_bPlasmaOwnsAttackLock[entity] = false;
 	}
+	KogasaPerfEnd(profile, "EntityHooks/destroy");
 }
 
 public void OnGameFrame()

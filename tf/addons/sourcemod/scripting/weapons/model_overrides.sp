@@ -407,6 +407,12 @@ static void ClearWorldModelWearableAssociation(int client) {
  * Called on weapon switch.  Detaches any old viewmodel overrides and attaches replacements.
  */
 void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERENCE) {
+    int profile = KogasaPerfBegin();
+    WeaponsDebug_UpdateClientWeaponModel(client, expectedWeapon);
+    WeaponsPerf_EndClient(profile, "Models/UpdateWeaponModel", client);
+}
+
+void WeaponsDebug_UpdateClientWeaponModel(int client, int expectedWeapon) {
 	if (!Weapons_IsValidClient(client)) {
 		ResetClientModelRefs(client);
 		return;
@@ -636,6 +642,12 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 }
 
 void UpdateClientWearableModels(int client) {
+    int profile = KogasaPerfBegin();
+    WeaponsDebug_UpdateClientWearableModels(client);
+    WeaponsPerf_EndClient(profile, "Models/UpdateWearableModels", client);
+}
+
+void WeaponsDebug_UpdateClientWearableModels(int client) {
 	int count = TF2Util_GetPlayerWearableCount(client);
 	for (int i = 0; i < count; i++) {
 		int wearable = TF2Util_GetPlayerWearable(client, i);
@@ -1058,6 +1070,13 @@ bool FileExistsAndLog(const char[] path, bool use_valve_fs = false,
 }
 
 int PrecacheModelAndLog(const char[] model, bool preload = false) {
+    int profile = KogasaPerfBegin();
+    int result = WeaponsDebug_PrecacheModelAndLog(model, preload);
+    KogasaPerfEnd(profile, "Models/Precache", model);
+    return result;
+}
+
+int WeaponsDebug_PrecacheModelAndLog(const char[] model, bool preload) {
 	int modelIndex = PrecacheModel(model, preload);
 	if (!modelIndex) {
 		LogError("Failed to precache model '%s'", model);

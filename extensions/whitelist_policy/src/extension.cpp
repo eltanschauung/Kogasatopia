@@ -5,6 +5,7 @@
 #include "smsdk_ext.h"
 #include "policy.h"
 #include "loadout_cache.h"
+#include "debug_timing.h"
 #include <safetyhook.hpp>
 #include <algorithm>
 #include <cstdio>
@@ -48,6 +49,7 @@ static int g_FlagsOffset = -1;
 static std::thread::id g_GameThread;
 static std::array<weapons_loadout::Cache, SM_MAXPLAYERS + 1> g_Loadouts;
 static unsigned g_LoadoutCalls, g_ResolverCalls, g_CacheHits, g_StockFastPaths;
+static loadout_debug::Recorder g_DebugTiming;
 
 static void InvalidateLoadouts() {
     for (auto &cache : g_Loadouts) cache.Invalidate();
@@ -191,6 +193,7 @@ static bool Removing(int reference) {
     return (flags & (1u << 27)) != 0; // TF2/HL2MP's FL_KILLME (not SM's remapped bit).
 }
 static void *ResolveCustom(int client, int playerClass, int slot) {
+    loadout_debug::Scope timing(g_DebugTiming, loadout_debug::Resolver);
     if (!g_Resolver || !weapons_loadout::ValidSlot(playerClass, slot))
         return nullptr;
     auto &cache = g_Loadouts[client];
@@ -212,7 +215,11 @@ static void *ResolveCustom(int client, int playerClass, int slot) {
     g_Resolver->PushCell(playerClass);
     g_Resolver->PushCell(slot);
     cell_t reference = weapons_loadout::kNoEntity;
-    const int error = g_Resolver->Execute(&reference);
+    int error;
+    {
+        loadout_debug::Scope timing(g_DebugTiming, loadout_debug::Callback);
+        error = g_Resolver->Execute(&reference);
+    }
     entry.resolving = false;
     if (error != SP_ERROR_NONE || epoch != cache.epoch) return nullptr;
     cache.Store(entry, epoch, reference, inInventory);
@@ -227,12 +234,21 @@ static void *GetLoadoutItem(void *entity, int playerClass, int slot, bool report
         return g_LoadoutHook.call<void *>(entity, playerClass, slot, reportWhitelist);
     // TF2 uses the normal Linux member-function ABI: this is the first argument.
     // Main-thread-only inventory hook; never remove its trampoline in a callback.
-    void *result = g_LoadoutHook.unsafe_call<void *>(entity, playerClass, slot, reportWhitelist);
+    loadout_debug::Scope timing(g_DebugTiming, loadout_debug::Total);
+    void *result;
+    {
+        loadout_debug::Scope engine(g_DebugTiming, loadout_debug::Engine);
+        result = g_LoadoutHook.unsafe_call<void *>(entity, playerClass, slot, reportWhitelist);
+    }
     ++g_LoadoutCalls;
     int client = gamehelpers->EntityToBCompatRef(static_cast<CBaseEntity *>(entity));
     if (client <= 0 || client > playerhelpers->GetMaxClients()) return result;
     void *replacement;
-    Reason reason = EvaluatePlayer(entity, client, playerClass, slot, replacement);
+    Reason reason;
+    {
+        loadout_debug::Scope policy(g_DebugTiming, loadout_debug::Policy);
+        reason = EvaluatePlayer(entity, client, playerClass, slot, replacement);
+    }
     if (reason != Allowed) {
         result = replacement;
         if (reportWhitelist && g_Notice && g_Notice->IsRunnable()) {
@@ -306,6 +322,23 @@ static cell_t Stats(IPluginContext *context, const cell_t *params) {
     output[2] = g_Checks; output[3] = g_ComboScans; output[4] = g_Denials;
     return 0;
 }
+static cell_t DebugEnable(IPluginContext *, const cell_t *params) {
+    g_DebugTiming.enabled = params[1] != 0;
+    return 0;
+}
+static cell_t DebugStats(IPluginContext *context, const cell_t *params) {
+    if (params[3] < loadout_debug::Count) return context->ThrowNativeError("Diagnostic output requires five stages");
+    cell_t *totals, *peaks;
+    if (context->LocalToPhysAddr(params[1], &totals) != SP_ERROR_NONE
+        || context->LocalToPhysAddr(params[2], &peaks) != SP_ERROR_NONE)
+        return context->ThrowNativeError("Invalid diagnostic outputs");
+    for (int stage = 0; stage < loadout_debug::Count; ++stage) {
+        totals[stage] = sp_ftoc(static_cast<float>(g_DebugTiming.total[stage]));
+        peaks[stage] = sp_ftoc(static_cast<float>(g_DebugTiming.peak[stage]));
+    }
+    g_DebugTiming.Reset();
+    return 0;
+}
 static sp_nativeinfo_t g_Natives[] = {
     {"WhitelistPolicy_BeginPolicy", BeginPolicy},
     {"WhitelistPolicy_RegisterDefinition", RegisterDefinition},
@@ -320,6 +353,8 @@ static sp_nativeinfo_t g_Natives[] = {
     {"WeaponsLoadout_PublishSelection", PublishSelection},
     {"WeaponsLoadout_InvalidateClient", InvalidateClient},
     {"WeaponsLoadout_GetStats", LoadoutStats},
+    {"WeaponsLoadout_DebugEnable", DebugEnable},
+    {"WeaponsLoadout_DebugStats", DebugStats},
     {nullptr, nullptr}
 };
 bool WhitelistPolicy::SDK_OnLoad(char *error, size_t length, bool) {
