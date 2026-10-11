@@ -46,7 +46,7 @@ pre-existing test bot names, and verify all sixteen bots were created. Duration
 is 15..300 seconds; operations are capped at 10,000; each timer processes at
 most sixteen bots. Stop below 160 free edicts, on missing bots, on map change,
 or on unload. Only bot serials created by the harness are kicked. The previous
-`tf_bot_zombie` value is restored. Trials refuse to overwrite their output.
+`nb_stop` value is restored. Trials refuse to overwrite their output.
 No unconditional `tf_bot_kick all`, cookie writes or production database cleanup.
 
 These are fake-client TF2 bots, **not sixteen networked human clients**. This

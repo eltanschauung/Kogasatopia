@@ -89,6 +89,8 @@ public Action StartTrial(int client,int args)
     char durationText[16]; GetCmdArg(2,durationText,sizeof(durationText));
     int duration=args>=2?StringToInt(durationText):60;
     if (duration<15||duration>300) { ReplyToCommand(client,"[Stress] Duration must be 15..300 seconds."); return Plugin_Handled; }
+    ConVar stopBots=FindConVar("nb_stop");
+    if (stopBots==null) { ReplyToCommand(client,"[Stress] Engine nb_stop unavailable.");return Plugin_Handled; }
     char path[PLATFORM_MAX_PATH];
     BuildPath(Path_SM,path,sizeof(path),"data/kogasatopia_debug_profiles.cfg");
     g_Profiles=new KeyValues("StressProfiles");
@@ -97,9 +99,9 @@ public Action StartTrial(int client,int args)
     if (FileExists(path)) { delete g_Profiles; ReplyToCommand(client,"[Stress] Trial output exists; use a new label."); return Plugin_Handled; }
     g_Output=OpenFile(path,"wt");
     if (g_Output==null) { delete g_Profiles; ReplyToCommand(client,"[Stress] Private output directory unavailable."); return Plugin_Handled; }
+    SetFilePermissions(path,0600);
     g_Preparing=true; g_EndAt=GetEngineTime()+float(duration);
-    ConVar zombie=FindConVar("tf_bot_zombie");
-    g_PreviousZombie=zombie.IntValue; zombie.IntValue=1;
+    g_PreviousZombie=stopBots.IntValue; stopBots.IntValue=1;
     for (int i=0;i<STRESS_PLAYERS;i++)
     {
         char section[8]; IntToString(i,section,sizeof(section));
@@ -220,6 +222,16 @@ public Action Report(Handle timer)
 {
     if (!g_Running) return Plugin_Stop;
     float totals[5],peaks[5]; WeaponsLoadout_DebugStats(totals,peaks,5);
+    int equipped;
+    for (int i=0;i<STRESS_PLAYERS;i++) {
+        int target=GetClientFromSerial(g_Bots[i]);
+        if (!NormalBot(target)) continue;
+        for (int slot=0;slot<5;slot++) {
+            int weapon=GetPlayerWeaponSlot(target,slot);char uid[64];
+            if (weapon>MaxClients&&Weapons_GetItemUIDFromEntity(weapon,uid,sizeof(uid))) equipped++;
+        }
+    }
+    g_Output.WriteLine("coverage|tick=%d|equipped_custom_weapons=%d",GetGameTickCount(),equipped);
     g_Output.WriteLine("sample|tick=%d|operations=%d|inventory_events=%d|rate=%.3f|entities=%d|native_total=%.3f|native_engine=%.3f|native_policy=%.3f|native_resolver=%.3f|native_sp=%.3f|peak_total=%.3f|peak_engine=%.3f|peak_policy=%.3f|peak_resolver=%.3f|peak_sp=%.3f",GetGameTickCount(),g_Operations,g_InventoryEvents,PluginStats_GetObservedTickrate(),GetEntityCount(),totals[0],totals[1],totals[2],totals[3],totals[4],peaks[0],peaks[1],peaks[2],peaks[3],peaks[4]);
     g_Output.Flush();
     return Plugin_Continue;
@@ -236,7 +248,8 @@ void EndTrial(const char[] reason)
         for (int i=0;i<g_SlowCount;i++) g_Output.WriteLine("slow_frame|tick=%d|ms=%.3f",g_SlowTick[i],g_SlowMs[i]);
         delete g_Output;
     }
-    FindConVar("tf_bot_zombie").IntValue=g_PreviousZombie;
+    ConVar stopBots=FindConVar("nb_stop");
+    if (stopBots!=null) stopBots.IntValue=g_PreviousZombie;
     for (int i=0;i<STRESS_PLAYERS;i++) {
         int target=GetClientFromSerial(g_Bots[i]);
         if (NormalBot(target)) KickClient(target,"Loadout stress trial finished");
