@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+from collections import Counter
 from console import send
 from summarize import summarize
 
@@ -28,6 +29,8 @@ def run(args):
     target=processes[0]
     # Identity checked internally only; do not retain or print process metadata.
     identity=(target/'stat').read_text().rsplit(')',1)[1].split()[19]
+    maps_before=len((target/'maps').read_text().splitlines())
+    error_offsets={p:p.stat().st_size for p in (root/'logs').glob('errors_*.log')}
     perf=None; perf_log=None
     try:
         if args.perf_output:
@@ -62,6 +65,15 @@ def run(args):
                 if text.startswith('summary|') or '\nsummary|' in text:
                     import json
                     result=summarize(output)
+                    result['vma_counts']={'before':maps_before,'after':len((target/'maps').read_text().splitlines())}
+                    errors=Counter()
+                    for error_file in (root/'logs').glob('errors_*.log'):
+                        with error_file.open(errors='replace') as stream:
+                            stream.seek(error_offsets.get(error_file,0))
+                            for line in stream:
+                                match=re.search(r'Blaming: ([A-Za-z0-9_.-]+\.smx)',line)
+                                if match: errors[match[1]]+=1
+                    result['new_plugin_errors']=dict(errors)
                     print(json.dumps(result,indent=2),flush=True)
                     if result['summary'].get('reason')!='complete': raise RuntimeError('Trial stopped before completion')
                     return

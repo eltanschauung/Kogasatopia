@@ -38,7 +38,24 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     RegPluginLibrary("checklag");
     CreateNative("CheckLag_RecordScope",Native_CheckLagRecordScope);
     CreateNative("CheckLag_IsProfilingEnabled", Native_CheckLagIsProfilingEnabled);
+    CreateNative("CheckLagDebug_ObserverCosts", Native_CheckLagDebugObserverCosts);
     return APLRes_Success;
+}
+
+// Lab-only non-destructive read of the previous second's root observer costs.
+// No logging/telemetry and no mutation of the production observer accounting.
+public any Native_CheckLagDebugObserverCosts(Handle plugin, int params)
+{
+    float costs[3], now = GetEngineTime();
+    for (int row = 0; row < g_SelfCount; row++)
+    {
+        if (now - g_SelfAt[row] > 1.0) continue;
+        costs[0] += g_SelfTotal[row];
+        if (g_SelfTotal[row] > costs[1]) costs[1] = g_SelfTotal[row];
+        costs[2] += g_SelfMs[row][Self_RecordScope];
+    }
+    SetNativeArray(1, costs, sizeof(costs));
+    return 0;
 }
 
 public void OnPluginStart()

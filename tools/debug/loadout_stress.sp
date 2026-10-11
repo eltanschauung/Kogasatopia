@@ -12,6 +12,7 @@ native bool WeaponsDebug_Reapply(int client);
 native bool WeaponsDebug_ReapplyHats(int client);
 native int WeaponsDebug_HatCount(int client);
 native void WeaponsLoadout_DebugStats(float[] totals, float[] peaks, int size);
+native void CheckLagDebug_ObserverCosts(float costs[3]);
 
 #define STRESS_PLAYERS 16
 #define STRESS_SLOW_FRAMES 512
@@ -20,6 +21,9 @@ static const char g_ClassNames[][] = {"unknown","scout","sniper","soldier","demo
 int g_Bots[STRESS_PLAYERS], g_ProfileClass[STRESS_PLAYERS], g_Cursor, g_Operations, g_InventoryEvents;
 int g_StartTick, g_EndTick, g_FrameCount, g_OverBudget, g_Over30, g_Over60, g_Over100;
 int g_SlowTick[STRESS_SLOW_FRAMES], g_SlowCount;
+int g_SlowOperationTick[STRESS_SLOW_FRAMES], g_SlowOperationClass[STRESS_SLOW_FRAMES];
+int g_SlowOperationProfile[STRESS_SLOW_FRAMES], g_SlowOperationCount;
+float g_SlowOperationMs[STRESS_SLOW_FRAMES];
 float g_SlowMs[STRESS_SLOW_FRAMES], g_TotalGap, g_PeakGap, g_OperationPeak;
 float g_EndAt;
 Profiler g_FrameClock, g_OperationClock;
@@ -29,6 +33,8 @@ Handle g_WorkTimer, g_ReportTimer, g_SetupTimer;
 ConVar g_BatchConVar, g_ForceConVar, g_ClassCycleConVar;
 ConVar g_TestHatsConVar,g_TestWeaponsConVar;
 bool g_Running, g_Preparing;
+bool g_PrimeFrame;
+int g_Duration;
 char g_Label[64];
 int g_OriginalHumanSerial;
 int g_PreviousZombie;
@@ -105,7 +111,7 @@ public Action StartTrial(int client,int args)
     g_Output=OpenFile(path,"wt");
     if (g_Output==null) { delete g_Profiles; ReplyToCommand(client,"[Stress] Private output directory unavailable."); return Plugin_Handled; }
     SetFilePermissions(path,384); // SourcePawn numeric literals are decimal: 0600 is NOT octal.
-    g_Preparing=true; g_EndAt=GetEngineTime()+float(duration);
+    g_Preparing=true; g_Duration=duration;
     g_PrepareNextBot=0;
     g_PreviousZombie=stopBots.IntValue; stopBots.IntValue=1;
     for (int i=0;i<STRESS_PLAYERS;i++)
@@ -163,8 +169,9 @@ public Action PrepareBots(Handle timer)
     g_Output.WriteLine("domains|weapons=%d|hats=%d|identity_pairing=same_source_player",g_TestWeaponsConVar.IntValue,g_TestHatsConVar.IntValue);
     float totals[5],peaks[5]; WeaponsLoadout_DebugStats(totals,peaks,5);
     g_Preparing=false; g_Running=true;
+    g_EndAt=GetEngineTime()+float(g_Duration);g_PrimeFrame=true;
     g_Cursor=0;g_Operations=0;g_InventoryEvents=0;g_FrameCount=0;g_OverBudget=0;g_Over30=0;g_Over60=0;g_Over100=0;
-    g_TotalGap=0.0;g_PeakGap=0.0;g_OperationPeak=0.0;g_SlowCount=0;
+    g_TotalGap=0.0;g_PeakGap=0.0;g_OperationPeak=0.0;g_SlowCount=0;g_SlowOperationCount=0;
     g_StartTick=GetGameTickCount(); g_EndTick=g_StartTick;
     g_FrameClock.Start();
     g_WorkTimer=CreateTimer(0.1,DoWork,_,TIMER_REPEAT);
@@ -196,6 +203,11 @@ public Action DoWork(Handle timer)
         g_OperationClock.Stop();
         float ms=g_OperationClock.Time*1000.0;
         if (ms>g_OperationPeak) g_OperationPeak=ms;
+        if (ms>=5.0 && g_SlowOperationCount<STRESS_SLOW_FRAMES) {
+            int row=g_SlowOperationCount++;
+            g_SlowOperationTick[row]=GetGameTickCount();g_SlowOperationClass[row]=playerClass;
+            g_SlowOperationProfile[row]=i;g_SlowOperationMs[row]=ms;
+        }
         g_Operations++;g_Cursor++;
     }
     return Plugin_Continue;
@@ -204,6 +216,8 @@ public void OnGameFrame()
 {
     if (!g_Running) return;
     g_FrameClock.Stop(); float ms=g_FrameClock.Time*1000.0; g_FrameClock.Start();
+    // PrepareBots ran within a frame: its remainder is not a whole frame gap.
+    if (g_PrimeFrame) { g_PrimeFrame=false;return; }
     g_FrameCount++;g_TotalGap+=ms;g_EndTick=GetGameTickCount();
     if (ms>g_PeakGap) g_PeakGap=ms;
     if (ms>GetTickInterval()*1100.0) g_OverBudget++;
@@ -226,6 +240,8 @@ public Action Report(Handle timer)
 {
     if (!g_Running) return Plugin_Stop;
     float totals[5],peaks[5]; WeaponsLoadout_DebugStats(totals,peaks,5);
+    float self[3];CheckLagDebug_ObserverCosts(self);
+    g_Output.WriteLine("observer|tick=%d|window_ms=1000|root_ms=%.3f|tick_peak_ms=%.3f|record_scope_ms=%.3f",GetGameTickCount(),self[0],self[1],self[2]);
     int equipped,hats;
     for (int i=0;i<STRESS_PLAYERS;i++) {
         int target=GetClientFromSerial(g_Bots[i]);
@@ -251,6 +267,7 @@ void EndTrial(const char[] reason)
         float rate=g_TotalGap>0.0?float(g_FrameCount)*1000.0/g_TotalGap:0.0;
         g_Output.WriteLine("summary|reason=%s|label=%s|start_tick=%d|end_tick=%d|frames=%d|observed_rate=%.3f|operations=%d|inventory_events=%d|frame_peak_ms=%.3f|operation_peak_ms=%.3f|over_budget=%d|over30=%d|over60=%d|over100=%d",reason,g_Label,g_StartTick,g_EndTick,g_FrameCount,rate,g_Operations,g_InventoryEvents,g_PeakGap,g_OperationPeak,g_OverBudget,g_Over30,g_Over60,g_Over100);
         for (int i=0;i<g_SlowCount;i++) g_Output.WriteLine("slow_frame|tick=%d|ms=%.3f",g_SlowTick[i],g_SlowMs[i]);
+        for (int i=0;i<g_SlowOperationCount;i++) g_Output.WriteLine("slow_operation|tick=%d|class=%d|profile=%d|ms=%.3f",g_SlowOperationTick[i],g_SlowOperationClass[i],g_SlowOperationProfile[i],g_SlowOperationMs[i]);
         delete g_Output;
     }
     ConVar stopBots=FindConVar("nb_stop");
