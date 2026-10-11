@@ -1,0 +1,35 @@
+enhanced_sprays 1.0.0 / API 8
+
+Build only. No command here deploys, unloads, reloads or restarts a server.
+Initialize SourceMod's SafetyHook/Zydis submodules. Use the SDK revisions in
+source.json, C++17, AMBuild 2 and a Linux compiler with x86/x64 support.
+
+From a private, empty build directory outside the checkout:
+python3 /CHECKOUT/extensions/enhanced_sprays/native/configure.py \
+  --sdks=tf2 --targets=x86,x86_64 --enable-optimize \
+  --hl2sdk-root=/SDK_PARENT --sm-path=/SOURCEMOD_SOURCE --mms-path=/METAMOD_SOURCE
+ambuild -j1
+
+Artifacts: package/addons/sourcemod/extensions/enhanced_sprays.ext.2.tf2.so
+           package/addons/sourcemod/extensions/x64/enhanced_sprays.ext.2.tf2.so
+
+spcomp /CHECKOUT/tf/addons/sourcemod/scripting/enhanced_sprays.sp \
+  -i/CHECKOUT/tf/addons/sourcemod/scripting/include -i/SOURCEMOD/scripting/include \
+  -o/PRIVATE_BUILD/enhanced_sprays.smx
+The checkout includes the existing WhaleTracker optional API header; use the
+usual server include directory for SourceMod/clientprefs/adminmenu dependencies.
+
+Offline regression tests (both Linux architectures; fixtures outside repo):
+bash /CHECKOUT/extensions/enhanced_sprays/tests/run.sh \
+  /PRIVATE_TEST_OUTPUT /PRIVATE_NATIVE_BUILD /SOURCEMOD_SOURCE
+
+Policy, geometry and asset-delivery tests also support ASan/UBSan. The
+filesystem test actually detours a synthetic filesystem on a disposable fixture,
+checks concurrent compression-like worker calls and verifies uninstall restores
+normal calls. It never loads this extension into SourceMod.
+The x86 PIE fixture separately verifies that unsupported call/pop PIC prologues
+are refused before hooks activate, instead of allowing an invalid GOT-base jump.
+
+preview_model.h embeds the compiled original mesh; its QC/SMD remain in
+model_source. The preview assets intentionally retain instant_sprays/v7 as their
+compiled cdmaterials namespace. No old plugin/extension is required.

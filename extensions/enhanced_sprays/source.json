@@ -1,0 +1,16 @@
+{
+  "name": "enhanced_sprays",
+  "version": "1.0.0",
+  "native_api": 8,
+  "authors": ["Hombre", "Dragon"],
+  "deployment": "not deployed; awaiting owner approval",
+  "sdk_revisions": {
+    "sourcemod": "fa56d42535171c3298cdb119fb95502a7076d7cc",
+    "metamod-source": "364cb6c26f66f7d9254d95a2fc533eac3557166b",
+    "hl2sdk-tf2": "42ab8953ee32ebeb1348485cb77bc98c81ed09b7"
+  },
+  "build": {
+    "sourcepawn": "1.12.0.7221",
+    "native": "C++17, AMBuild 2, Linux x86 and x86_64, single build worker"
+  }
+}

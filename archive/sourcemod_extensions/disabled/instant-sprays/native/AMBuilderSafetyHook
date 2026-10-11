@@ -1,0 +1,20 @@
+# Compile the pinned SourceMod SafetyHook dependency without copying its source.
+import os
+root=os.path.join(Extension.sm_root,'public','safetyhook')
+project=builder.StaticLibraryProject('spray_safetyhook')
+project.sources=[os.path.join(root,'src',name+'.cpp') for name in
+                 ['allocator','easy','inline_hook','mid_hook','utility','vmt_hook']]
+project.sources.append(os.path.join(root,'zydis','Zydis.c'))
+for target in Extension.compilers:
+    binary=project.Configure(target,'spray_safetyhook','Release - '+target.target.arch)
+    cxx=binary.compiler
+    cxx.includes += [os.path.join(root,'include'),os.path.join(root,'zydis')]
+    if target.target.platform=='windows':
+        cxx.cxxflags += ['/std:c++17','/EHsc']
+        cxx.cflags += ['/MT','/O2']
+        binary.sources.append(os.path.join(root,'src','os.windows.cpp'))
+    else:
+        cxx.cxxflags += ['-std=c++17']
+        cxx.cflags += ['-fPIC','-O2']
+        binary.sources.append(os.path.join(root,'src','os.linux.cpp'))
+sh.libsafetyhook=builder.Add(project)

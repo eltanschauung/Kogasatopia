@@ -1,0 +1,16 @@
+import os.path
+for compiler in Extension.compilers:
+    builder.compiler=Extension.configure(compiler)
+    project=builder.project=Extension.HL2Project(builder,'enhanced_sprays.ext')
+    project.sources+=['extension.cpp','filesystem_hooks.cpp','spray_policy.cpp','preview_geometry.cpp','preview_surface.cpp',os.path.join(Extension.sm_root,'public','smsdk_ext.cpp')]
+    for sdk in Extension.sdks.values():
+        if sdk.specPasses(compiler.target):
+            binary=Extension.HL2Config(builder,'enhanced_sprays.ext.'+sdk.ext,sdk)
+            binary.compiler.cxxincludes += [os.path.join(Extension.sm_root,'public','safetyhook','include')]
+            # Current Valve ButtonCode.h has an unrelated, contradictory enum
+            # comparison. Keep -Werror for our code while tolerating that SDK warning.
+            if binary.compiler.like('clang'):
+                binary.compiler.cxxflags += ['-Wno-tautological-overlap-compare']
+            for task in sh.libsafetyhook:
+                if task.target.arch==compiler.target.arch:binary.compiler.postlink += [task.binary]
+    Extension.extensions+=builder.Add(project)
