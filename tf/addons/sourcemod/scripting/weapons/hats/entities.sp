@@ -1,5 +1,14 @@
 void EquipHat(int client, int hatIndex)
 {
+	int profile=KogasaPerfBegin();
+	WeaponsDebug_EquipHat(client,hatIndex);
+	char detail[80];
+	FormatEx(detail,sizeof(detail),"hat=%s",IsHatIndexValid(hatIndex)?g_Hats[hatIndex].id:"invalid");
+	WeaponsPerf_EndClient(profile,"Hats/Equip",client,detail);
+}
+
+void WeaponsDebug_EquipHat(int client,int hatIndex)
+{
 	RemoveHat(client, hatIndex);
 
 	TFClassType playerClass = TF2_GetPlayerClass(client);
@@ -94,6 +103,14 @@ void RemoveHat(int client, int hatIndex)
 }
 
 int CreateWearableBase(int client, int itemIndex, int level, int quality)
+{
+	int profile=KogasaPerfBegin();
+	int result=WeaponsDebug_CreateWearableBase(client,itemIndex,level,quality);
+	WeaponsPerf_EndClient(profile,"Hats/CreateWearable",client);
+	return result;
+}
+
+int WeaponsDebug_CreateWearableBase(int client,int itemIndex,int level,int quality)
 {
 	if (itemIndex <= 0)
 	{

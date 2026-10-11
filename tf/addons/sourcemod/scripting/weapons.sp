@@ -155,6 +155,8 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
     CreateNative("Weapons_GetKillingWeapon", Native_GetKillingWeapon);
     CreateNative("WeaponsDebug_ApplyHats", Native_WeaponsDebugHats);
     CreateNative("WeaponsDebug_Reapply", Native_WeaponsDebugReapply);
+    CreateNative("WeaponsDebug_HatCount", Native_WeaponsDebugHatCount);
+    CreateNative("WeaponsDebug_ReapplyHats", Native_WeaponsDebugReapplyHats);
     return APLRes_Success;
 }
 

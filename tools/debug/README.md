@@ -18,11 +18,18 @@ and fixtures must be private (0700 directories / 0600 files).
   `noquota` and unique names. SourceTV/replay are never test players. Bots are
   frozen for the initial inventory experiment; weapons are switched through
   the normal server `use` command. Persistent cookies and real players are
-  never modified. Normal entitlement, whitelist and class compatibility checks
-  remain in place, so some saved purchases may not equip on bots.
+  never modified. Imported selections receive ephemeral bot-only item/hat
+  grants so paid saved equipment can actually be recreated without spoofing
+  the donor's Steam identity. Whitelist and class compatibility checks remain.
 * `WeaponsDebug_*` targets only ordinary bots. The native test API applies hats
   in memory and optionally forces custom equipment recreation at regeneration.
-  No backend-update loadout flags are used. Existing user changes to gameplay
+  No backend-update loadout flags are used. Grants are bound to client serials
+  and never apply to real players or reused client slots. Hat testing is an
+  equal-priority domain: independent `sm_loadoutstress_hats` and
+  `sm_loadoutstress_weapons` switches allow weapons-only, hats-only and paired
+  trials. Forced trials recreate both domains. Coverage counts actual custom
+  weapon entities and custom hat wearables, not just accepted selections.
+  Existing user changes to gameplay
   are preserved in the debugging snapshot; they are not promoted to main.
 * Weapons diagnostics span ManageRegularWeapons, full GiveNamedItem, weapon/
   wearable validation and GiveTo, PostInventoryApplication, model precaching,
@@ -41,8 +48,10 @@ and fixtures must be private (0700 directories / 0600 files).
 
 ## Bounds and cleanup
 
-Trials refuse more than one human, stop if an additional human connects, reject
-pre-existing test bot names, and verify all sixteen bots were created. Duration
+Trials refuse more than one human and any pre-existing ordinary bots, stop if
+an additional human connects, and verify all sixteen bots were created. Bot
+ownership is captured by client-creation serials, not display names that another
+plugin may rename. Duration
 is 15..300 seconds; operations are capped at 10,000; each timer processes at
 most sixteen bots. Stop below 160 free edicts, on missing bots, on map change,
 or on unload. Only bot serials created by the harness are kicked. The previous

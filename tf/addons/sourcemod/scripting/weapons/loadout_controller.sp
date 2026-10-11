@@ -797,6 +797,7 @@ bool ItemRequiresPointsStorePurchase(int client, const CustomItemDefinition item
 
 bool CanPlayerAccessItem(int client, const CustomItemDefinition item)
 {
+    if (WeaponsDebug_ItemGrant(client,item)) return true;
     return CanPlayerViewItem(client, item) && !ItemRequiresPointsStorePurchase(client, item);
 }
 

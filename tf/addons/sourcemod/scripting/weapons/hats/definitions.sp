@@ -69,6 +69,7 @@ bool IsHatEnabled(int hatIndex)
 
 bool IsHatEquippedForClient(int client, int hatIndex)
 {
+    if (WeaponsDebug_HatsDisabled(client)) return false;
 	return IsHatEnabled(hatIndex)
 		&& (g_Hats[hatIndex].force || g_bHatEnabled[client][hatIndex]);
 }
@@ -84,6 +85,9 @@ bool CanClientAccessHat(int client, int hatIndex)
 	{
 		return false;
 	}
+	// Debug branch: replay the donor's selected hats on test bots only, without
+	// Steam identity spoofing or real-client purchase/cookie database writes.
+	if (WeaponsDebug_HatGrant(client,hatIndex)) return true;
 	if (g_Hats[hatIndex].force)
 	{
 		return true;

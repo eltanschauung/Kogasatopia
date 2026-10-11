@@ -1,5 +1,12 @@
 void ApplyCustomModel(int entity, const char[] modelPath)
 {
+	int profile=KogasaPerfBegin();
+	WeaponsDebug_ApplyCustomModel(entity,modelPath);
+	KogasaPerfEnd(profile,"Hats/ApplyModel",modelPath);
+}
+
+void WeaponsDebug_ApplyCustomModel(int entity,const char[] modelPath)
+{
 	if (!modelPath[0])
 	{
 		return;

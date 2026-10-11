@@ -7,8 +7,10 @@
 #include <weapons>
 #include <plugin_statistics>
 
-native bool WeaponsDebug_ApplyHats(int client, const char[] state);
+native bool WeaponsDebug_ApplyHats(int client, const char[] state,bool enabled=true);
 native bool WeaponsDebug_Reapply(int client);
+native bool WeaponsDebug_ReapplyHats(int client);
+native int WeaponsDebug_HatCount(int client);
 native void WeaponsLoadout_DebugStats(float[] totals, float[] peaks, int size);
 
 #define STRESS_PLAYERS 16
@@ -25,16 +27,20 @@ KeyValues g_Profiles;
 File g_Output;
 Handle g_WorkTimer, g_ReportTimer, g_SetupTimer;
 ConVar g_BatchConVar, g_ForceConVar, g_ClassCycleConVar;
+ConVar g_TestHatsConVar,g_TestWeaponsConVar;
 bool g_Running, g_Preparing;
 char g_Label[64];
 int g_OriginalHumanSerial;
 int g_PreviousZombie;
+int g_PrepareNextBot;
 
 public void OnPluginStart()
 {
     g_BatchConVar = CreateConVar("sm_loadoutstress_batch","1","Bots regenerated per 0.1s monitor service",_,true,1.0,true,16.0);
     g_ForceConVar = CreateConVar("sm_loadoutstress_force","0","Force custom equipment recreation on each regeneration",_,true,0.0,true,1.0);
     g_ClassCycleConVar = CreateConVar("sm_loadoutstress_class_cycle","0","Rotate class after each full 16-bot pass",_,true,0.0,true,1.0);
+    g_TestHatsConVar = CreateConVar("sm_loadoutstress_hats","1","Replay paired saved custom hats",_,true,0.0,true,1.0);
+    g_TestWeaponsConVar = CreateConVar("sm_loadoutstress_weapons","1","Replay paired saved custom weapons",_,true,0.0,true,1.0);
     RegAdminCmd("sm_loadoutstress_start",StartTrial,ADMFLAG_ROOT,"Start labelled bounded 16-bot trial, optional duration 15..300s");
     RegAdminCmd("sm_loadoutstress_stop",StopTrial,ADMFLAG_ROOT);
     HookEvent("post_inventory_application",InventoryApplied,EventHookMode_Post);
@@ -45,11 +51,9 @@ public void OnMapEnd() { EndTrial("map_end"); }
 public void OnClientPutInServer(int client)
 {
     if (!g_Preparing || !NormalBot(client)) return;
-    char name[64]; GetClientName(client,name,sizeof(name));
-    for (int i=0;i<STRESS_PLAYERS;i++) {
-        char wanted[40];FormatEx(wanted,sizeof(wanted),"LoadoutStress_%02d",i);
-        if (StrEqual(name,wanted)) g_Bots[i]=GetClientSerial(client);
-    }
+    // Creation order + serial ownership, not names: other plugins may rename
+    // bots during initialization. Start refuses existing ordinary bots.
+    if (g_PrepareNextBot<STRESS_PLAYERS) g_Bots[g_PrepareNextBot++]=GetClientSerial(client);
 }
 public void OnPluginEnd()
 {
@@ -83,6 +87,7 @@ public Action StartTrial(int client,int args)
     for (int target=1;target<=MaxClients;target++) if (IsClientConnected(target)&&!IsFakeClient(target)) { humans++; g_OriginalHumanSerial=GetClientSerial(target); }
     if (humans>1 || GetClientCount(false)+STRESS_PLAYERS>MaxClients) { ReplyToCommand(client,"[Stress] Refused: population/capacity unsafe."); return Plugin_Handled; }
     for (int target=1;target<=MaxClients;target++) if (IsClientConnected(target)) {
+        if (NormalBot(target)) { ReplyToCommand(client,"[Stress] Refused: ordinary bots already present.");return Plugin_Handled; }
         char name[64];GetClientName(target,name,sizeof(name));
         if (StrContains(name,"LoadoutStress_")==0) { ReplyToCommand(client,"[Stress] Refused: prior test bots require operator cleanup.");return Plugin_Handled; }
     }
@@ -99,8 +104,9 @@ public Action StartTrial(int client,int args)
     if (FileExists(path)) { delete g_Profiles; ReplyToCommand(client,"[Stress] Trial output exists; use a new label."); return Plugin_Handled; }
     g_Output=OpenFile(path,"wt");
     if (g_Output==null) { delete g_Profiles; ReplyToCommand(client,"[Stress] Private output directory unavailable."); return Plugin_Handled; }
-    SetFilePermissions(path,0600);
+    SetFilePermissions(path,384); // SourcePawn numeric literals are decimal: 0600 is NOT octal.
     g_Preparing=true; g_EndAt=GetEngineTime()+float(duration);
+    g_PrepareNextBot=0;
     g_PreviousZombie=stopBots.IntValue; stopBots.IntValue=1;
     for (int i=0;i<STRESS_PLAYERS;i++)
     {
@@ -122,16 +128,13 @@ public Action PrepareBots(Handle timer)
     int assigned, invalid, selected;
     for (int i=0;i<STRESS_PLAYERS;i++)
     {
-        char wanted[40]; FormatEx(wanted,sizeof(wanted),"LoadoutStress_%02d",i);
-        for (int target=1;target<=MaxClients;target++)
+        int target=GetClientFromSerial(g_Bots[i]);
+        if (NormalBot(target))
         {
-            if (!NormalBot(target)) continue;
-            char name[64]; GetClientName(target,name,sizeof(name));
-            if (!StrEqual(name,wanted)) continue;
             g_Bots[i]=GetClientSerial(target); assigned++;
             char section[8]; IntToString(i,section,sizeof(section));
             g_Profiles.Rewind(); g_Profiles.JumpToKey(section);
-            if (g_Profiles.JumpToKey("weapons")&&g_Profiles.GotoFirstSubKey(false))
+            if (g_TestWeaponsConVar.BoolValue&&g_Profiles.JumpToKey("weapons")&&g_Profiles.GotoFirstSubKey(false))
             {
                 do {
                     char key[32],uid[64],parts[2][8];
@@ -150,14 +153,14 @@ public Action PrepareBots(Handle timer)
                     FormatEx(entry,sizeof(entry),"%s:%d,",id,g_Profiles.GetNum(NULL_STRING,0)); StrCat(state,sizeof(state),entry);
                 } while (g_Profiles.GotoNextKey(false));
             }
-            WeaponsDebug_ApplyHats(target,state);
+            WeaponsDebug_ApplyHats(target,state,g_TestHatsConVar.BoolValue);
             TF2_SetPlayerClass(target,view_as<TFClassType>(g_ProfileClass[i]),false,true);
             TF2_RespawnPlayer(target);
-            break;
         }
     }
     if (assigned!=STRESS_PLAYERS) { EndTrial("bot_creation_failed"); return Plugin_Stop; }
     g_Output.WriteLine("start|label=%s|bots=%d|selected=%d|invalid=%d|batch=%d|force=%d|classes=%d|checklag=%d|tick=%d",g_Label,assigned,selected,invalid,g_BatchConVar.IntValue,g_ForceConVar.IntValue,g_ClassCycleConVar.IntValue,FindConVar("sm_checklag_mode").IntValue,GetGameTickCount());
+    g_Output.WriteLine("domains|weapons=%d|hats=%d|identity_pairing=same_source_player",g_TestWeaponsConVar.IntValue,g_TestHatsConVar.IntValue);
     float totals[5],peaks[5]; WeaponsLoadout_DebugStats(totals,peaks,5);
     g_Preparing=false; g_Running=true;
     g_Cursor=0;g_Operations=0;g_InventoryEvents=0;g_FrameCount=0;g_OverBudget=0;g_Over30=0;g_Over60=0;g_Over100=0;
@@ -184,6 +187,7 @@ public Action DoWork(Handle timer)
         TF2_SetPlayerClass(target,view_as<TFClassType>(playerClass),false,true);
         if (!IsPlayerAlive(target)) TF2_RespawnPlayer(target);
         if (g_ForceConVar.BoolValue) WeaponsDebug_Reapply(target); else TF2_RegeneratePlayer(target);
+        if (g_ForceConVar.BoolValue&&g_TestHatsConVar.BoolValue) WeaponsDebug_ReapplyHats(target);
         int weapon=GetPlayerWeaponSlot(target,g_Cursor%3);
         if (weapon>MaxClients) {
             char className[64];GetEntityClassname(weapon,className,sizeof(className));
@@ -222,16 +226,17 @@ public Action Report(Handle timer)
 {
     if (!g_Running) return Plugin_Stop;
     float totals[5],peaks[5]; WeaponsLoadout_DebugStats(totals,peaks,5);
-    int equipped;
+    int equipped,hats;
     for (int i=0;i<STRESS_PLAYERS;i++) {
         int target=GetClientFromSerial(g_Bots[i]);
         if (!NormalBot(target)) continue;
+        hats+=WeaponsDebug_HatCount(target);
         for (int slot=0;slot<5;slot++) {
             int weapon=GetPlayerWeaponSlot(target,slot);char uid[64];
             if (weapon>MaxClients&&Weapons_GetItemUIDFromEntity(weapon,uid,sizeof(uid))) equipped++;
         }
     }
-    g_Output.WriteLine("coverage|tick=%d|equipped_custom_weapons=%d",GetGameTickCount(),equipped);
+    g_Output.WriteLine("coverage|tick=%d|equipped_custom_weapons=%d|equipped_custom_hats=%d",GetGameTickCount(),equipped,hats);
     g_Output.WriteLine("sample|tick=%d|operations=%d|inventory_events=%d|rate=%.3f|entities=%d|native_total=%.3f|native_engine=%.3f|native_policy=%.3f|native_resolver=%.3f|native_sp=%.3f|peak_total=%.3f|peak_engine=%.3f|peak_policy=%.3f|peak_resolver=%.3f|peak_sp=%.3f",GetGameTickCount(),g_Operations,g_InventoryEvents,PluginStats_GetObservedTickrate(),GetEntityCount(),totals[0],totals[1],totals[2],totals[3],totals[4],peaks[0],peaks[1],peaks[2],peaks[3],peaks[4]);
     g_Output.Flush();
     return Plugin_Continue;
