@@ -10,15 +10,20 @@ def fields(line):
     return parts[0], dict(p.split("=", 1) for p in parts[1:] if "=" in p)
 
 def summarize(path):
-    start, summary, samples, slow = {}, {}, [], []
+    start, summary, domains, samples, slow, coverage = {}, {}, {}, [], [], []
     for line in Path(path).read_text().splitlines():
         kind, values = fields(line)
         if kind == "start": start = values
+        elif kind == "domains": domains = values
+        elif kind == "coverage": coverage.append(values)
         elif kind == "summary": summary = values
         elif kind == "sample": samples.append(values)
         elif kind == "slow_frame": slow.append(values)
     if not summary: raise ValueError("Trial has not finished")
-    return {"file": Path(path).name, "settings": start, "summary": summary,
+    return {"file": Path(path).name, "settings": start, "domains": domains, "summary": summary,
+            "coverage": {k: {"min": min((int(s[k]) for s in coverage), default=0),
+                              "max": max((int(s[k]) for s in coverage), default=0)}
+                         for k in ("equipped_custom_weapons", "equipped_custom_hats")},
             "sample_rate_min": min((float(s["rate"]) for s in samples), default=0),
             "sample_rate_median": statistics.median([float(s["rate"]) for s in samples]) if samples else 0,
             "native_totals_ms": {k: round(sum(float(s[k]) for s in samples), 3)
