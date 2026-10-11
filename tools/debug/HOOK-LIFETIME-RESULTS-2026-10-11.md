@@ -132,6 +132,8 @@ directory. Bot input/class overrides were restored. All 624 preserved config
 checksums matched, including admin configuration. No extension hot-unload was
 used underneath dependent plugins.
 
-Ordinary **human** Halo Sniper switching and custom-hat equip/unequip validation
-has been requested separately. Until that response arrives, bot validation must
-not be described as human validation.
+Human validation completed: in response to the requested Halo Sniper and custom
+hat check, the operator reported that even rapid class and equipment changes
+could not bring the displayed tickrate below 66. No functional issue was reported.
+This corroborates the laboratory improvement in ordinary live use; it is not a
+guarantee against every future workload or unrelated source of lag.
