@@ -8,6 +8,10 @@ int g_iWeaponsDeployFinishEntity[MAXPLAYERS + 1];
 int g_iWeaponsDeployFinishHook[MAXPLAYERS + 1];
 int g_iWeaponsDeployFinishClient[WEAPONS_SOUND_MAX_ENTITIES];
 int g_iWeaponsDeployFrameHook[WEAPONS_SOUND_MAX_ENTITIES];
+int g_iWeaponsDeployPostHook[WEAPONS_SOUND_MAX_ENTITIES];
+int g_iWeaponsRecentDeployRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
+int g_iWeaponsLastSwitchRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
+float g_flWeaponsRecentDeployDeadline[MAXPLAYERS + 1];
 
 void WeaponsSound_InitDeployFinishedHooks()
 {
@@ -38,13 +42,22 @@ void WeaponsSound_ShutdownDeployFinishedHooks()
 
 void WeaponsSound_HookDeployFinishedWeapon(int weapon)
 {
-    if (g_WeaponsSoundDeployHook != null && weapon < WEAPONS_SOUND_MAX_ENTITIES)
-        g_WeaponsSoundDeployHook.HookEntity(Hook_Post, weapon, WeaponsSound_DeployPost);
+    if (g_WeaponsSoundDeployHook != null && weapon > MaxClients
+        && weapon < WEAPONS_SOUND_MAX_ENTITIES)
+    {
+        if (g_iWeaponsDeployPostHook[weapon] == INVALID_HOOK_ID)
+            g_iWeaponsDeployPostHook[weapon] = g_WeaponsSoundDeployHook.HookEntity(
+                Hook_Post, weapon, WeaponsSound_DeployPost);
+        // Install before Deploy, not from inside an engine callback.
+        WeaponsSound_AddDeployFinishHook(weapon);
+    }
 }
 
 public MRESReturn WeaponsSound_DeployPost(int weapon, DHookReturn result)
 {
-    if (result.Value && Weapons_IsValidWeaponEntity(weapon))
+    if (weapon > MaxClients && weapon < WEAPONS_SOUND_MAX_ENTITIES
+        && (g_iWeaponsSoundFeatures[weapon] & WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED)
+        && result.Value && Weapons_IsValidWeaponEntity(weapon))
         WeaponsSound_TrackDeployFinish(GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity"), weapon);
     return MRES_Ignored;
 }
@@ -53,7 +66,7 @@ void WeaponsSound_TrackDeployFinish(int client, int weapon)
 {
     if (client < 1 || client > MaxClients)
         return;
-    WeaponsSound_CancelDeployFinish(client);
+    WeaponsSound_CancelDeployFinish(client, false);
     if (!Weapons_IsValidClient(client) || !IsPlayerAlive(client)
         || !Weapons_IsValidWeaponEntity(weapon) || weapon >= WEAPONS_SOUND_MAX_ENTITIES)
         return;
@@ -65,7 +78,7 @@ void WeaponsSound_TrackDeployFinish(int client, int weapon)
     g_iWeaponsDeployFinishRef[client] = EntIndexToEntRef(weapon);
     g_iWeaponsDeployFinishEntity[client] = weapon;
     g_iWeaponsDeployFinishClient[weapon] = client;
-    g_iWeaponsDeployFinishHook[client] = WeaponsSound_AddDeployFinishHook(weapon);
+    g_iWeaponsDeployFinishHook[client] = g_iWeaponsDeployFrameHook[weapon];
     if (g_iWeaponsDeployFinishHook[client] == INVALID_HOOK_ID)
     {
         WeaponsSound_ClearDeployFinishState(client);
@@ -96,10 +109,39 @@ static void WeaponsSound_ClearDeployFinishState(int client)
     g_iWeaponsDeployFinishHook[client] = INVALID_HOOK_ID;
 }
 
-void WeaponsSound_CancelDeployFinish(int client)
+void WeaponsSound_RecordSuccessfulSwitch(int client, int weapon)
+{
+    g_iWeaponsRecentDeployRef[client] = EntIndexToEntRef(weapon);
+    g_flWeaponsRecentDeployDeadline[client] = GetEntPropFloat(client, Prop_Send, "m_flNextAttack");
+}
+
+void WeaponsSound_ResumeLateDeployFinish(int weapon)
+{
+    int client = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
+    if (!Weapons_IsValidClient(client) || !IsPlayerAlive(client))
+        return;
+    int weaponRef = EntIndexToEntRef(weapon);
+    // Only the original deploy window qualifies. A later reload/attack lockout
+    // must not be mistaken for a deployment when an attribute is assigned.
+    if (g_iWeaponsRecentDeployRef[client] == weaponRef
+        && g_flWeaponsRecentDeployDeadline[client] > GetGameTime()
+        && GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon") == weapon
+        && g_iWeaponsDeployFinishRef[client] != weaponRef)
+        WeaponsSound_TrackDeployFinish(client, weapon);
+}
+
+void WeaponsSound_CancelDeployFinish(int client, bool clearRecent = true)
 {
     if (client >= 1 && client <= MaxClients)
+    {
         WeaponsSound_ClearDeployFinishState(client);
+        if (clearRecent)
+        {
+            g_iWeaponsRecentDeployRef[client] = INVALID_ENT_REFERENCE;
+            g_flWeaponsRecentDeployDeadline[client] = 0.0;
+            g_iWeaponsLastSwitchRef[client] = INVALID_ENT_REFERENCE;
+        }
+    }
 }
 
 void WeaponsSound_CancelOtherDeploy(int client, int weapon)
@@ -119,6 +161,12 @@ void WeaponsSound_DeployFinishEntityDestroyed(int weapon)
     if (client >= 1 && client <= MaxClients)
         WeaponsSound_CancelDeployFinish(client);
     g_iWeaponsDeployFrameHook[weapon] = INVALID_HOOK_ID;
+    g_iWeaponsDeployPostHook[weapon] = INVALID_HOOK_ID;
+    g_iWeaponsSoundSwingPreHook[weapon] = INVALID_HOOK_ID;
+    g_iWeaponsSoundSwingPostHook[weapon] = INVALID_HOOK_ID;
+    g_iWeaponsSoundFeatures[weapon] = 0;
+    g_iWeaponsSoundHookRef[weapon] = INVALID_ENT_REFERENCE;
+    g_WeaponsSoundPendingSwing[weapon] = false;
 }
 
 public void WeaponsSound_DeployFinishHookRemoved(int hookId)
@@ -143,11 +191,14 @@ public MRESReturn WeaponsSound_ItemPostFramePre(int weapon)
         return MRES_Ignored;
 
     bool ready = Weapons_IsValidClient(client) && IsPlayerAlive(client)
+        && (g_iWeaponsSoundFeatures[weapon] & WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED)
         && Weapons_IsValidWeaponEntity(weapon)
         && EntRefToEntIndex(g_iWeaponsDeployFinishRef[client]) == weapon
         && GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity") == client
         && GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon") == weapon;
-    WeaponsSound_CancelDeployFinish(client);
+    WeaponsSound_CancelDeployFinish(client, false);
+    g_iWeaponsRecentDeployRef[client] = INVALID_ENT_REFERENCE;
+    g_flWeaponsRecentDeployDeadline[client] = 0.0;
     if (ready)
         WeaponsSound_OnWeaponFinishedDeploy(client, weapon);
     return MRES_Ignored;

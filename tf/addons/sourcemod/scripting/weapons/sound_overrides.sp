@@ -23,6 +23,12 @@
 StringMap g_WeaponsSoundGroups;
 DynamicHook g_WeaponsSoundPrimaryAttackHook;
 #define WEAPONS_SOUND_MAX_ENTITIES 2049
+#define WEAPONS_SOUND_FEATURE_MELEE_SWING (1 << 0)
+#define WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED (1 << 1)
+int g_iWeaponsSoundHookRef[WEAPONS_SOUND_MAX_ENTITIES] = { INVALID_ENT_REFERENCE, ... };
+int g_iWeaponsSoundFeatures[WEAPONS_SOUND_MAX_ENTITIES];
+int g_iWeaponsSoundSwingPreHook[WEAPONS_SOUND_MAX_ENTITIES];
+int g_iWeaponsSoundSwingPostHook[WEAPONS_SOUND_MAX_ENTITIES];
 float g_WeaponsSoundAttackTimeBefore[WEAPONS_SOUND_MAX_ENTITIES];
 bool g_WeaponsSoundPendingSwing[WEAPONS_SOUND_MAX_ENTITIES];
 int g_iWeaponsSoundWeaponRef[MAXPLAYERS + 1] = { INVALID_ENT_REFERENCE, ... };
@@ -81,7 +87,10 @@ void WeaponsSound_OnPluginEnd()
 
 void WeaponsSound_OnEntityCreated(int entity, const char[] className)
 {
-	WeaponsSound_HookWeaponEntity(entity, className);
+	// Attributes are normally assigned after creation. Reconcile at assignment
+	// and item-ready, not before the new entity has its final feature set.
+	if (StrContains(className, "tf_weapon_") == 0)
+		WeaponsSound_DeployFinishEntityDestroyed(entity);
 }
 
 static void WeaponsSound_HookExistingWeaponEntities()
@@ -96,33 +105,79 @@ static void WeaponsSound_HookExistingWeaponEntities()
 		}
 
 		GetEntityClassname(weapon, className, sizeof(className));
-		WeaponsSound_HookWeaponEntity(weapon, className);
+		if (StrContains(className, "tf_weapon_") == 0)
+			WeaponsSound_ReconcileWeaponHooks(weapon);
 	}
 }
 
-static void WeaponsSound_HookWeaponEntity(int weapon, const char[] className)
+void WeaponsSound_AttributeChanged(int weapon, const char[] attribute)
 {
-	if (g_WeaponsSoundPrimaryAttackHook == null
-			|| weapon <= MaxClients
-			|| !IsValidEntity(weapon)
-			|| StrContains(className, "tf_weapon_") != 0)
-	{
+	if (StrEqual(attribute, Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND)
+		|| StrEqual(attribute, Weapons_ATTR_CUSTOM_DEPLOY_FINISHED_SOUND))
+		WeaponsSound_ReconcileWeaponHooks(weapon);
+}
+
+void WeaponsSound_ReconcileWeaponHooks(int weapon)
+{
+	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES
+		|| !IsValidEntity(weapon) || g_WeaponsSoundPrimaryAttackHook == null)
 		return;
+
+	int weaponRef = EntIndexToEntRef(weapon);
+	if (g_iWeaponsSoundHookRef[weapon] != weaponRef)
+	{
+		WeaponsSound_DeployFinishEntityDestroyed(weapon);
+		g_iWeaponsSoundHookRef[weapon] = weaponRef;
 	}
 
+	char value[2];
+	int features;
+	if (TF2CustAttr_GetString(weapon, Weapons_ATTR_CUSTOM_MELEE_SWING_SOUND, value, sizeof(value)))
+		features |= WEAPONS_SOUND_FEATURE_MELEE_SWING;
+	if (TF2CustAttr_GetString(weapon, Weapons_ATTR_CUSTOM_DEPLOY_FINISHED_SOUND, value, sizeof(value)))
+		features |= WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED;
+	if (features && !TF2Util_IsEntityWeapon(weapon))
+		features = 0;
+	if ((features & WEAPONS_SOUND_FEATURE_MELEE_SWING)
+		&& TF2Util_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
+		features &= ~WEAPONS_SOUND_FEATURE_MELEE_SWING;
+	g_iWeaponsSoundFeatures[weapon] = features;
+
+	// Retain installed hooks for the entity's lifetime. Removing an attribute
+	// makes callbacks inert; it never removes a hook from an executing callback.
+	if (!(features & WEAPONS_SOUND_FEATURE_MELEE_SWING))
+		g_WeaponsSoundPendingSwing[weapon] = false;
+	if (!(features & WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED))
+	{
+		int client = g_iWeaponsDeployFinishClient[weapon];
+		if (client > 0)
+			WeaponsSound_CancelDeployFinish(client, false);
+	}
+	if (!features)
+		return;
+
 	int profile = KogasaPerfBegin();
-	g_WeaponsSoundPrimaryAttackHook.HookEntity(
-		Hook_Pre, weapon, WeaponsSound_PrimaryAttackPre);
-	g_WeaponsSoundPrimaryAttackHook.HookEntity(
-		Hook_Post, weapon, WeaponsSound_PrimaryAttackPost);
-	WeaponsSound_HookDeployFinishedWeapon(weapon);
+	if (features & WEAPONS_SOUND_FEATURE_MELEE_SWING)
+	{
+		if (g_iWeaponsSoundSwingPreHook[weapon] == INVALID_HOOK_ID)
+			g_iWeaponsSoundSwingPreHook[weapon] = g_WeaponsSoundPrimaryAttackHook.HookEntity(
+				Hook_Pre, weapon, WeaponsSound_PrimaryAttackPre);
+		if (g_iWeaponsSoundSwingPostHook[weapon] == INVALID_HOOK_ID)
+			g_iWeaponsSoundSwingPostHook[weapon] = g_WeaponsSoundPrimaryAttackHook.HookEntity(
+				Hook_Post, weapon, WeaponsSound_PrimaryAttackPost);
+	}
+	if (features & WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED)
+	{
+		WeaponsSound_HookDeployFinishedWeapon(weapon);
+		WeaponsSound_ResumeLateDeployFinish(weapon);
+	}
 	KogasaPerfEnd(profile, "EntityHooks/weapon_sound");
 }
 
 public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)
 {
 	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES || !IsValidEntity(weapon)
-		|| !TF2Util_IsEntityWeapon(weapon))
+		|| !(g_iWeaponsSoundFeatures[weapon] & WEAPONS_SOUND_FEATURE_MELEE_SWING))
 		return MRES_Ignored;
 	g_WeaponsSoundPendingSwing[weapon] = TF2Util_GetWeaponSlot(weapon) == TFWeaponSlot_Melee;
 	if (g_WeaponsSoundPendingSwing[weapon])
@@ -206,8 +261,26 @@ public Action WeaponsSound_Hook(
 void WeaponsSound_OnWeaponSwitchPost(int client, int weapon)
 {
 	if (Weapons_IsValidClient(client))
+	{
 		WeaponsSound_CancelOtherDeploy(client,
 			GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon"));
+		if (Weapons_IsValidWeaponEntity(weapon)
+			&& GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon") == weapon)
+		{
+			int weaponRef = EntIndexToEntRef(weapon);
+			bool changed = g_iWeaponsLastSwitchRef[client] != weaponRef;
+			g_iWeaponsLastSwitchRef[client] = weaponRef;
+			if (changed)
+				WeaponsSound_RecordSuccessfulSwitch(client, weapon);
+			WeaponsSound_ReconcileWeaponHooks(weapon);
+			// SDKHooks post callbacks also run for unsuccessful switch attempts.
+			// Do not re-arm the already active weapon. Real same-weapon redeploys
+			// are covered by the successful Deploy post hook instead.
+			if (changed && (g_iWeaponsSoundFeatures[weapon] & WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED)
+				&& g_iWeaponsDeployFinishRef[client] != EntIndexToEntRef(weapon))
+				WeaponsSound_TrackDeployFinish(client, weapon);
+		}
+	}
 	WeaponsSound_UpdateClientWeapon(client, weapon);
 	WeaponsSound_PlayCustomDeploySound(client, weapon);
 }
@@ -427,6 +500,7 @@ static bool WeaponsSound_EmitCustomAttribute(int client, int weapon,
 
 void WeaponsSound_OnItemRuntimeStateReady(int client, int entity)
 {
+	WeaponsSound_ReconcileWeaponHooks(entity);
 	if (Weapons_IsValidClient(client)
 			&& GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon") == entity)
 	{

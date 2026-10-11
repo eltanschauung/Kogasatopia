@@ -13,6 +13,25 @@ bool WeaponsDebug_IsBot(int client)
         && IsFakeClient(client) && !IsClientSourceTV(client) && !IsClientReplay(client);
 }
 
+// Cold-path inspection for lifecycle regression tests, never human targets.
+public any Native_WeaponsDebugSoundState(Handle plugin, int params)
+{
+    int weapon = GetNativeCell(1);
+    if (!Weapons_IsValidWeaponEntity(weapon) || weapon >= WEAPONS_SOUND_MAX_ENTITIES
+        || !WeaponsDebug_IsBot(GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity")))
+        return ThrowNativeError(SP_ERROR_NATIVE, "Sound probe targets must be bot-owned weapons");
+    int state[7];
+    state[0] = g_iWeaponsSoundFeatures[weapon];
+    state[1] = g_iWeaponsSoundSwingPreHook[weapon];
+    state[2] = g_iWeaponsSoundSwingPostHook[weapon];
+    state[3] = g_iWeaponsDeployPostHook[weapon];
+    state[4] = g_iWeaponsDeployFrameHook[weapon];
+    state[5] = g_iWeaponsDeployFinishClient[weapon];
+    state[6] = g_iWeaponsSoundHookRef[weapon];
+    SetNativeArray(2, state, sizeof(state));
+    return 1;
+}
+
 bool WeaponsDebug_HasProfile(int client)
 {
     return WeaponsDebug_IsBot(client)
