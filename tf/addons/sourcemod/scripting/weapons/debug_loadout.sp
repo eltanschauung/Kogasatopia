@@ -13,6 +13,12 @@ bool WeaponsDebug_IsBot(int client)
         && IsFakeClient(client) && !IsClientSourceTV(client) && !IsClientReplay(client);
 }
 
+bool WeaponsDebug_HasProfile(int client)
+{
+    return WeaponsDebug_IsBot(client)
+        && g_WeaponsDebugSerial[client] == GetClientSerial(client);
+}
+
 public any Native_WeaponsDebugHats(Handle plugin, int params)
 {
     int client = GetNativeCell(1);

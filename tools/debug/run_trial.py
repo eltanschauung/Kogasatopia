@@ -59,7 +59,7 @@ def run(args):
                 raise RuntimeError('Perf capture exceeded 32MiB')
             if output.exists():
                 text=output.read_text()
-                if '\nsummary|' in text:
+                if text.startswith('summary|') or '\nsummary|' in text:
                     import json
                     result=summarize(output)
                     print(json.dumps(result,indent=2),flush=True)

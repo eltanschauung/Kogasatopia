@@ -41,6 +41,9 @@ void LoadStableHatStateChunk(int client, const char[] stateValue)
 
 void LoadHatStateCookie(int client)
 {
+    // Lab profiles are session-only. A late clientprefs callback must not
+    // overwrite the paired source player's imported hat selections.
+    if (WeaponsDebug_HasProfile(client)) return;
 	ResetClientHatSelections(client);
 	g_szHatIdChoice[client][0] = '\0';
 	g_iHatCookieChunksUsed[client] = 0;
@@ -223,6 +226,7 @@ public Action Timer_HatStateSave(Handle timer, any client)
 
 void SaveHatStateCookie(int client, bool allowClear = false)
 {
+    if (WeaponsDebug_HasProfile(client)) return;
 	if (g_hHatStateCookies[0] == INVALID_HANDLE || client <= 0 || client > MaxClients)
 	{
 		return;

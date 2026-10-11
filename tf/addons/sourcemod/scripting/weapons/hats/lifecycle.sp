@@ -174,6 +174,8 @@ void CustomHats_OnClientCookiesCached(int client)
 		return;
 	}
 
+	if (WeaponsDebug_HasProfile(client)) return;
+
 	if (g_hHatDebug != null && g_hHatDebug.BoolValue)
 	{
 		LogMessage("[CustomHats] Cookies cached for %N (cached=%d).", client, AreClientCookiesCached(client));
