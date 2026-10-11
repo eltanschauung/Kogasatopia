@@ -44,6 +44,15 @@ void CheckLag_SanitizeField(char[] value, int maxlen)
 
 public any Native_CheckLagRecordScope(Handle plugin, int params)
 {
+    if (g_CheckLagMode != 2) return 0;
+    int self = CheckLag_SelfBegin(Self_RecordScope);
+    any result = CheckLag_RecordScopeImpl(plugin, params);
+    CheckLag_SelfEnd(self);
+    return result;
+}
+
+any CheckLag_RecordScopeImpl(Handle plugin, int params)
+{
     if (g_LagScopeIndexes == null) return 0;
     char filename[80], scope[72], key[160], context[CHECKLAG_CONTEXT_LENGTH];
     GetPluginFilename(plugin, filename, sizeof(filename));
@@ -102,6 +111,14 @@ public any Native_CheckLagRecordScope(Handle plugin, int params)
 }
 
 public void OnGameFrame()
+{
+    if (g_CheckLagMode != 2) return;
+    int self = CheckLag_SelfBegin(Self_Frame);
+    CheckLag_GameFrameImpl();
+    CheckLag_SelfEnd(self);
+}
+
+void CheckLag_GameFrameImpl()
 {
     float now = GetEngineTime(), gap = now - g_LastFrameAt;
     g_LastFrameAt = now;
@@ -217,15 +234,20 @@ void CheckLag_LogSnapshot(int alertTick, float current, float maximum, int measu
 
 public Action Command_LagSnapshot(int client, int args)
 {
+    if (g_CheckLagMode != 2) { ReplyToCommand(client, "[CheckLag] Use sm_checklag_mode 2 for snapshots."); return Plugin_Handled; }
+    int emission = CheckLag_SelfBegin(Self_Snapshot);
     int tick = GetGameTickCount();
     CheckLag_LogSnapshot(tick, PluginStats_GetObservedTickrate(), PluginStats_GetExpectedTickrate(),
         CheckLag_RecentMeasuredScope(), true);
     ReplyToCommand(client, "[CheckLag] Manual snapshot saved for Tick #%d (not a tickrate-drop event).", tick);
+    CheckLag_SelfReport(tick, tick - 1);
+    CheckLag_SelfEmission(emission);
     return Plugin_Handled;
 }
 
 public Action Command_LagDetails(int client, int args)
 {
+    if (g_CheckLagMode != 2) { ReplyToCommand(client, "[CheckLag] Use sm_checklag_mode 2 for details."); return Plugin_Handled; }
     if (g_LastLagSnapshotReady)
     {
         ReplyToCommand(client, "[CheckLag] Saved alert Tick #%d (%.1f seconds ago): %.1f tick/s; recent frame peak %.1f ms. Inclusive times:",

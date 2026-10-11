@@ -17,6 +17,9 @@
 Handle g_AdminMonitorTimer = null;
 float g_NextAdminAlertAt = 0.0;
 float g_RoundQuietUntil = 0.0;
+ConVar g_CheckLagModeConVar;
+int g_CheckLagMode = 1;
+#include "checklag_self.inc"
 #include "checklag_diagnostics.inc"
 
 public Plugin myinfo =
@@ -24,7 +27,7 @@ public Plugin myinfo =
     name = "CheckLag",
     author = "Hombre",
     description = "Reports the server's current and expected tickrate.",
-    version = "1.2.0",
+    version = "1.5.0",
     url = "https://kogasa.tf"
 };
 
@@ -33,12 +36,18 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     MarkNativeAsOptional("DGM_IsRoundRunning");
     RegPluginLibrary("checklag");
     CreateNative("CheckLag_RecordScope",Native_CheckLagRecordScope);
+    CreateNative("CheckLag_IsProfilingEnabled", Native_CheckLagIsProfilingEnabled);
     return APLRes_Success;
 }
 
 public void OnPluginStart()
 {
     g_LagScopeIndexes=new StringMap();g_LastFrameAt=GetEngineTime();
+    g_CheckLagModeConVar = CreateConVar("sm_checklag_mode", "1",
+        "0=off, 1=tickrate alerts with self-cost accounting, 2=full profiling.", _, true, 0.0, true, 2.0);
+    g_CheckLagMode = g_CheckLagModeConVar.IntValue;
+    g_CheckLagModeConVar.AddChangeHook(CheckLag_ModeChanged);
+    RegAdminCmd("sm_lagself", Command_LagSelf, ADMFLAG_ROOT, "Completed CheckLag observer costs.");
     RegAdminCmd("sm_lagdetails",Command_LagDetails,ADMFLAG_ROOT,"Recent measured callback times and network context.");
     RegAdminCmd("sm_lagsnapshot", Command_LagSnapshot, ADMFLAG_ROOT, "Persist current timings without classifying them as a tickrate drop.");
     RegConsoleCmd("sm_lag", Command_CheckLag, "Broadcast the server tickrate.");
@@ -62,6 +71,7 @@ public void Event_RoundQuietPeriod(Event event, const char[] name, bool dontBroa
 
 public void OnMapStart()
 {
+    CheckLag_SelfReset();
     CheckLag_ResetFrames();
     g_LagScopeCount=0;if(g_LagScopeIndexes!=null)g_LagScopeIndexes.Clear();
     g_LagScopeDropped = 0;
@@ -88,6 +98,20 @@ public void OnPluginEnd()
     delete g_AdminMonitorTimer;
     g_AdminMonitorTimer = null;
     delete g_LagScopeIndexes;
+    CheckLag_SelfShutdown();
+}
+
+public any Native_CheckLagIsProfilingEnabled(Handle plugin, int params)
+{
+    return g_CheckLagMode == 2;
+}
+
+public void CheckLag_ModeChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    g_CheckLagMode = convar.IntValue;
+    CheckLag_SelfReset();
+    CheckLag_ResetFrames();
+    g_RoundQuietUntil = GetEngineTime() + 5.0;
 }
 
 bool IsWordCharacter(char value)
@@ -162,6 +186,15 @@ void PrintTickrateToClient(int client)
 
 public Action Timer_MonitorTickrate(Handle timer)
 {
+    if (g_CheckLagMode == 0) return Plugin_Continue;
+    int self = CheckLag_SelfBegin(Self_Monitor);
+    Action result = CheckLag_MonitorTickrate();
+    CheckLag_SelfEnd(self);
+    return result;
+}
+
+Action CheckLag_MonitorTickrate()
+{
     if (GetEngineTime() < g_RoundQuietUntil || !CheckLag_IsRoundRunning())
     {
         return Plugin_Continue;
@@ -182,8 +215,18 @@ public Action Timer_MonitorTickrate(Handle timer)
     float maximum = PluginStats_GetExpectedTickrate();
     int serverTick = GetGameTickCount();
     g_NextAdminAlertAt = now + CHECKLAG_ADMIN_ALERT_INTERVAL;
-    int measured=CheckLag_RecentMeasuredScope();
-    CheckLag_LogSnapshot(serverTick, current, maximum, measured);
+    int measured = g_CheckLagMode == 2 ? CheckLag_RecentMeasuredScope() : -1;
+    int emission = CheckLag_SelfBegin(Self_Snapshot);
+    if (g_CheckLagMode == 2)
+        CheckLag_LogSnapshot(serverTick, current, maximum, measured);
+    else
+    {
+        char detail[160];
+        FormatEx(detail, sizeof(detail), "v=3|mode=1|alert_tick=%d|rate=%.3f|expected=%.3f|snapshot_kind=automatic", serverTick, current, maximum);
+        PluginStats_Record("tickrate_drop", detail);
+        LogMessage("[CheckLag] %s", detail);
+    }
+    CheckLag_SelfReport(serverTick, serverTick - 1);
 
     for (int client = 1; client <= MaxClients; client++)
     {
@@ -201,6 +244,7 @@ public Action Timer_MonitorTickrate(Handle timer)
         if(measured>=0)
             CPrintToChat(client,"{gold}[CheckLag]{default} Measured: %s ({salmon}%.2f ms{default} peak). {gold}!lagdetails{default} for context.",g_LagScopeNames[measured],g_LagScopePeak[measured]);
     }
+    CheckLag_SelfEmission(emission);
     return Plugin_Continue;
 }
 
