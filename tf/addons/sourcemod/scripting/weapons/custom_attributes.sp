@@ -297,6 +297,7 @@ void TF2CustAttr_SetInt(int entity, const char[] attr, int value) {
 	KeyValues kv = WeaponsCustomAttributes_InitStruct(entity);
 	if (kv != null) {
 		kv.SetNum(attr, value);
+		WeaponsSound_AttributeChanged(entity, attr);
 	}
 }
 
@@ -304,6 +305,7 @@ void TF2CustAttr_SetFloat(int entity, const char[] attr, float value) {
 	KeyValues kv = WeaponsCustomAttributes_InitStruct(entity);
 	if (kv != null) {
 		kv.SetFloat(attr, value);
+		WeaponsSound_AttributeChanged(entity, attr);
 	}
 }
 
@@ -311,6 +313,7 @@ void TF2CustAttr_SetString(int entity, const char[] attr, const char[] value) {
 	KeyValues kv = WeaponsCustomAttributes_InitStruct(entity);
 	if (kv != null) {
 		kv.SetString(attr, value);
+		WeaponsSound_AttributeChanged(entity, attr);
 	}
 }
 
@@ -456,6 +459,7 @@ void WeaponsCustomAttributes_SetStruct(int entity, KeyValues kv) {
 	IntToString(token, tokenKey, sizeof(tokenKey));
 	g_WeaponsCustomAttributeKVs.SetValue(tokenKey, kv);
 	TF2Attrib_SetByDefIndex(entity, ATTRID_CUSTOM_STORAGE, float(token));
+	WeaponsSound_ReconcileWeaponHooks(entity);
 }
 
 int WeaponsCustomAttributes_AllocateToken() {
