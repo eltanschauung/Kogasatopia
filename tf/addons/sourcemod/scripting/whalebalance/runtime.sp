@@ -169,7 +169,8 @@ void TeamBalance_FinishScrambleInternal(bool movedPlayers, bool countForImmunity
         TeamBalance_FinishOperation(false);
         return;
     }
-    g_fScrambleCooldownUntil = GetEngineTime() + TEAM_BALANCE_SCRAMBLE_COOLDOWN;
+    float cooldown = g_hScrambleCooldown.FloatValue;
+    g_fScrambleCooldownUntil = GetEngineTime() + cooldown;
     if (countForImmunity && ++g_iScramblesSinceImmunityClear >= 2)
     {
         if (g_hScrambleImmunity != null) g_hScrambleImmunity.Clear();
@@ -177,7 +178,7 @@ void TeamBalance_FinishScrambleInternal(bool movedPlayers, bool countForImmunity
         LogBalance("Cleared scramble immunity after two completed scrambles.");
     }
     TeamBalance_FinishOperation(true);
-    LogBalance("Scramble completed; cooldown and settle window started.");
+    LogBalance("Scramble completed; %.1f-second cooldown and settle window started.", cooldown);
 }
 
 bool TeamBalance_IsScrambleCandidateInternal(int client, int expectedTeam, bool ignoreImmunity, bool allowBots)

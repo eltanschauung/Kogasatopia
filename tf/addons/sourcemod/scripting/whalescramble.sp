@@ -137,7 +137,6 @@ DynamicDetour g_hConstructionMultiplierDetour = null;
 #define TEAM_BALANCE_SETTLE_TIME 3.0
 #define TEAM_BALANCE_OPERATION_LEASE 5.0
 #define TEAM_BALANCE_MOVE_PROTECTION 15.0
-#define TEAM_BALANCE_SCRAMBLE_COOLDOWN 120.0
 #define TEAM_BALANCE_RESPAWN_RETRY_DELAY 0.50
 #define TEAM_BALANCE_RESPAWN_RETRY_COUNT 8
 #define POINTS_STORE_SCRAMBLE_IMMUNITY_ITEM "scramImmunity24h"
@@ -176,6 +175,7 @@ ConVar g_hMaxUnbalanceTime;
 ConVar g_hForceThresholdDelta;
 ConVar g_hSimpleSelection;
 ConVar g_hIgnoreWinning;
+ConVar g_hScrambleCooldown;
 ConVar g_hDatabaseConfig;
 ConVar g_hMpAutoteamBalance;
 ConVar g_hMpTeamsUnbalanceLimit;
