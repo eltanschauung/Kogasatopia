@@ -40,8 +40,8 @@
 #define PERMAMUTE_VERSION   "0.2"
 #define VOTEMUTE_COST       50
 #define VOTEMUTE_DURATION   3600
-#define VOTEMUTE_PERCENT    65
-#define VOTEMUTE_TIME       20
+#define VOTEMUTE_PERCENT    50
+#define VOTEMUTE_TIME       7
 #define VOTEMUTE_DB_CONFIG  "default"
 #define VOTEMUTE_HISTORY_TABLE "permamute_votemute_history"
 #define VOTEMUTE_LOCK_TABLE "permamute_votemute_targets"
