@@ -43,7 +43,7 @@ void Firework_ApplyPerk(const int client, const Perk perk)
 	hData.WriteCell(GetClientUserId(client));
 	hData.WriteCell(perk.GetPrefCell("damage", 0));
 	hData.WriteCell(perk.GetPrefCell("ignite", 1));
-	CreateTimer(0.5, Timer_Firework_Explode, hData, TIMER_DATA_HNDL_CLOSE);
+	CreateTimer(0.5, Timer_Firework_Explode, hData, TIMER_DATA_HNDL_CLOSE | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action Timer_Firework_Explode(Handle hTimer, DataPack hData)
@@ -51,7 +51,7 @@ public Action Timer_Firework_Explode(Handle hTimer, DataPack hData)
 	hData.Reset();
 
 	int client = GetClientOfUserId(hData.ReadCell());
-	if (!client)
+	if (!IsValidClient(client))
 		return Plugin_Stop;
 
 	float fPos[3];
@@ -82,19 +82,25 @@ public Action Timer_Firework_Explode(Handle hTimer, DataPack hData)
 		}
 	}
 
-	DataPack hFollowup = new DataPack();
+	DataPack hFollowup;
+	CreateDataTimer(0.7, Timer_Firework_Followup_Trigger, hFollowup, TIMER_FLAG_NO_MAPCHANGE);
 	hFollowup.WriteCell(3);
 	hFollowup.WriteFloat(fPos[0]);
 	hFollowup.WriteFloat(fPos[1]);
 	hFollowup.WriteFloat(fPos[2]);
-	CreateTimer(0.7, Timer_Firework_Followup_Trigger, hFollowup);
 
 	return Plugin_Stop;
 }
 
 public Action Timer_Firework_Followup_Trigger(Handle hTimer, DataPack hFollowup)
 {
-	CreateTimer(0.1, Timer_Firework_Followup, hFollowup, TIMER_REPEAT | TIMER_DATA_HNDL_CLOSE);
+	// Each timer owns its own pack; map-change cancellation also closes it.
+	hFollowup.Reset();
+	DataPack repeating;
+	CreateDataTimer(0.1, Timer_Firework_Followup, repeating, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	repeating.WriteCell(hFollowup.ReadCell());
+	for (int axis = 0; axis < 3; axis++)
+		repeating.WriteFloat(hFollowup.ReadFloat());
 	return Plugin_Stop;
 }
 

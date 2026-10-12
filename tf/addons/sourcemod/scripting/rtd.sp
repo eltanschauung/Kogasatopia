@@ -33,7 +33,7 @@
 #tryinclude <friendlysimple>
 #define REQUIRE_PLUGIN
 
-#define PLUGIN_VERSION	"2.5.5"
+#define PLUGIN_VERSION	"2.5.6"
 
 #define CHAT_PREFIX 	"\x07FFD700[RTD]\x01"
 #define CONS_PREFIX 	"[RTD]"
@@ -97,6 +97,10 @@ bool g_bRtdCooldownHudVisible[MAXPLAYERS + 1];
 Handle g_hRtdCooldownHudTimer;
 int g_iLastFireworkTime[MAXPLAYERS + 1];
 bool g_bPurchasedFirework[MAXPLAYERS + 1];
+ConVar g_cvFireworkOnly;
+bool g_bFireworkOnly = true;
+bool g_bFullRuntimeActive;
+bool g_bFullClientHooked[MAXPLAYERS + 1];
 
 Handle g_hFwdCanRoll;
 Handle g_hFwdCanForce;
@@ -118,6 +122,7 @@ Handle g_hFwdOnRegOpen;
 #include "rtd/perks.sp"
 #include "rtd/natives.sp"
 #include "rtd/convars.sp"
+#include "rtd/runtime.sp"
 
 public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErrorSize)
 {
@@ -132,6 +137,8 @@ public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr
 	}
 
 	CreateNatives();
+	// Internal bridge binding; keeps ordinary RTD2 APIs available in both modes.
+	CreateNative("RTD2_GetRuntimeOwner", Native_GetRuntimeOwner);
 	RegPluginLibrary("RollTheDice2");
 	MarkNativeAsOptional("PointsStore_AreBonusPointsLoaded");
 	MarkNativeAsOptional("PointsStore_GetBonusPoints");
@@ -157,6 +164,10 @@ public void OnPluginStart()
 	// ConVars
 	CreateConVar("sm_rtd2_version", PLUGIN_VERSION, "Current RTD version, do not change.", FLAGS_CVARS|FCVAR_DONTRECORD|FCVAR_SPONLY);
 	SetupConVars();
+	g_cvFireworkOnly = CreateConVar("sm_rtd2_firework_only", "1",
+		"Only allow Firework; omit all full-RTD hooks. Mode changes apply at the next map start.",
+		FLAGS_CVARS, true, 0.0, true, 1.0);
+	g_bFireworkOnly = g_cvFireworkOnly.BoolValue;
 
 	AutoExecConfig(true);
 
@@ -193,15 +204,8 @@ public void OnPluginStart()
 	RegAdminCmd("sm_updatertd", Command_Update, ADMFLAG_ROOT, "Force an update check. Does nothing if Updater is not installed.");
 #endif
 
-	// Listeners
-	AddCommandListener(Listener_Say, "say");
-	AddCommandListener(Listener_Say, "say_team");
-	AddCommandListener(Listener_Voice, "voicemenu");
-	AddNormalSoundHook(Listener_Sound);
-
 	g_hRollers = new Rollers();
 	g_hPerkHistory = new PerkList();
-	g_hRtdCooldownHudTimer = CreateTimer(1.0, Timer_RtdCooldownHud, _, TIMER_REPEAT);
 
 	for (int i = 1; i <= MaxClients; ++i)
 		if (IsClientInGame(i))
@@ -210,16 +214,16 @@ public void OnPluginStart()
 
 public void OnConfigsExecuted()
 {
-	g_bIsRegisteringOpen = true;
-
-	Forward_OnRegOpen();
+	g_bIsRegisteringOpen = !g_bFireworkOnly;
+	if (g_bIsRegisteringOpen)
+		Forward_OnRegOpen();
 	ParseDisabledPerks();
 }
 
 public void OnPluginEnd()
 {
 	delete g_hRtdCooldownHudTimer;
-	ResetAllClients(RTDRemove_PluginUnload);
+	StopFullRtdRuntime(RTDRemove_PluginUnload);
 }
 
 void InitClientCache()
@@ -255,24 +259,20 @@ void ResetAllClients(RTDRemoveReason reason, const int iInitiator=0, const bool 
 
 public void OnMapStart()
 {
-	HookEvent("player_death", Event_PlayerDeath);
-	HookEvent("player_changeclass", Event_ClassChange);
-	HookEvent("teamplay_round_active", Event_RoundActive);
-	HookEvent("post_inventory_application", Event_Resupply);
-	HookEvent("player_hurt", Event_PlayerHurt);
-	HookEvent("player_chargedeployed", Event_UberchargeDeployed);
-	HookEvent("player_team", Event_PlayerTeam);
-
-	HookEvent("teamplay_round_start", Event_RoundStart);
-	HookEvent("arena_round_start", Event_RoundStart);
-	HookEvent("mvm_begin_wave", Event_RoundStart);
-
-	Storage_Precache();
-	Stocks_OnMapStart(); // rtd/stocks.sp
-	PrecachePerkSounds();
-
-	Events.Init();
-	InitPerks();
+	// Latch at map boundaries: arbitrary perks may have delayed callbacks and
+	// projectile hooks that cannot safely be abandoned in the middle of a roll.
+	g_bFireworkOnly = g_cvFireworkOnly.BoolValue;
+	if (g_bFireworkOnly)
+	{
+		// Firework needs particles/sound, not the registrar, homing, damage,
+		// condition, usercmd, crit, sound interception, or round event hooks.
+		TEParticles.Init();
+		InitFireworkRuntime();
+	}
+	else
+	{
+		StartFullRtdRuntime();
+	}
 
 	g_bIsGameArena = (FindEntityByClassname(MaxClients + 1, "tf_logic_arena") > MaxClients);
 
@@ -285,20 +285,14 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
-	ResetAllClients(RTDRemove_NoPrint, .bForce=false);
-	Events.Cleanup();
-
-	UnhookEvent("player_death", Event_PlayerDeath);
-	UnhookEvent("player_changeclass", Event_ClassChange);
-	UnhookEvent("teamplay_round_active", Event_RoundActive);
-	UnhookEvent("post_inventory_application", Event_Resupply);
-	UnhookEvent("player_hurt", Event_PlayerHurt);
-	UnhookEvent("player_chargedeployed", Event_UberchargeDeployed);
-	UnhookEvent("player_team", Event_PlayerTeam);
-
-	UnhookEvent("teamplay_round_start", Event_RoundStart);
-	UnhookEvent("arena_round_start", Event_RoundStart);
-	UnhookEvent("mvm_begin_wave", Event_RoundStart);
+	StopFullRtdRuntime(RTDRemove_NoPrint);
+	delete g_hRtdCooldownHudTimer;
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		ClearRtdCooldownHud(client);
+		g_iLastFireworkTime[client] = 0;
+		g_bPurchasedFirework[client] = false;
+	}
 }
 
 public void OnClientPutInServer(int client)
@@ -312,14 +306,16 @@ public void OnClientPutInServer(int client)
 	if (g_hRollers.GetHud(client) == null)
 		g_hRollers.SetHud(client, CreateHudSynchronizer());
 
-	SDKHook(client, SDKHook_GetMaxHealth, OnGetMaxHealth);
+	if (g_bFullRuntimeActive)
+		HookFullRtdClient(client);
 }
 
 public void OnClientDisconnect(int client)
 {
 	g_bFreeRtdNoticeScheduled[client] = false;
 	g_bRtdCooldownHudVisible[client] = false;
-	Events.PlayerDisconnected(client);
+	if (g_bFullRuntimeActive)
+		Events.PlayerDisconnected(client);
 
 	if (g_hRollers.GetInRoll(client))
 		RemovePerk(client, RTDRemove_Disconnect);
@@ -327,15 +323,24 @@ public void OnClientDisconnect(int client)
 	g_hRollers.Reset(client);
 	g_iLastFireworkTime[client] = 0;
 	g_bPurchasedFirework[client] = false;
-	SDKUnhook(client, SDKHook_GetMaxHealth, OnGetMaxHealth);
+	UnhookFullRtdClient(client);
 }
 
 public Action Timer_RtdCooldownHud(Handle timer)
 {
+	bool fireworkCoolingDown;
 	for (int client = 1; client <= MaxClients; client++)
 	{
 		if (IsClientInGame(client) && !IsFakeClient(client))
+		{
 			UpdateRtdCooldownHud(client);
+			fireworkCoolingDown |= g_iLastFireworkTime[client] + g_iCvarRollInterval > GetTime();
+		}
+	}
+	if (g_bFireworkOnly && !fireworkCoolingDown)
+	{
+		g_hRtdCooldownHudTimer = null;
+		return Plugin_Stop;
 	}
 
 	return Plugin_Continue;
@@ -343,14 +348,14 @@ public Action Timer_RtdCooldownHud(Handle timer)
 
 void UpdateRtdCooldownHud(int client)
 {
-	if (g_hRollers.GetInRoll(client))
+	if (!g_bFireworkOnly && g_hRollers.GetInRoll(client))
 	{
 		// The active perk duration owns this synchronized HUD channel while rolling.
 		g_bRtdCooldownHudVisible[client] = false;
 		return;
 	}
 
-	int remaining = g_hRollers.GetLastRollTime(client) + g_iCvarRollInterval - GetTime();
+	int remaining = g_bFireworkOnly ? 0 : g_hRollers.GetLastRollTime(client) + g_iCvarRollInterval - GetTime();
 	int fireworkRemaining = g_iLastFireworkTime[client] + g_iCvarRollInterval - GetTime();
 	if (remaining <= 0 && fireworkRemaining <= 0)
 	{
@@ -414,7 +419,7 @@ public void OnAllPluginsLoaded()
 {
 #if defined _updater_included
 	g_bPluginUpdater = LibraryExists("updater");
-	if (g_bPluginUpdater)
+	if (g_bPluginUpdater && !g_bFireworkOnly)
 		Updater_AddPlugin(UPDATE_URL);
 #endif
 
@@ -433,7 +438,8 @@ public void OnLibraryAdded(const char[] sLibName)
 	if (StrEqual(sLibName, "updater"))
 	{
 		g_bPluginUpdater = true;
-		Updater_AddPlugin(UPDATE_URL);
+		if (!g_bFireworkOnly)
+			Updater_AddPlugin(UPDATE_URL);
 		return;
 	}
 #endif
@@ -485,7 +491,7 @@ public void OnLibraryRemoved(const char[] sLibName)
 #if defined _updater_included
 public Action Updater_OnPluginChecking()
 {
-	if (!g_bCvarAutoUpdate && !g_bIsUpdateForced)
+	if (g_bFireworkOnly || (!g_bCvarAutoUpdate && !g_bIsUpdateForced))
 		return Plugin_Handled;
 
 	g_bIsUpdateForced = false;
@@ -494,13 +500,15 @@ public Action Updater_OnPluginChecking()
 
 public void Updater_OnPluginUpdated()
 {
-	if (g_bCvarReloadUpdate)
+	if (!g_bFireworkOnly && g_bCvarReloadUpdate)
 		ReloadPlugin();
 }
 #endif
 
 public Action Command_RTD(const int client, const int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	if (client != 0)
 	{
 		if (args > 0)
@@ -522,6 +530,8 @@ public Action Command_RTD(const int client, const int args)
 
 public Action Command_RTDHelp(const int client, const int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	char currencyName[64];
 	GetRollCurrencyName(currencyName, sizeof(currencyName));
 
@@ -657,7 +667,7 @@ bool PurchaseFirework(int payer, int target, int cost)
 
 	// Like normal RTD, the recipient owns the cooldown. Recheck at purchase
 	// time so a stale confirmation menu cannot bypass it or charge on failure.
-	if (g_hRollers.GetInRoll(target))
+	if (!g_bFireworkOnly && g_hRollers.GetInRoll(target))
 	{
 		RTDPrint(payer, "%N is already using RTD.", target);
 		return false;
@@ -667,7 +677,21 @@ bool PurchaseFirework(int payer, int target, int cost)
 	if (!SpendFireworkCost(payer, cost))
 		return false;
 
-	ApplyPerk(target, firework, .purchasedFirework=true);
+	if (g_bFireworkOnly)
+	{
+		// Instant Firework owns no Rollers timer/history or perk subscriptions.
+		g_iLastFireworkTime[target] = GetTime();
+		if (g_hCvarEmitSound.BoolValue)
+			firework.EmitSound(target);
+		Firework_ApplyPerk(target, firework);
+		PrintToRoller(target, firework, -1);
+		PrintToNonRollers(target, firework, -1);
+		EnsureRtdCooldownHudTimer();
+	}
+	else
+	{
+		ApplyPerk(target, firework, .purchasedFirework=true);
+	}
 	return true;
 }
 
@@ -703,6 +727,8 @@ bool SpendFireworkCost(int client, int cost)
 
 public Action Command_DescMenu(const int client, const int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	if (client != 0)
 		ShowDescriptionMenu(client);
 
@@ -711,6 +737,8 @@ public Action Command_DescMenu(const int client, const int args)
 
 public Action Command_ForceRTD(const int client, const int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	if (args < 1)
 	{
 		ReplyToCommand(client, "[SM] Usage: sm_forcertd <target> [perk query] [time in seconds]");
@@ -751,6 +779,8 @@ public Action Command_ForceRTD(const int client, const int args)
 
 public Action Command_TimeRTD(const int client, const int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	if (args < 1)
 	{
 		ReplyToCommand(client, "[SM] Usage: sm_addrtdtime <target> [time to add in seconds]");
@@ -824,6 +854,8 @@ public Action Command_TimeRTD(const int client, const int args)
 
 public Action Command_RemoveRTD(int client, int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	if (args < 1)
 	{
 		ReplyToCommand(client, "[SM] Usage: sm_removertd <player> [\"reason\"]");
@@ -871,6 +903,8 @@ public Action Command_RemoveRTD(int client, int args)
 
 public Action Command_PerkSearchup(int client, int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	char sQuery[64] = "";
 	if (args > 0)
 		GetCmdArg(1, sQuery, 64);
@@ -906,11 +940,17 @@ public Action Command_Reload(int client, int args)
 	ParseCustomEffects();
 	ParseDisabledPerks();
 
-	Events.Cleanup();
-	Events.Init();
-	InitPerks();
-
-	Forward_OnRegOpen();
+	if (g_bFullRuntimeActive)
+	{
+		Events.Cleanup();
+		Events.Init();
+		InitPerks();
+		Forward_OnRegOpen();
+	}
+	else
+	{
+		InitFireworkRuntime();
+	}
 
 	ReplyToCommand(client, CONS_PREFIX ... " Configs and perks reloaded successfully.");
 
@@ -920,6 +960,8 @@ public Action Command_Reload(int client, int args)
 #if defined _updater_included
 public Action Command_Update(int client, int args)
 {
+	if (ReplyIfFullRtdDisabled(client))
+		return Plugin_Handled;
 	if (g_iCvarLogging & view_as<int>(LogFlag_Action))
 		LogAction(client, -1, "\"%L\" triggered plugin update", client);
 
@@ -1249,9 +1291,9 @@ public Action Event_RoundStart(Handle hEvent, const char[] sEventName, bool dont
 	return Plugin_Continue;
 }
 
-public void OnEntityCreated(int iEnt, const char[] sClassname)
+public void RTD_Full_EntityCreated(int iEnt, const char[] sClassname)
 {
-	if (g_iActiveEntitySpawnedSubscribers <= 0)
+	if (!g_bFullRuntimeActive || g_iActiveEntitySpawnedSubscribers <= 0)
 		return;
 
 	if (!Events.ClassnameHasSubscribers(sClassname))
@@ -1262,6 +1304,8 @@ public void OnEntityCreated(int iEnt, const char[] sClassname)
 
 public void OnEntitySpawned(const int iEnt)
 {
+	if (!g_bFullRuntimeActive)
+		return;
 	int iSpawnTime = RoundToNearest(GetEngineTime() * 1000);
 
 	// For certain entities Spawn hook fires twice for some reason
@@ -1272,32 +1316,35 @@ public void OnEntitySpawned(const int iEnt)
 	Events.EntitySpawned(iEnt);
 }
 
-public void OnGameFrame()
+public void RTD_Full_GameFrame()
 {
-	Homing_OnGameFrame();
+	if (g_bFullRuntimeActive)
+		Homing_OnGameFrame();
 }
 
-public void TF2_OnConditionAdded(int client, TFCond condition)
+public void RTD_Full_ConditionAdded(int client, TFCond condition)
 {
-	Events.ConditionAdded(client, condition);
+	if (g_bFullRuntimeActive && IsValidClient(client))
+		Events.ConditionAdded(client, condition);
 }
 
-public void TF2_OnConditionRemoved(int client, TFCond condition)
+public void RTD_Full_ConditionRemoved(int client, TFCond condition)
 {
-	Events.ConditionRemoved(client, condition);
+	if (g_bFullRuntimeActive && IsValidClient(client))
+		Events.ConditionRemoved(client, condition);
 }
 
-public Action OnPlayerRunCmd(int client, int &iButtons, int &iImpulse, float fVel[3], float fAng[3], int &iWeapon)
+public Action RTD_Full_PlayerRunCmd(int client, int &iButtons, int &iImpulse, float fVel[3], float fAng[3], int &iWeapon)
 {
-	if (!IsValidClient(client))
+	if (!g_bFullRuntimeActive || !IsValidClient(client))
 		return Plugin_Continue;
 
 	return Events.PlayerRunCmd(client, iButtons, fVel, fAng) ? Plugin_Changed : Plugin_Continue;
 }
 
-public Action TF2_CalcIsAttackCritical(int client, int iWeapon, char[] sWeaponName, bool &bResult)
+public Action RTD_Full_AttackCritical(int client, int iWeapon, char[] sWeaponName, bool &bResult)
 {
-	if (!IsValidClient(client))
+	if (!g_bFullRuntimeActive || !IsValidClient(client))
 		return Plugin_Continue;
 
 	if (!Events.AttackCritCheck(client, iWeapon))
@@ -1448,7 +1495,11 @@ void ParseDisabledPerks()
 	PerkIter iter = new PerkContainerIter(-1);
 
 	while ((++iter).Perk())
-		iter.Perk().Enabled = true;
+	{
+		char token[32];
+		iter.Perk().GetToken(token, sizeof(token));
+		iter.Perk().Enabled = !g_bFireworkOnly || StrEqual(token, "firework");
+	}
 
 	delete iter;
 
@@ -1527,6 +1578,8 @@ void FinishPerkCooldown(int client)
 
 bool RollPerkForClient(int client, int payer = 0, bool chargeCost = true)
 {
+	if (g_bFireworkOnly)
+		return false;
 	if (!IsValidClient(client))
 	{
 		if (IsValidClient(payer))
@@ -1758,6 +1811,8 @@ void GetRollCurrencyColor(char[] buffer, int maxlen)
 
 RTDForceResult ForcePerk(const int client, const char[] sQuery, const int iPerkTime=-1, const int iInitiator=0)
 {
+	if (g_bFireworkOnly)
+		return RTDForce_Blocked;
 	if (!IsValidClient(client))
 		return RTDForce_ClientInvalid;
 
@@ -1837,6 +1892,8 @@ bool GoodRoll(const int client)
 
 Perk RollPerk(const int client=0, const int iRollFlags=ROLLFLAG_NONE, const char[] sFilter="")
 {
+	if (g_bFireworkOnly)
+		return null;
 	bool bFilter = strlen(sFilter) > 0;
 	Perk perk = null;
 	PerkList candidates = g_hPerkContainer.FindPerks(sFilter);
@@ -1889,6 +1946,8 @@ Perk RollPerk(const int client=0, const int iRollFlags=ROLLFLAG_NONE, const char
 
 void ApplyPerk(const int client, Perk perk, const int iPerkTime=-1, bool purchasedFirework=false)
 {
+	if (g_bFireworkOnly)
+		return;
 	if (!IsValidClient(client))
 		return;
 
