@@ -42,6 +42,7 @@ char g_sGameMode[64] = "this map";
 Handle g_hClassStatsTimer = null;
 Handle g_hClassStateTimer = null;
 StringMap g_ClassBans = null;
+#include "persistent_immunity.sp"
 bool g_bOverhealDisabled = false;
 bool g_bOverhealUpdateQueued = false;
 bool g_bOverhealWarningShown[MAXPLAYERS + 1];
@@ -68,6 +69,7 @@ char g_sSounds[TF_CLASS_ENGINEER + 1][24] = {"", "vo/scout_no03.mp3",   "vo/snip
 void ClassLimits_OnPluginStart()
 {
     g_ClassBans = new StringMap();
+    ClassLimits_InitializePersistentImmunity();
     SetupOverhealWarningHook();
 
     CreateConVar("classlimits_version", CLASSLIMITS_VERSION, "Restrict classes in TF2.", FCVAR_NOTIFY);
@@ -202,6 +204,7 @@ void ClassLimits_OnPluginEnd()
     }
 
     delete g_ClassBans;
+    ClassLimits_ClosePersistentImmunity();
 }
 
 void ClassLimits_OnClientPutInServer(int client)
@@ -373,6 +376,7 @@ public Action ClassLimits_JoinClass(int client, const char[] command, int args)
 {
     if (client <= 0 || !IsClientInGame(client) || !g_hEnabled.BoolValue || args < 1)
         return Plugin_Continue;
+    if (ClassLimits_IsPersistentlyImmune(client)) return Plugin_Continue;
     char name[32];GetCmdArg(1, name, sizeof(name));
     int classId = TF_CLASS_UNKNOWN;
     if (StrEqual(name, "heavyweapons", false) || StrEqual(name, "heavy", false)) classId = TF_CLASS_HEAVY;
@@ -531,7 +535,9 @@ static bool IsClientClassRestricted(int client, int team, int classId, int &limi
         || classId < TF_CLASS_SCOUT || classId > TF_CLASS_ENGINEER)
         return false;
 
-    // Population bans are absolute. Otherwise every zero-score player is a
+    if (ClassLimits_IsPersistentlyImmune(client)) return false;
+
+    // Population bans are absolute for automatic/admin immunity. Otherwise every zero-score player is a
     // top scorer at round start and can bypass a configured Heavy ban.
     if (IsClientClassBanned(client, classId) || IsClassPopulationRestricted(classId))
     {
@@ -843,6 +849,7 @@ void EnforceClassPopulationLimits()
     {
         if (!IsClientInGame(client) || IsFakeClient(client) || GetClientTeam(client) < TF_TEAM_RED)
             continue;
+        if (ClassLimits_IsPersistentlyImmune(client)) continue;
         int classId = view_as<int>(TF2_GetPlayerClass(client));
         if (!IsClassPopulationRestricted(classId))
             continue;
@@ -1111,6 +1118,7 @@ static bool IsClassAvailableForClient(int client, int classId)
     {
         return true;
     }
+    if (ClassLimits_IsPersistentlyImmune(client)) return true;
     if (IsClientClassBanned(client, classId) || IsClassPopulationRestricted(classId))
     {
         return false;

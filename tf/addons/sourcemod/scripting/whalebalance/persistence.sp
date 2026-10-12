@@ -20,12 +20,18 @@ void ConnectImmunityDatabase()
 
 static void ScheduleImmunityDatabaseReconnect(float delay = DB_RECONNECT_DELAY)
 {
+    ClassLimits_InvalidateImmunityDatabase();
     g_bImmunityDbReady = false;
     g_bVolunteerDbReady = false;
     if (g_hImmunityDbReconnectTimer == null)
     {
         g_hImmunityDbReconnectTimer = CreateTimer(delay, Timer_ReconnectImmunityDatabase, _, TIMER_FLAG_NO_MAPCHANGE);
     }
+}
+
+void WhaleBalance_RequestImmunityDatabaseReconnect()
+{
+    ScheduleImmunityDatabaseReconnect(DB_RECONNECT_FAST_DELAY);
 }
 
 public Action Timer_ReconnectImmunityDatabase(Handle timer, any data)
@@ -50,6 +56,7 @@ public void SQL_OnImmunityDatabaseConnected(Database db, const char[] error, any
     }
 
     g_hImmunityDb = db;
+    ClassLimits_InvalidateImmunityDatabase();
     g_bImmunityDbReady = false;
     g_bVolunteerDbReady = false;
     g_iPersistentVolunteerCount = 0;
@@ -63,11 +70,12 @@ public void SQL_OnImmunityDatabaseConnected(Database db, const char[] error, any
     g_hImmunityDb.Query(SQL_OnImmunitySchemaReady,
         "CREATE TABLE IF NOT EXISTS autobalance_immunity ("
         ... "steamid64 VARCHAR(32) NOT NULL PRIMARY KEY, "
-        ... "immune TINYINT(1) NOT NULL DEFAULT 1)");
+        ... "immune TINYINT(1) NOT NULL DEFAULT 1)", g_iClassLimitImmunityGeneration);
 }
 
 public void SQL_OnImmunitySchemaReady(Database db, DBResultSet results, const char[] error, any data)
 {
+    if (data != g_iClassLimitImmunityGeneration) return;
     if (error[0])
     {
         LogError("[whalebalance] Immunity schema creation failed: %s", error);
@@ -85,6 +93,8 @@ public void SQL_OnImmunitySchemaReady(Database db, DBResultSet results, const ch
 
     g_hImmunityDb.Query(SQL_OnPersistentImmunityLoaded,
         "SELECT steamid64 FROM autobalance_immunity WHERE immune != 0");
+
+    ClassLimits_LoadPersistentImmunity(db);
 
     g_hImmunityDb.Query(SQL_OnVolunteerSchemaReady,
         "CREATE TABLE IF NOT EXISTS autobalance_volunteers ("
