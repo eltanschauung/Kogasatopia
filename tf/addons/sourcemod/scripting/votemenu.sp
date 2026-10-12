@@ -1526,6 +1526,12 @@ static void LoadVoteMenuConfig()
     {
         kv.GetSectionName(section, sizeof(section));
 
+        // Omit disabled entries from both menus and configured chat listeners.
+        if (GetVoteMenuConfigBool(kv, "disabled"))
+        {
+            continue;
+        }
+
         VoteOption opt;
         strcopy(opt.id, sizeof(opt.id), section);
         kv.GetString("name", opt.name, sizeof(opt.name), "");
@@ -1549,3 +1555,19 @@ static void LoadVoteMenuConfig()
 
     delete kv;
 }
+
+// Fixture-only entry points into file-private policy; absent from production.
+#if defined VOTEMENU_POLICY_TEST
+bool VoteMenu_TestConfigBool(KeyValues kv, const char[] key)
+{
+    return GetVoteMenuConfigBool(kv, key);
+}
+void VoteMenu_TestLoadConfig()
+{
+    LoadVoteMenuConfig();
+}
+int VoteMenu_TestFindVote(const char[] id)
+{
+    return FindVoteIndex(id);
+}
+#endif
