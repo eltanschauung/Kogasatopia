@@ -1,3 +1,5 @@
+#include "filters/chat_client_state.sp"
+
 static void Filters_ApplyAdminTargetAction(int client, int target, FilterAdminAction action)
 {
     switch (action)
@@ -141,8 +143,13 @@ public Action Command_Gradient(int client, int args)
 
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
 {
-    if (!client)
+    if (client == 0)
         return Plugin_Continue;
+
+    // Say can arrive while a client is connecting/disconnecting. Never enter
+    // client-indexed filtering or player-state natives for a non-ingame slot.
+    if (!Filters_IsInGameChatClient(client))
+        return Plugin_Stop;
 
     // Sliding one-second window shared by say/say_team and chat commands.
     // Check before dispatch or side effects so excess messages stop entirely.
@@ -305,22 +312,6 @@ static void LogBlacklistedMessage(int client, const char[] message, bool hasBlac
     LogToFileEx("addons/sourcemod/logs/filters_blacklist.log",
         "name=\"%s\" steamid=\"%s\" term=%d blacklisted=%d msg=\"%s\"",
         name, steamId, hasBlacklistedTerm ? 1 : 0, isBlacklistedClient ? 1 : 0, message);
-}
-
-void BuildDeathPrefix(int client, char[] deadPrefix, int length)
-{
-    if (!IsPlayerAlive(client))
-    {
-        if (GetClientTeam(client) == 1)
-        {
-            strcopy(deadPrefix, length, "{grey}*SPEC*{default} ");
-            return;
-        }
-        Format(deadPrefix, length, "*DIDDY* ");
-        return;
-    }
-
-    deadPrefix[0] = '\0';
 }
 
 bool HandleNameColorCommand(int client, const char[] sArgs)
