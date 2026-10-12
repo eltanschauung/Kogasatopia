@@ -56,6 +56,7 @@ bool g_bExecuteSwapImmediately = false;
 bool g_bSuppressSwapRespawn = false;
 bool g_bKothRedCapped = false;
 bool g_bKothBluCapped = false;
+#include "koth_timer_progress.sp"
 bool g_bPayloadStompCheckedThisRound = false;
 int g_iRoundCaptureCount = 0;
 int g_iLastFullRoundWinner = 0;
@@ -106,7 +107,7 @@ void WhaleScramble_OnPluginStart()
     g_hStackRedPayload = CreateConVar("whalescramble_stack_red_pl", "1", "Swap one highest-ranked BLU player for one lowest-ranked or unranked RED player per payload map when setup teams become ready.", _, true, 0.0, true, 1.0);
     g_hDisableTfAuto = CreateConVar("sm_whalescramble_disable_tf_auto", "1", "Disable TF2's built-in mp_scrambleteams_auto while WhaleScramble owns auto scrambles.", _, true, 0.0, true, 1.0);
     g_hShortRoundAutoSeconds = CreateConVar("sm_whalescramble_short_round_seconds", "60", "Automatically whale scramble when the previous round duration is under this many seconds. 0 disables.", _, true, 0.0, true, 600.0);
-    g_hKothNoCapAuto = CreateConVar("sm_whalescramble_koth_no_cap", "1", "Automatically whale scramble when a full KOTH round ends with either team never capturing the point.", _, true, 0.0, true, 1.0);
+    g_hKothNoCapAuto = CreateConVar("sm_whalescramble_koth_no_cap", "1", "Auto scramble after a full KOTH round if either timer used at most 20% since first capture; fall back to never-captured when timers are unavailable.", _, true, 0.0, true, 1.0);
     g_hPayloadStompFirstCapSeconds = CreateConVar("sm_whalescramble_pl_firstcap_seconds", "100", "Immediately whale scramble when BLU captures the first payload control point within this many seconds. 0 disables.", _, true, 0.0, true, 600.0);
     g_hWinStreakAuto = CreateConVar("sm_whalescramble_win_streak", "2", "Automatically whale scramble after one team wins this many full rounds in a row. 0 disables.", _, true, 0.0, true, 20.0);
     g_hNoSequentialAuto = CreateConVar("sm_whalescramble_no_sequential", "1", "Block auto scrambles from happening in consecutive rounds or more than once in one round.", _, true, 0.0, true, 1.0);
@@ -164,6 +165,9 @@ void WhaleBalance_OnLibraryRemoved(const char[] name)
 
 void WhaleScramble_OnMapStart()
 {
+    ResetKothTimerProgress();
+    g_bKothRedCapped = false;
+    g_bKothBluCapped = false;
     StopStackRedPayloadWaitTimer();
     g_bStackRedPayloadAttempted = false;
     ResetVotes();
@@ -176,6 +180,7 @@ void WhaleScramble_OnMapStart()
 
 void WhaleScramble_OnMapEnd()
 {
+    ResetKothTimerProgress();
     StopStackRedPayloadWaitTimer();
     ResetVotes();
     ClearAutoScramblePending();
@@ -503,6 +508,7 @@ public Action Timer_CheckShortRoundAutoScramble(Handle timer)
 
 public void WhaleBalance_Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+    ResetKothTimerProgress();
     g_bKothRedCapped = false;
     g_bKothBluCapped = false;
     g_bPayloadStompCheckedThisRound = false;
@@ -542,6 +548,12 @@ public void WhaleBalance_Event_PointCaptured(Event event, const char[] name, boo
     else if (team == TEAM_BLU)
     {
         g_bKothBluCapped = true;
+    }
+
+    if (g_iRoundCaptureCount == 1 && (team == TEAM_RED || team == TEAM_BLU)
+        && IsCurrentKothGamemode())
+    {
+        RecordKothFirstCaptureTimers();
     }
 
     if (team == TEAM_BLU && g_iRoundCaptureCount == 1 && !g_bPayloadStompCheckedThisRound)
@@ -604,14 +616,24 @@ static void CheckKothNoCapAutoScramble()
         return;
     }
 
-    if (g_bKothRedCapped && g_bKothBluCapped)
+    float redRemaining;
+    float bluRemaining;
+    KothTimerProgress progress = GetKothTimerProgress(redRemaining, bluRemaining);
+    bool needsScramble = KothTimerProgressNeedsScramble(progress, g_bKothRedCapped, g_bKothBluCapped);
+    LogWhale("KOTH auto scramble check: timerProgress=%d baselineRed=%.3f baselineBlu=%.3f remainingRed=%.3f remainingBlu=%.3f redCapped=%d bluCapped=%d needsScramble=%d.",
+        progress, g_flKothFirstCaptureTimes[KOTH_TIMER_RED], g_flKothFirstCaptureTimes[KOTH_TIMER_BLU],
+        redRemaining, bluRemaining, g_bKothRedCapped, g_bKothBluCapped, needsScramble);
+
+    if (!needsScramble)
     {
         return;
     }
 
-    if (TryArmAutoScrambleForNextRound("koth-no-cap"))
+    char reason[32];
+    strcopy(reason, sizeof(reason), progress == KothTimerProgress_Unavailable ? "koth-no-cap" : "koth-timer-progress");
+    if (TryArmAutoScrambleForNextRound(reason))
     {
-        LogWhale("KOTH no-cap auto scramble armed: redCapped=%d bluCapped=%d.", g_bKothRedCapped ? 1 : 0, g_bKothBluCapped ? 1 : 0);
+        LogWhale("KOTH auto scramble armed: reason=%s.", reason);
     }
 }
 
