@@ -179,7 +179,7 @@ void EngiPads_OnPluginStart()
 	
 	cvarPads[VersionNumber] = CreateConVar("pads_version", ENGIPADS_PLUGIN_VERSION, "EngiPads version number. Don't touch this!", FCVAR_NOTIFY|FCVAR_DONTRECORD|FCVAR_CHEAT);
 	g_hTeleporterMinLevel = CreateConVar(
-		"sm_teleporters_min_level", "0",
+		"sm_teleporters_min_level", "2",
 		"Minimum upgrade level for completed normal teleporters. 0 and 1 disables.",
 		FCVAR_NOTIFY, true, 0.0, true, 3.0);
 	cvarPads[PadsEnabled] = CreateConVar("pads_enabled", "1", "Enables/Disables the plugin. (2 - BoostPads only, 3 - JumpPads only)", FCVAR_NOTIFY, true, 0.0, true, 3.0);

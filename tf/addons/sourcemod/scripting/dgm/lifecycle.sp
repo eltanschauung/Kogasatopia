@@ -5,7 +5,7 @@ void DGM_OnPluginStart()
     g_cvRespawnTime = CreateConVar("respawn_time", "3.0", "Respawn time length", _, true, 0.0, true, 30.0);
     g_flDgmConfiguredRespawnTime = g_cvRespawnTime.FloatValue;
     g_cvPopulationRespawns = CreateConVar("dgm_population_respawns", "1", "Allow playercount changes to adjust respawn times.", _, true, 0.0, true, 1.0);
-    g_cvHalveRespawnWaves = CreateConVar("dgm_halve_respawn_waves", "0",
+    g_cvHalveRespawnWaves = CreateConVar("dgm_halve_respawn_waves", "1",
         "Halve TF2's calculated respawn waves when reduced respawns are requested; preserve death/freezecam.",
         _, true, 0.0, true, 1.0);
     g_cvHalveRespawnWaves.AddChangeHook(DGM_ConVarChangeNativeWaves);

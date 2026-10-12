@@ -88,7 +88,7 @@ void ClassLimits_OnPluginStart()
     );
     g_hDisableOverhealMedicImbalance = CreateConVar(
         "disable_overheal_medic_imbalance",
-        "0",
+        "1",
         "Disable overheal while exactly one team has a Medic.",
         _,
         true,

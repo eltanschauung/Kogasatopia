@@ -31,7 +31,7 @@ public void OnPluginStart()
     }
 
     g_CvarDatabase = CreateConVar("sm_bonuspoints_transactions_database", BP_TRANS_DB_CONFIG_DEFAULT, "Databases.cfg entry for bonuspoints_transactions.");
-    g_CvarEventLogging = CreateConVar("sm_points_store_event_logging", "1", "Write structured currency economy events through plugin statistics.", _, true, 0.0, true, 1.0);
+    g_CvarEventLogging = CreateConVar("sm_points_store_event_logging", "0", "Write structured currency economy events through plugin statistics.", _, true, 0.0, true, 1.0);
     g_CvarLogRandomMisses = CreateConVar("sm_points_store_log_random_misses", "0", "Log failed random-chance currency rolls when event logging is enabled.", _, true, 0.0, true, 1.0);
     g_CvarCurrencyShort = CreateConVar("sm_points_store_currency_short", "Gems", "Short currency label used in compact messages, e.g. BP or Gem.");
     g_CvarCurrencyLong = CreateConVar("sm_points_store_currency_long", "Gems", "Long currency label used in menus and prose, e.g. Bonus Points or Gems.");

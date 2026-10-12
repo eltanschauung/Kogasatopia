@@ -75,12 +75,12 @@ static void Filters_CreateConVars()
     g_hChatFrontend = CreateConVar("filters_chat_frontend", "1", "Show frontend chat to all clients; blacklist level 3 clients still receive it when disabled");
     g_hCrossServerTag = CreateConVar("sm_filters_cross_sv_tag", "none", "Label stamped on database chat and shown when relayed to another server; none disables it.");
     g_hWebchatParsee = CreateConVar("sm_filters_webchat_parsee", "0", "If 1, render all webchat messages as Parsee in-game without changing frontend chat.", _, true, 0.0, true, 1.0);
-    g_hFiltersEnabled = CreateConVar("filters", "0", "If 0, blacklist word matching is disabled.");
+    g_hFiltersEnabled = CreateConVar("filters", "1", "If 0, blacklist word matching is disabled.");
     g_hRedlistEnabled = CreateConVar("redlist", "0", "Enable/Disable redlist features.", _, true, 0.0, true, 1.0);
     g_hBlacklistMinLen = CreateConVar("filters_blacklist_minlen", "8", "Minimum message length to check blacklist words.");
     g_hFiltersChristmas = CreateConVar("filters_christmas", "0", "If 1, red chat is {axis} and blue chat is {green}.");
     g_hFiltersTeamChat = CreateConVar("teamchat", "0", "If 1, normal chat is sent to the sender's team only.");
-    g_hPChat = CreateConVar("sm_pchat", "1", "If 0, filtered/monitored chat is only printed to server console and not shown to whitelisted clients.", _, true, 0.0, true, 1.0);
+    g_hPChat = CreateConVar("sm_pchat", "0", "If 0, filtered/monitored chat is only printed to server console and not shown to whitelisted clients.", _, true, 0.0, true, 1.0);
     g_hMuteDeafenEnabled = CreateConVar("sm_filters_mute_deafen", "0", "If 1, clients who mute another connected player cannot hear voice chat or send chat until no connected players are muted.", _, true, 0.0, true, 1.0);
     g_hFiltersAlltalk = CreateConVar("sm_filters_alltalk", "0", "If 1, human clients can only hear voice from their randomly assigned group (1 or 2), subject to existing voice restrictions.", _, true, 0.0, true, 1.0);
     g_hParseeEnabled = CreateConVar("sm_filters_parsee", "0", "Enable Parsee archived messages and webchat impersonation.", _, true, 0.0, true, 1.0);

@@ -1,6 +1,6 @@
 # Respawn Modes
 
-`dgm_halve_respawn_waves` defaults to `0`; server.cfg enables it with `1`.
+`dgm_halve_respawn_waves` defaults to `1`.
 It changes how DGM's reduced-respawn state works, not the existing
 population/setup/admin policies which select that state.
 
