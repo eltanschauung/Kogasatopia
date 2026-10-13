@@ -6,13 +6,9 @@
 /**
  * Native extension backing [TF2] Sentry NewTarget Distance.
  */
-public Extension __ext_tf2_sentry_newtarget_dist =
-{
-    name = "tf2_sentry_newtarget_dist",
-    file = "tf2_sentry_newtarget_dist.ext",
-    autoload = 1,
-    required = 1,
-};
+
+#include <weapons_ext_dependency>
+
 
 /**
  * Enables or disables the native FindTarget() range override.

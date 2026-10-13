@@ -1,0 +1,34 @@
+import os
+project = builder.LibraryProject('weapons_ext')
+root = Extension.sm_root
+hooks = os.path.join(root, 'public', 'safetyhook')
+project.sources += [
+    'extension.cpp',
+    'items/extension.cpp',
+    'tf2tools/extension.cpp', 'tf2tools/natives.cpp', 'tf2tools/RegNatives.cpp',
+    'tf2tools/util.cpp', 'tf2tools/criticals.cpp', 'tf2tools/holiday.cpp',
+    'tf2tools/teleporter.cpp', 'tf2tools/gameplayrules.cpp', 'tf2tools/conditions.cpp',
+    'conch/extension.cpp', 'pellets/extension.cpp', 'spread/extension.cpp',
+    'whitelist/extension.cpp', 'sentry/extension.cpp', 'sentry/natives.cpp',
+    'sentry/range_override.cpp',
+    os.path.join(root, 'public', 'smsdk_ext.cpp'),
+    os.path.join(root, 'public', 'CDetour', 'detours.cpp'),
+]
+for unit in ('allocator', 'easy', 'inline_hook', 'mid_hook', 'utility', 'vmt_hook', 'os.linux'):
+    project.sources.append(os.path.join(hooks, 'src', unit + '.cpp'))
+project.sources.append(os.path.join(hooks, 'zydis', 'Zydis.c'))
+
+for sdk_name in Extension.sdks:
+    sdk = Extension.sdks[sdk_name]
+    if sdk['name'] != 'tf2': continue
+    for cxx in builder.targets:
+        if cxx.target.arch != 'x86' or cxx.target.platform != 'linux':
+            raise Exception('The imported TF2Items econ layout is Linux x86 only')
+        binary = Extension.HL2ExtConfig(project, builder, cxx, 'weapons_ext.ext.' + sdk['extension'], sdk)
+        binary.compiler.cxxincludes += [os.path.join(hooks, 'include'), os.path.join(hooks, 'zydis')]
+        binary.compiler.includes += [os.path.join(hooks, 'zydis')]
+        binary.compiler.cxxflags += ['-Wno-invalid-offsetof', '-Wno-deprecated-copy', '-fno-sized-deallocation']
+        binary.compiler.defines += ['HAVE_STRING_H']
+        binary.compiler.cflags = [flag for flag in binary.compiler.cflags if flag != '-Wno-nontrivial-memcall']
+        binary.compiler.cxxflags = [flag for flag in binary.compiler.cxxflags if flag != '-Wno-nontrivial-memcall']
+Extension.extensions += builder.Add(project)

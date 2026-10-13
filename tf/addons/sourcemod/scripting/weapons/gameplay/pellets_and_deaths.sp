@@ -10,7 +10,7 @@ void ScatterPellets_Debug(const char[] format, any ...)
 
 public Action Command_ScatterPelletsStatus(int client, int args)
 {
-	ReplyToCommand(client, "[Weapons] scattergun_pellets extension: %s", LibraryExists("scattergun_pellets") ? "available" : "unavailable");
+	ReplyToCommand(client, "[Weapons] weapons_ext pellet tracking: %s", LibraryExists("weapons_ext") ? "available" : "unavailable");
 
 	if (Accuracy_IsValidClient(client))
 	{

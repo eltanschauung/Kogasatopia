@@ -3,7 +3,7 @@
 
 #include <sourcemod>
 
-#include <tf2_sentry_newtarget_dist>
+#include <weapons_ext>
 
 #define PLUGIN_VERSION "1.1.0"
 

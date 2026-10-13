@@ -7,11 +7,10 @@
 #include <sdkhooks>
 #include <sdktools>
 #include <sdktools_sound>
-#include <tf2>
+#include <weapons_ext>
 #include <tf2utils>
 #include <tf_econ_data>
 #include <tf2attributes>
-#include <tf2items>
 #include <tf2_stocks>
 #include <tf_ontakedamage>
 #include <morecolors>
@@ -24,14 +23,6 @@
 #include <stocksoup/tf/econ>
 #include <stocksoup/tf/entity_prop_stocks>
 #include <stocksoup/tf/weapon>
-
-#undef REQUIRE_EXTENSIONS
-#include <tf2_spread_patterns>
-#define REQUIRE_EXTENSIONS
-
-#undef REQUIRE_EXTENSIONS
-#include <scattergun_pellets>
-#define REQUIRE_EXTENSIONS
 
 #undef REQUIRE_PLUGIN
 #include <dgm_api>

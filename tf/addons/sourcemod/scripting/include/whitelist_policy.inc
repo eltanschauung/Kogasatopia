@@ -30,9 +30,5 @@ native void WeaponsLoadout_Unbind();
 native void WeaponsLoadout_PublishSelection(int client, int playerClass, const bool selected[7]);
 native void WeaponsLoadout_InvalidateClient(int client);
 native void WeaponsLoadout_GetStats(int stats[6]);
-public Extension __ext_whitelist_policy = {
-    name = "TF2 Whitelist Policy",
-    file = "whitelist_policy.ext",
-    autoload = 1,
-    required = 1
-};
+
+#include <weapons_ext_dependency>

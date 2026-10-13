@@ -38,24 +38,5 @@ native bool TF2Scatter_IsCurrentShotFull(int attacker, int victim, int weapon);
  */
 native void TF2Scatter_SetWeaponPelletCount(int weapon, int pelletsFired);
 
-public Extension __ext_scattergun_pellets =
-{
-	name = "Scattergun Pellets",
-	file = "scattergun_pellets.ext.2.tf2",
-	autoload = 1,
-#if defined REQUIRE_EXTENSIONS
-	required = 1,
-#else
-	required = 0,
-#endif
-};
 
-#if !defined REQUIRE_EXTENSIONS
-public void __ext_scattergun_pellets_SetNTVOptional()
-{
-	MarkNativeAsOptional("TF2Scatter_GetLastKillPellets");
-	MarkNativeAsOptional("TF2Scatter_WasLastKillFull");
-	MarkNativeAsOptional("TF2Scatter_IsCurrentShotFull");
-	MarkNativeAsOptional("TF2Scatter_SetWeaponPelletCount");
-}
-#endif
+#include <weapons_ext_dependency>

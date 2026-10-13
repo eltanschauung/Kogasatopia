@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Inspired by Sappykun's whitelist enabler plugin.
-#include <whitelist_policy>
+#include <weapons_ext>
 
 bool g_WeaponsWhitelistNoticePending[MAXPLAYERS + 1];
 WhitelistPolicyReason g_WeaponsWhitelistNoticeReason[MAXPLAYERS + 1];

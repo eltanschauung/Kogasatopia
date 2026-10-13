@@ -1,0 +1,7 @@
+/build/
+*.so
+*.smx
+*.o
+*.d
+__pycache__/
+*.private.log

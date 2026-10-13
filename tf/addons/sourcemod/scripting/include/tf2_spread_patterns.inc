@@ -34,24 +34,5 @@ native bool TF2Spread_IsAmbassadorAccuracyRecovered(int weapon);
  */
 native void TF2Weapon_SetPunchAngle(int weapon, bool enabled, int amount, bool consistent);
 
-public Extension __ext_tf2_spread_patterns =
-{
-	name = "TF2 Spread Patterns",
-	file = "tf2_spread_patterns.ext.2.tf2",
-	autoload = 1,
-#if defined REQUIRE_EXTENSIONS
-	required = 1,
-#else
-	required = 0,
-#endif
-};
 
-#if !defined REQUIRE_EXTENSIONS
-public void __ext_tf2_spread_patterns_SetNTVOptional()
-{
-	MarkNativeAsOptional("TF2Spread_SetPattern");
-	MarkNativeAsOptional("TF2Spread_SetAmbassadorAccuracy");
-	MarkNativeAsOptional("TF2Spread_IsAmbassadorAccuracyRecovered");
-	MarkNativeAsOptional("TF2Weapon_SetPunchAngle");
-}
-#endif
+#include <weapons_ext_dependency>

@@ -4,7 +4,7 @@
 #pragma newdecls required
 #include <sourcemod>
 #include <tf_econ_data>
-#include <whitelist_policy>
+#include <weapons_ext>
 public Plugin myinfo = {
     name = "TF2 Whitelist Policy",
     author = "Hombre",

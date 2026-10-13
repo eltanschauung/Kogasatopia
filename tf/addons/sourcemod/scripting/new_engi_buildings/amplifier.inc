@@ -22,7 +22,7 @@
 #undef REQUIRE_PLUGIN
 #include <tf_custom_attributes>
 #define REQUIRE_PLUGIN
-#include <conch_no_speed>
+#include <weapons_ext>
 
 #include <client_validation>
 
