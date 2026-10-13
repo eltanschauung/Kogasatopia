@@ -48,6 +48,9 @@ The canonical includes are in `tf/addons/sourcemod/scripting/include` in the
 Kogasatopia repository. The TF2 core include is intentionally overridden too;
 indirect consumers such as `tf2_stocks` must not retain `game.tf2.ext` metadata.
 SourceMod package upgrades must preserve/reapply this repository's includes.
+The dependency's file key is `weapons_ext.ext`, matching `weapons_ext.autoload`.
+SourceMod resolves the engine suffix itself. An explicit `.2.tf2` dependency
+creates a second owner for the same DSO and invalidates handle identities.
 
 All existing gamedata filenames are retained to preserve their updater/ABI
 ownership. This is not a compatibility extension. TF2Tools reads `sm-tf2.games`
@@ -106,6 +109,13 @@ reentrancy, hash collisions, disconnection and client reuse, plus the existing
 576 whitelist checks, 284 transaction/loadout-cache checks and shared-vtable
 lifetime tests. `tests/runtime_probe.sp` is a console-only, isolated-server
 probe, not a permanent production plugin. Never point tests at production DBs.
+
+The expanded probe checks weapon/wearable creation with exactly one generation
+forward, condition behavior, spread/pellet/sentry API bindings, native econ-view
+identity, nested inventory caching/invalidation/deleted-entity handling, and
+exactly one shared-critical callback. It passed 32 checks in the isolated x86
+server on 2026-10-13. This is native API validation, not a full production
+Weapons/custom-hats visual test or a measured A/B performance improvement.
 
 ## Provenance and license
 

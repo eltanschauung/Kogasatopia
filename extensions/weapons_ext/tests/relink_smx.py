@@ -49,7 +49,7 @@ def relink(source, output):
     names_index,native_table,native_size=sections['.natives']
     before_natives=bytes(image[native_table:native_table+native_size])
     address,oldvalues=candidates[0]
-    name=b'weapons_ext\0';file=b'weapons_ext.ext.2.tf2\0'
+    name=b'weapons_ext\0';file=b'weapons_ext.ext\0'
     append=name+file
     append+=b'\0'*((-len(append))%4)
     struct.pack_into('<IIII',image,data+start+address,datasize,datasize+len(name),1,oldvalues[3])
@@ -69,7 +69,7 @@ def relink(source, output):
     struct.pack_into('<IHBIIBII',result,0,*header)
     output.write_bytes(result)
     after=extension_dependencies(output)
-    assert not has_legacy(after) and sum(d['file']=='weapons_ext.ext.2.tf2' for d in after)==1
+    assert not has_legacy(after) and sum(d['file']=='weapons_ext.ext' for d in after)==1
     new_code=code+len(append) if code>=insertion else code
     new_natives=native_table+len(append) if native_table>=insertion else native_table
     assert hashlib.sha256(image[new_code:new_code+code_size]).digest()==before_code

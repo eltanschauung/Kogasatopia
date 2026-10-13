@@ -16,11 +16,12 @@ parser.add_argument('--whaletracker', required=True, type=Path)
 parser.add_argument('--nativevotes', required=True, type=Path)
 parser.add_argument('--output', required=True, type=Path)
 parser.add_argument('--overlays', type=Path)
+parser.add_argument('--api-includes', type=Path, help='Canonical unified headers when building another checkout or dirty source snapshot')
 parser.add_argument('--relink-unbuildable', action='store_true', help='Relink one dependency in missing/unbuildable third-party binaries; preserve bytecode')
 args=parser.parse_args()
 root=Path(__file__).resolve().parent
-api_includes=root/'include'
-if not api_includes.is_dir():api_includes=args.kogasatopia/'tf/addons/sourcemod/scripting/include'
+api_includes=args.api_includes or root/'include'
+if not api_includes.is_dir():api_includes=root.parents[1]/'tf/addons/sourcemod/scripting/include'
 api_headers=('tf2.inc','tf2items.inc','conch_no_speed.inc','scattergun_pellets.inc',
              'tf2_spread_patterns.inc','whitelist_policy.inc','tf2_sentry_newtarget_dist.inc',
              'weapons_ext.inc','weapons_ext_dependency.inc')
@@ -68,6 +69,7 @@ plugins=[p for p in sorted(args.server_plugins.glob('*.smx'))
 helper=args.server_plugins/'disabled/rtd_full_events.smx'
 if helper.is_file() and metadata.has_legacy(metadata.extension_dependencies(helper)):plugins.append(helper)
 results=[]
+third_party={'centerprojectiles','hwn_cosmetic_enabler','mge','tf-bhop','tf2utils'}
 for binary in plugins:
     name=binary.stem
     source=None
@@ -76,7 +78,7 @@ for binary in plugins:
         if candidate.is_file():source=candidate;break
     if source is None and name=='rtd_full_events':source=snapshots['kogasatopia']/'rtd/full_events.sp'
     if source is None or not source.is_file():
-        if args.relink_unbuildable:
+        if args.relink_unbuildable and name in third_party:
             deps=relink(binary,args.output/(name+'.smx'))
             row={'plugin':binary.name,'status':'dependency_relinked','bytecode_unchanged':True}
             results.append(row);print(json.dumps(row),flush=True);continue
@@ -90,13 +92,13 @@ for binary in plugins:
     log=args.output/(name+'.compile.private.log')
     log.write_text(proc.stdout+proc.stderr);log.chmod(0o600)
     row={'plugin':binary.name,'status':'compiled' if proc.returncode==0 else 'compile_failed'}
-    if proc.returncode and args.relink_unbuildable:
+    if proc.returncode and args.relink_unbuildable and name in third_party:
         if output.exists():output.unlink()
         deps=relink(binary,output)
         row={'plugin':binary.name,'status':'dependency_relinked','bytecode_unchanged':True}
     if not proc.returncode:
         deps=metadata.extension_dependencies(output)
-        if metadata.has_legacy(deps) or sum(d['file']=='weapons_ext.ext.2.tf2' for d in deps)!=1:
+        if metadata.has_legacy(deps) or sum(d['file']=='weapons_ext.ext' for d in deps)!=1:
             row['status']='metadata_failed'
         row['extensions']=[d['file'] for d in deps if d['file']!='core']
     results.append(row)

@@ -11,6 +11,10 @@ int g_Checks;
 int g_Bot;
 int g_Item = INVALID_ENT_REFERENCE;
 int g_Generated;
+Handle g_GetLoadout;
+Handle g_CriticalHelper;
+int g_CriticalProbeWeapon = -1;
+int g_CriticalCalls;
 
 public Plugin myinfo = {
     name = "Weapons Extension Isolated Probe", author = "Hombre",
@@ -20,6 +24,22 @@ public Plugin myinfo = {
 public void OnPluginStart()
 {
     RegAdminCmd("sm_weapons_ext_probe", Probe, ADMFLAG_ROOT);
+    GameData data = new GameData("tf2.whitelist_policy");
+    StartPrepSDKCall(SDKCall_Raw);
+    PrepSDKCall_SetFromConf(data, SDKConf_Signature, "GetLoadoutItem");
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+    PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+    g_GetLoadout = EndPrepSDKCall();
+    delete data;
+    data = new GameData("sm-tf2.games");
+    StartPrepSDKCall(SDKCall_Entity);
+    PrepSDKCall_SetVirtual(data.GetOffset("CalcIsAttackCriticalHelper"));
+    PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
+    g_CriticalHelper = EndPrepSDKCall();
+    delete data;
+    if (!g_GetLoadout || !g_CriticalHelper) SetFailState("Probe SDK bindings unavailable");
 }
 
 void Check(bool result, const char[] label)
@@ -73,7 +93,9 @@ public Action RunChecks(Handle timer, int userid)
     TF2Items_SetNumAttributes(item, 1);
     TF2Items_SetAttribute(item, 0, 1, 1.0);
     Check(TF2Items_GetItemIndex(item) == 10 && TF2Items_GetLevel(item) == 10, "item handle properties");
+    int generatedBefore = g_Generated;
     int weapon = TF2Items_GiveNamedItem(bot, item);
+    Check(g_Generated == generatedBefore + 1, "one post forward per native weapon generation");
     delete item;
     Check(weapon > MaxClients && IsValidEntity(weapon), "native item generation");
     if (weapon > MaxClients && IsValidEntity(weapon)) {
@@ -97,7 +119,9 @@ public Action RunChecks(Handle timer, int userid)
     TF2Items_SetQuality(hat, 6);
     TF2Items_SetLevel(hat, 10);
     TF2Items_SetNumAttributes(hat, 0);
+    generatedBefore = g_Generated;
     int wearable = TF2Items_GiveNamedItem(bot, hat);
+    Check(g_Generated == generatedBefore + 1, "one post forward per native wearable generation");
     delete hat;
     Check(wearable > MaxClients && IsValidEntity(wearable), "native wearable generation");
     if (wearable > MaxClients && IsValidEntity(wearable)) {
@@ -128,6 +152,15 @@ public Action RunChecks(Handle timer, int userid)
     Check(stats[0] == 1 && stats[1] > 0, "whitelist policy commit");
     int loadoutStats[6]; WeaponsLoadout_GetStats(loadoutStats);
     Check(loadoutStats[1] == 0, "no production resolver owner");
+    if (weapon > MaxClients && IsValidEntity(weapon)) RunLoadoutChecks(bot, weapon);
+    int primary = GetPlayerWeaponSlot(bot, 0);
+    if (primary > MaxClients && IsValidEntity(primary)) {
+        g_CriticalProbeWeapon = primary;
+        g_CriticalCalls = 0;
+        Check(view_as<bool>(SDKCall(g_CriticalHelper, primary)), "shared critical hook can override helper");
+        Check(g_CriticalCalls == 1, "one critical callback per helper invocation");
+        g_CriticalProbeWeapon = -1;
+    }
     PrintToServer("[WeaponsExtProbe] %d checks, %d failures. Feature API calls completed.", g_Checks, g_Failures);
     Cleanup();
     return Plugin_Stop;
@@ -141,7 +174,67 @@ public int TF2Items_OnGiveNamedItem_Post(int client, char[] classname, int defin
 
 public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] classname, bool &critical)
 {
+    if (client == g_Bot && weapon == g_CriticalProbeWeapon) {
+        g_CriticalCalls++;
+        critical = true;
+        return Plugin_Changed;
+    }
     return Plugin_Continue;
+}
+
+// Demand-driven condition setup must use TF2Tools' own gamedata even though
+// the seven components share one CDetour runtime. Calls are no-ops here.
+public void TF2_OnConditionAdded(int client, TFCond condition) {}
+public void TF2_OnConditionRemoved(int client, TFCond condition) {}
+
+public int ResolveProbeLoadout(int client, int playerClass, int slot)
+{
+    if (client == g_Bot && playerClass == view_as<int>(TFClass_Soldier) && slot == 1)
+        return g_Item;
+    return INVALID_ENT_REFERENCE;
+}
+public void ProbePolicyNotice(int client, WhitelistPolicyReason reason) {}
+
+void RunLoadoutChecks(int bot, int weapon)
+{
+    WeaponsLoadout_Bind(ResolveProbeLoadout, ProbePolicyNotice);
+    bool selected[7];
+    selected[1] = true;
+    WeaponsLoadout_PublishSelection(bot, view_as<int>(TFClass_Soldier), selected);
+    Address expected = GetEntityAddress(weapon) + view_as<Address>(GetEntSendPropOffs(weapon, "m_Item", true));
+    int before[6], after[6];
+    WeaponsLoadout_GetStats(before);
+    WhitelistPolicy_BeginInventory(bot);
+    WhitelistPolicy_BeginInventory(bot);
+    bool allMatched = true;
+    for (int lookup = 0; lookup < 10; lookup++) {
+        if (view_as<Address>(SDKCall(g_GetLoadout, GetEntityAddress(bot), TFClass_Soldier, 1, false)) != expected)
+            allMatched = false;
+    }
+    Check(allMatched, "native loadout returns the actual weapon econ view");
+    WhitelistPolicy_EndInventory(bot);
+    Check(view_as<Address>(SDKCall(g_GetLoadout, GetEntityAddress(bot), TFClass_Soldier, 1, false)) == expected,
+          "nested inventory end retains cache");
+    WeaponsLoadout_GetStats(after);
+    Check(after[3] - before[3] == 1 && after[4] - before[4] == 10, "one resolver call plus ten cache hits");
+    WhitelistPolicy_EndInventory(bot);
+    WeaponsLoadout_GetStats(before);
+    SDKCall(g_GetLoadout, GetEntityAddress(bot), TFClass_Soldier, 1, false);
+    SDKCall(g_GetLoadout, GetEntityAddress(bot), TFClass_Soldier, 1, false);
+    WeaponsLoadout_GetStats(after);
+    Check(after[3] - before[3] == 2, "no cache reuse outside an inventory transaction");
+    WhitelistPolicy_BeginInventory(bot);
+    WeaponsLoadout_InvalidateClient(bot);
+    Check(view_as<Address>(SDKCall(g_GetLoadout, GetEntityAddress(bot), TFClass_Soldier, 1, false)) == expected,
+          "explicit invalidation refreshes loadout");
+    RemoveEntity(weapon);
+    g_Item = INVALID_ENT_REFERENCE;
+    Check(view_as<Address>(SDKCall(g_GetLoadout, GetEntityAddress(bot), TFClass_Soldier, 1, false)) != expected,
+          "deleted entity is not returned from cache");
+    WhitelistPolicy_EndInventory(bot);
+    WeaponsLoadout_Unbind();
+    WeaponsLoadout_GetStats(after);
+    Check(after[1] == 0, "probe resolver ownership released");
 }
 
 void Cleanup()
@@ -153,4 +246,10 @@ void Cleanup()
     g_Bot = 0;
 }
 
-public void OnPluginEnd() { Cleanup(); }
+public void OnPluginEnd()
+{
+    WeaponsLoadout_Unbind();
+    Cleanup();
+    delete g_GetLoadout;
+    delete g_CriticalHelper;
+}

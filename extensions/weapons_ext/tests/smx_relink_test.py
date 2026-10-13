@@ -3,8 +3,14 @@ import struct
 import tempfile
 from pathlib import Path
 import zlib
+import re
 from relink_smx import relink
 from smx_dependencies import extension_dependencies
+
+# SourceMod keys extension owners by the requested name, not the resulting
+# physical DSO. The .autoload marker uses this unsuffixed key too.
+header=Path(__file__).resolve().parents[3]/'tf/addons/sourcemod/scripting/include/weapons_ext_dependency.inc'
+assert re.search(r'file\s*=\s*"weapons_ext\.ext"\s*,',header.read_text()), 'Dependency must match autoload owner; never spell the engine suffix here'
 
 def fixture(compressed, data_first):
     names=b'__ext_tf2\0ExampleNative\0'
@@ -39,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='weapons-ext-smx-') as directory:
             source.write_bytes(initial)
             relink(source,target)
             assert source.read_bytes()==initial
-            assert extension_dependencies(target)==[{'file':'weapons_ext.ext.2.tf2','required':True,'autoload':True}]
+            assert extension_dependencies(target)==[{'file':'weapons_ext.ext','required':True,'autoload':True}]
             try:relink(source,target)
             except AssertionError:pass
             else:raise AssertionError('Output overwrite was not rejected')

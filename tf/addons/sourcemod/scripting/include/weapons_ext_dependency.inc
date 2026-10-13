@@ -6,7 +6,9 @@
 
 public Extension __ext_weapons_ext = {
     name = "weapons_ext",
-    file = "weapons_ext.ext.2.tf2",
+    // Match the autoload marker's canonical key. SourceMod selects the
+    // engine-specific binary; spelling that suffix here loads the DSO twice.
+    file = "weapons_ext.ext",
     autoload = 1,
 #if defined REQUIRE_EXTENSIONS
     required = 1

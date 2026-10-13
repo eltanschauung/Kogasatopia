@@ -458,7 +458,12 @@ bool TF2Items::SDK_OnLoad(char *error, size_t maxlen, bool late) {
 	sharesys->AddNatives(myself, g_ExtensionNatives);
 
 	// Create handles
-	g_ScriptedItemOverrideHandleType = g_pHandleSys->CreateType("TF2ItemType", &g_ScriptedItemOverrideHandler, 0, NULL, NULL, myself->GetIdentity(), NULL);
+	HandleError typeError = HandleError_None;
+	g_ScriptedItemOverrideHandleType = g_pHandleSys->CreateType("TF2ItemType", &g_ScriptedItemOverrideHandler, 0, NULL, NULL, myself->GetIdentity(), &typeError);
+	if (!g_ScriptedItemOverrideHandleType) {
+		snprintf(error, maxlen, "TF2Items handle type registration failed (error %d)", typeError);
+		return false;
+	}
 
 	// Create forwards
 	g_pForwardGiveItem = g_pForwards->CreateForward("TF2Items_OnGiveNamedItem", ET_Hook, 4, NULL, Param_Cell, Param_String, Param_Cell, Param_CellByRef);
@@ -677,6 +682,7 @@ static cell_t TF2Items_CreateItem(IPluginContext *pContext, const cell_t *params
 
 	if (!retHandle)
 	{
+		delete pScriptedItemOverride;
 		return pContext->ThrowNativeError("TF2ItemType handle not created (error %d)", hndlError);
 	} else {
 		return retHandle;
