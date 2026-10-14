@@ -1,5 +1,5 @@
 plugin_statistics_database_explanation.txt
-docs/
+/docs/
 tools/live_config_sync*.log
 extensions/*/src/build/
 tf/addons/sourcemod/scripting/compiled/
