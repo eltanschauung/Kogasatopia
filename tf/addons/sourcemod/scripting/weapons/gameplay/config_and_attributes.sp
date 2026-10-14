@@ -261,7 +261,7 @@ static void WeaponsGameplay_ApplyAttributeSection(int entity, const char[] secti
 				}
 				else
 				{
-					TF2Attrib_SetByName(entity, attr, StringToFloat(value));
+					WeaponsAttrib_SetByName(entity, attr, StringToFloat(value));
 				}
 			}
 		}
@@ -346,7 +346,7 @@ void WeaponsGameplay_ApplyPrimaryClipBonusFromLoadout(int client)
 	if (bonus <= 0.0)
 		return;
 
-	TF2Attrib_SetByName(primary, ATTR_CLIP_SIZE_BONUS, bonus);
+	WeaponsAttrib_SetByName(primary, ATTR_CLIP_SIZE_BONUS, bonus);
 }
 
 static float WeaponsGameplay_GetPipebombDecreaseFromLoadout(int client)
@@ -375,7 +375,7 @@ void WeaponsGameplay_ClearPipebombWearerAttribute(int client)
 	{
 		if (g_bPipebombWearerHadBaseAttribute[client])
 		{
-			TF2Attrib_SetByName(
+			WeaponsAttrib_SetByName(
 				secondary,
 				ATTR_MAX_PIPEBOMBS_DECREASED,
 				g_flPipebombWearerBaseAttribute[client]
@@ -383,7 +383,7 @@ void WeaponsGameplay_ClearPipebombWearerAttribute(int client)
 		}
 		else
 		{
-			TF2Attrib_RemoveByName(secondary, ATTR_MAX_PIPEBOMBS_DECREASED);
+			WeaponsAttrib_RemoveByName(secondary, ATTR_MAX_PIPEBOMBS_DECREASED);
 		}
 	}
 
@@ -414,7 +414,7 @@ void WeaponsGameplay_ApplyPipebombDecreaseFromLoadout(int client)
 
 	if (g_iPipebombWearerSecondaryRef[client] == INVALID_ENT_REFERENCE)
 	{
-		Address baseAttribute = TF2Attrib_GetByName(
+		Address baseAttribute = WeaponsAttrib_GetByName(
 			secondary,
 			ATTR_MAX_PIPEBOMBS_DECREASED
 		);
@@ -422,8 +422,8 @@ void WeaponsGameplay_ApplyPipebombDecreaseFromLoadout(int client)
 		g_iPipebombWearerSecondaryRef[client] = EntIndexToEntRef(secondary);
 		g_bPipebombWearerHadBaseAttribute[client] = baseAttribute != Address_Null;
 		g_flPipebombWearerBaseAttribute[client] =
-			baseAttribute != Address_Null ? TF2Attrib_GetValue(baseAttribute) : 0.0;
-		g_flPipebombWearerBaseEffectiveAttribute[client] = TF2Attrib_HookValueFloat(
+			baseAttribute != Address_Null ? WeaponsAttrib_GetValue(baseAttribute) : 0.0;
+		g_flPipebombWearerBaseEffectiveAttribute[client] = WeaponsAttrib_HookValueFloat(
 			0.0,
 			ATTR_CLASS_MAX_PIPEBOMBS_DECREASED,
 			secondary
@@ -437,7 +437,7 @@ void WeaponsGameplay_ApplyPipebombDecreaseFromLoadout(int client)
 		decrease += MIN_MAX_PIPEBOMBS_ATTRIBUTE - effectiveAttribute;
 	}
 
-	TF2Attrib_SetByName(
+	WeaponsAttrib_SetByName(
 		secondary,
 		ATTR_MAX_PIPEBOMBS_DECREASED,
 		g_flPipebombWearerBaseAttribute[client] + decrease
@@ -478,7 +478,7 @@ void WeaponsGameplay_ClearStickyFizzleWearerAttribute(int client)
 	{
 		if (g_bStickyFizzleWearerHadBaseAttribute[client])
 		{
-			TF2Attrib_SetByName(
+			WeaponsAttrib_SetByName(
 				secondary,
 				ATTR_STICKYBOMB_FIZZLE_TIME,
 				g_flStickyFizzleWearerBaseAttribute[client]
@@ -486,7 +486,7 @@ void WeaponsGameplay_ClearStickyFizzleWearerAttribute(int client)
 		}
 		else
 		{
-			TF2Attrib_RemoveByName(secondary, ATTR_STICKYBOMB_FIZZLE_TIME);
+			WeaponsAttrib_RemoveByName(secondary, ATTR_STICKYBOMB_FIZZLE_TIME);
 		}
 	}
 
@@ -516,7 +516,7 @@ void WeaponsGameplay_ApplyStickyFizzleTimeFromLoadout(int client)
 
 	if (g_iStickyFizzleWearerSecondaryRef[client] == INVALID_ENT_REFERENCE)
 	{
-		Address baseAttribute = TF2Attrib_GetByName(
+		Address baseAttribute = WeaponsAttrib_GetByName(
 			secondary,
 			ATTR_STICKYBOMB_FIZZLE_TIME
 		);
@@ -524,9 +524,9 @@ void WeaponsGameplay_ApplyStickyFizzleTimeFromLoadout(int client)
 		g_iStickyFizzleWearerSecondaryRef[client] = EntIndexToEntRef(secondary);
 		g_bStickyFizzleWearerHadBaseAttribute[client] = baseAttribute != Address_Null;
 		g_flStickyFizzleWearerBaseAttribute[client] =
-			baseAttribute != Address_Null ? TF2Attrib_GetValue(baseAttribute) : 0.0;
+			baseAttribute != Address_Null ? WeaponsAttrib_GetValue(baseAttribute) : 0.0;
 	}
 
-	TF2Attrib_SetByName(secondary, ATTR_STICKYBOMB_FIZZLE_TIME, fizzleTime);
+	WeaponsAttrib_SetByName(secondary, ATTR_STICKYBOMB_FIZZLE_TIME, fizzleTime);
 }
 

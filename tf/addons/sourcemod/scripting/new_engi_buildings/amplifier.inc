@@ -16,7 +16,7 @@
 
 #include <tf2>
 #include <tf2_stocks>
-#include <tf2attributes>
+#include <weapons_attributes>
 
 #include <morecolors>
 #undef REQUIRE_PLUGIN
@@ -1812,8 +1812,8 @@ stock bool AddAmplifierEffect(int client)
 			{
 				factor_reloadrate = 1.0;
 			}
-            //TF2Attrib_SetByName(weapon, ATTR_FIRE_RATE, factor_firerate);
-	        TF2Attrib_SetByName(weapon, ATTR_RELOAD_RATE, factor_reloadrate);
+            //WeaponsAttrib_SetByName(weapon, ATTR_FIRE_RATE, factor_firerate);
+	        WeaponsAttrib_SetByName(weapon, ATTR_RELOAD_RATE, factor_reloadrate);
         }
     }
 
@@ -1838,13 +1838,13 @@ void RemoveAmplifierWeaponEffects(int client)
 		int defIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 		if (defIndex == BEGGARS_BAZOOKA || defIndex == SHORTSTOP)
 		{
-			//TF2Attrib_SetByName(weapon, ATTR_FIRE_RATE, 0.30);
-			TF2Attrib_SetByName(weapon, ATTR_RELOAD_RATE, 1.30);
+			//WeaponsAttrib_SetByName(weapon, ATTR_FIRE_RATE, 0.30);
+			WeaponsAttrib_SetByName(weapon, ATTR_RELOAD_RATE, 1.30);
 		}
 		else
 		{
-			//TF2Attrib_RemoveByName(weapon, ATTR_FIRE_RATE);
-			TF2Attrib_RemoveByName(weapon, ATTR_RELOAD_RATE);
+			//WeaponsAttrib_RemoveByName(weapon, ATTR_FIRE_RATE);
+			WeaponsAttrib_RemoveByName(weapon, ATTR_RELOAD_RATE);
 		}
 	}
 }

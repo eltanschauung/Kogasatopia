@@ -1,0 +1,40 @@
+"Games"
+{
+    "tf"
+    {
+        "Signatures"
+        {
+            "AllocPooledString"
+            {
+                "library" "server"
+                "linux" "@_Z17AllocPooledStringPKc"
+            }
+            "CBasePlayer::SetFOV"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer6SetFOVEP11CBaseEntityifi"
+            }
+            "CBasePlayer::SetDefaultFOV"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer13SetDefaultFOVEi"
+            }
+            "CBasePlayer::Weapon_ShootPosition"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer20Weapon_ShootPositionEv"
+            }
+        }
+        "Offsets"
+        {
+            "IsViewModelFlipped"
+            {
+                "linux" "450"
+            }
+            "GetSlot"
+            {
+                "linux" "340"
+            }
+        }
+    }
+}

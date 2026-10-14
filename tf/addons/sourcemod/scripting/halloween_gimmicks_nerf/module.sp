@@ -122,7 +122,7 @@ public Action HalloweenGimmicksNerf_OnTakeDamage(int entity, int &attacker, int 
             int melee = GetPlayerWeaponSlot(entity, 2);
             if (melee > MaxClients && IsValidEntity(melee))
             {
-                TF2Attrib_SetByName(melee, "rocket jump damage reduction HIDDEN", 0.40);
+                WeaponsAttrib_SetByName(melee, "rocket jump damage reduction HIDDEN", 0.40);
                 RequestFrame(HalloweenGimmicksNerf_Frame_RemovePumpkinDamageReduction, EntIndexToEntRef(melee));
             }
         }
@@ -144,7 +144,7 @@ void HalloweenGimmicksNerf_Frame_RemovePumpkinDamageReduction(any entityRef)
     int weapon = EntRefToEntIndex(entityRef);
     if (weapon != INVALID_ENT_REFERENCE && IsValidEntity(weapon))
     {
-        TF2Attrib_RemoveByName(weapon, "rocket jump damage reduction HIDDEN");
+        WeaponsAttrib_RemoveByName(weapon, "rocket jump damage reduction HIDDEN");
     }
 }
 

@@ -223,7 +223,7 @@ public Action FilterSound(int clients[MAXPLAYERS], int &count, char sample[PLATF
 
 public void TF2_OnConditionAdded(int client, TFCond condition)
 {
-    if (GetFeatureStatus(FeatureType_Native, "TF2Util_GetPlayerConditionProvider") != FeatureStatus_Available) return;
-    int source = Actor(TF2Util_GetPlayerConditionProvider(client, condition));
+    if (GetFeatureStatus(FeatureType_Native, "WeaponsUtil_GetPlayerConditionProvider") != FeatureStatus_Available) return;
+    int source = Actor(WeaponsUtil_GetPlayerConditionProvider(client, condition));
     if (Blocked(client, source)) TF2_RemoveCondition(client, condition);
 }

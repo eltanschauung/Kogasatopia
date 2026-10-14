@@ -52,12 +52,12 @@ static void Plasma_LockAttack(int weapon)
 {
 	if (!g_bPlasmaOwnsAttackLock[weapon])
 	{
-		Address existing = TF2Attrib_GetByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE);
+		Address existing = WeaponsAttrib_GetByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE);
 		g_bPlasmaHadNoAttack[weapon] = existing != Address_Null;
 		if (existing != Address_Null)
-			g_fPlasmaPreviousNoAttack[weapon] = TF2Attrib_GetValue(existing);
+			g_fPlasmaPreviousNoAttack[weapon] = WeaponsAttrib_GetValue(existing);
 	}
-	TF2Attrib_SetByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE, 1.0);
+	WeaponsAttrib_SetByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE, 1.0);
 	g_bPlasmaOwnsAttackLock[weapon] = true;
 }
 
@@ -68,9 +68,9 @@ static void Plasma_UnlockAttack(int weapon)
 
 	// Restore any pre-existing restriction instead of clearing another feature's lock.
 	if (g_bPlasmaHadNoAttack[weapon])
-		TF2Attrib_SetByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE, g_fPlasmaPreviousNoAttack[weapon]);
+		WeaponsAttrib_SetByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE, g_fPlasmaPreviousNoAttack[weapon]);
 	else
-		TF2Attrib_RemoveByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE);
+		WeaponsAttrib_RemoveByDefIndex(weapon, PLASMA_NO_ATTACK_ATTRIBUTE);
 	g_bPlasmaOwnsAttackLock[weapon] = false;
 }
 

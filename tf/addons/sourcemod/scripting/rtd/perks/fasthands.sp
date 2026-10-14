@@ -51,8 +51,8 @@ public void FastHands_RemovePerk(const int client, const RTDRemoveReason eRemove
 		if (iWeapon <= MaxClients || !IsValidEntity(iWeapon))
 			continue;
 
-		TF2Attrib_RemoveByDefIndex(iWeapon, Attribs.FireRate);
-		TF2Attrib_RemoveByDefIndex(iWeapon, Attribs.ReloadSpeed);
+		WeaponsAttrib_RemoveByDefIndex(iWeapon, Attribs.FireRate);
+		WeaponsAttrib_RemoveByDefIndex(iWeapon, Attribs.ReloadSpeed);
 	}
 }
 
@@ -64,8 +64,8 @@ public void FastHands_Apply(const int client)
 		if (iWeapon <= MaxClients || !IsValidEntity(iWeapon))
 			continue;
 
-		TF2Attrib_SetByDefIndex(iWeapon, Attribs.FireRate, Cache[client].Attack);
-		TF2Attrib_SetByDefIndex(iWeapon, Attribs.ReloadSpeed, Cache[client].Reload);
+		WeaponsAttrib_SetByDefIndex(iWeapon, Attribs.FireRate, Cache[client].Attack);
+		WeaponsAttrib_SetByDefIndex(iWeapon, Attribs.ReloadSpeed, Cache[client].Reload);
 	}
 
 }

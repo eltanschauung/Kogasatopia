@@ -359,7 +359,7 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 	
 	// add a stinky attribute that holds the item's uid
 	// this value is read with Weapons_GetItemUIDFromEntity
-	TF2Attrib_SetFromStringValue(itemEntity, ATTRIB_NAME_CUSTOM_UID, item.uid);
+	WeaponsAttrib_SetFromStringValue(itemEntity, ATTRIB_NAME_CUSTOM_UID, item.uid);
 	
 	// apply attributes for Custom Attributes
 	if (item.customAttributes) {
@@ -395,9 +395,9 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 	
 	// remove existing item(s) on player
 	bool bRemovedWeaponInSlot = false;
-	if (TF2Util_IsEntityWeapon(itemEntity)) {
+	if (WeaponsUtil_IsEntityWeapon(itemEntity)) {
 		// replace item by slot for cross-class equip compatibility
-		int weaponSlot = TF2Util_GetWeaponSlot(itemEntity);
+		int weaponSlot = WeaponsUtil_GetWeaponSlot(itemEntity);
 		bRemovedWeaponInSlot = IsValidEntity(GetPlayerWeaponSlot(client, weaponSlot));
 		TF2_RemoveWeaponSlot(client, weaponSlot);
 		
@@ -435,9 +435,9 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 		}
 		
 		// HACK: remove the correct item for demoman when applying the revolver
-		if (TF2Util_IsEntityWeapon(itemEntity)
+		if (WeaponsUtil_IsEntityWeapon(itemEntity)
 				&& TF2Econ_GetItemLoadoutSlot(item.defindex, TF2_GetPlayerClass(client)) == -1) {
-			loadoutSlot = TF2Util_GetWeaponSlot(itemEntity);
+			loadoutSlot = WeaponsUtil_GetWeaponSlot(itemEntity);
 		}
 		
 		TF2_RemoveItemByLoadoutSlot(client, loadoutSlot);
@@ -473,12 +473,12 @@ static bool ApplyCustomItemNativeAttributes(int itemEntity,
 			item.nativeAttributes.GetSectionName(key, sizeof(key));
 			item.nativeAttributes.GetString(NULL_STRING, value, sizeof(value));
 
-			bool missing = !TF2Attrib_GetByName(itemEntity, key);
+			bool missing = !WeaponsAttrib_GetByName(itemEntity, key);
 			if (missing) {
 				restored = true;
 			}
 			if (!onlyMissing || missing) {
-				TF2Attrib_SetFromStringValue(itemEntity, key, value);
+				WeaponsAttrib_SetFromStringValue(itemEntity, key, value);
 			}
 		} while (item.nativeAttributes.GotoNextKey(false));
 		item.nativeAttributes.GoBack();
@@ -494,8 +494,8 @@ bool EnsureCustomItemRuntimeAttributes(int itemEntity,
 	}
 
 	bool restored = ApplyCustomItemNativeAttributes(itemEntity, item, true);
-	if (!TF2Attrib_GetByName(itemEntity, ATTRIB_NAME_CUSTOM_UID)) {
-		TF2Attrib_SetFromStringValue(itemEntity, ATTRIB_NAME_CUSTOM_UID, item.uid);
+	if (!WeaponsAttrib_GetByName(itemEntity, ATTRIB_NAME_CUSTOM_UID)) {
+		WeaponsAttrib_SetFromStringValue(itemEntity, ATTRIB_NAME_CUSTOM_UID, item.uid);
 		restored = true;
 	}
 

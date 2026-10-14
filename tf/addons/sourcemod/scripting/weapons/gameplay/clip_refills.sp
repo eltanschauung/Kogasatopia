@@ -216,7 +216,7 @@ static bool RefillHeavyLunchboxMeter(int client, int secondary, float fraction)
         if (ammoType >= 0 && ammoType < GetEntPropArraySize(client, Prop_Send, "m_iAmmo"))
         {
             int ammo = GetEntProp(client, Prop_Send, "m_iAmmo", _, ammoType);
-            int maximum = TF2Util_GetPlayerMaxAmmo(client, ammoType);
+            int maximum = WeaponsUtil_GetPlayerMaxAmmo(client, ammoType);
             if (ammo < maximum) SetEntProp(client, Prop_Send, "m_iAmmo", ammo + 1, _, ammoType);
         }
     }

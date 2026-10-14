@@ -9,6 +9,10 @@ SDKExtension &PelletsModule();
 SDKExtension &SpreadModule();
 SDKExtension &WhitelistModule();
 SDKExtension &SentryModule();
+SDKExtension &AttributesModule();
+SDKExtension &UtilitiesModule();
+SDKExtension &DamageModule();
+SDKExtension &ViewModule();
 void ItemsSeedView(void *view);
 size_t PelletSharedTraceTables();
 
@@ -23,7 +27,7 @@ public:
     void OnClientDisconnecting(int client) override;
     void OnClientDisconnected(int client) override;
 private:
-    std::array<IClientListener *, 8> listeners_{};
+    std::array<IClientListener *, 16> listeners_{};
 };
 ClientDispatch &Clients();
 }

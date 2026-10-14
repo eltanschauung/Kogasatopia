@@ -49,7 +49,7 @@ static bool AmmoPickups_DenySecondary(int client, int ammoIndex, int ammoSource)
 		int denied = TF2CustAttr_GetInt(weapon, ATTR_NO_SECONDARY_AMMO_PICKUPS, 0);
 		// SourcePawn equivalent of CALL_ATTRIB_HOOK_INT_ON_OTHER. The custom
 		// value is the default; a schema-provided hook is also supported.
-		denied = TF2Attrib_HookValueInt(denied, HOOK_NO_SECONDARY_AMMO_PICKUPS, weapon);
+		denied = WeaponsAttrib_HookValueInt(denied, HOOK_NO_SECONDARY_AMMO_PICKUPS, weapon);
 		if (denied != 0)
 			return true;
 	}

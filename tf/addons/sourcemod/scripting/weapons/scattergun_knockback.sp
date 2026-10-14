@@ -46,7 +46,7 @@ static bool ScattergunKnockback_IsPushImmune(int victim)
 
 	return TF2_GetPlayerClass(victim) == TFClass_Heavy
 		&& TF2_IsPlayerInCondition(victim, TFCond_Slowed)
-		&& TF2Attrib_HookValueInt(0, "spunup_push_force_immunity", victim) != 0;
+		&& WeaponsAttrib_HookValueInt(0, "spunup_push_force_immunity", victim) != 0;
 }
 
 static void ScattergunKnockback_GetWorldCenter(int client, float center[3])
@@ -100,7 +100,7 @@ static bool ScattergunKnockback_CanApply(int victim, int attacker, int weapon, f
 	ScattergunKnockback_GetWorldCenter(victim, victimCenter);
 
 	float distanceSq = GetVectorDistance(attackerCenter, victimCenter, true);
-	float eligibilityMultiplier = TF2Attrib_HookValueFloat(
+	float eligibilityMultiplier = WeaponsAttrib_HookValueFloat(
 		1.0, "scattergun_knockback_mult", weapon);
 	return (damage > SCATTERGUN_KNOCKBACK_MIN_DAMAGE
 		&& distanceSq < SCATTERGUN_KNOCKBACK_MAX_DISTANCE_SQ)
@@ -121,7 +121,7 @@ static void ScattergunKnockback_Apply(int victim, int attacker, int weapon, floa
 	if (NormalizeVector(impulse, impulse) <= 0.0)
 		return;
 
-	float forceMultiplier = TF2Attrib_HookValueFloat(
+	float forceMultiplier = WeaponsAttrib_HookValueFloat(
 		SCATTERGUN_KNOCKBACK_DEFAULT_MULTIPLIER,
 		"scattergun_knockback_mult",
 		weapon);
@@ -134,7 +134,7 @@ static void ScattergunKnockback_Apply(int victim, int attacker, int weapon, floa
 	ScaleVector(impulse, force);
 	impulse[2] += SCATTERGUN_KNOCKBACK_JUMP_SPEED;
 
-	float vulnerability = TF2Attrib_HookValueFloat(
+	float vulnerability = WeaponsAttrib_HookValueFloat(
 		1.0, "airblast_vulnerability_multiplier", victim);
 	ScaleVector(impulse, vulnerability);
 	if (TF2_IsPlayerInCondition(victim, TFCond_HalloweenTiny))
@@ -148,7 +148,7 @@ static void ScattergunKnockback_Apply(int victim, int attacker, int weapon, floa
 	int flags = GetEntityFlags(victim);
 	if ((flags & FL_ONGROUND) != 0 && impulse[2] < SCATTERGUN_KNOCKBACK_JUMP_SPEED)
 		impulse[2] = SCATTERGUN_KNOCKBACK_JUMP_SPEED;
-	impulse[2] = TF2Attrib_HookValueFloat(
+	impulse[2] = WeaponsAttrib_HookValueFloat(
 		impulse[2], "airblast_vertical_vulnerability_multiplier", victim);
 
 	float velocity[3];

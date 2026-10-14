@@ -154,9 +154,9 @@ static int SandmanPreJI_FindPendingStunVictim()
 
 static int SandmanPreJI_GetStunVictim(Address sharedAddress)
 {
-	if (GetFeatureStatus(FeatureType_Native, "TF2Util_GetPlayerFromSharedAddress") == FeatureStatus_Available)
+	if (GetFeatureStatus(FeatureType_Native, "WeaponsUtil_GetPlayerFromSharedAddress") == FeatureStatus_Available)
 	{
-		int victim = TF2Util_GetPlayerFromSharedAddress(sharedAddress);
+		int victim = WeaponsUtil_GetPlayerFromSharedAddress(sharedAddress);
 		if (Weapons_IsClientInGame(victim))
 		{
 			return victim;

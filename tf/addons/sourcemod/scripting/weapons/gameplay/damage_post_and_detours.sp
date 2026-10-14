@@ -13,16 +13,16 @@ static void WeaponsGameplay_ApplyDamageTypeIgniteDuration(int weapon, int victim
 		return;
 	}
 
-	float desiredDuration = TF2Attrib_HookValueFloat(0.0, "set_dmgtype_ignite", weapon);
+	float desiredDuration = WeaponsAttrib_HookValueFloat(0.0, "set_dmgtype_ignite", weapon);
 	if (desiredDuration <= 0.0)
 	{
 		return;
 	}
 
-	float additionalDuration = desiredDuration - TF2Util_GetPlayerBurnDuration(victim);
+	float additionalDuration = desiredDuration - WeaponsUtil_GetPlayerBurnDuration(victim);
 	if (additionalDuration > 0.0)
 	{
-		TF2Util_IgnitePlayer(victim, attacker, additionalDuration, weapon);
+		WeaponsUtil_IgnitePlayer(victim, attacker, additionalDuration, weapon);
 	}
 }
 
@@ -47,7 +47,7 @@ public void WeaponsGameplay_OnTakeDamageAlivePost(
 	FullPelletIgnite_TryConsumePost(victim, attacker, weapon, inflictor);
 
 	if (damageCustom == TF_CUSTOM_BURNING
-		|| weapon <= MaxClients || !IsValidEntity(weapon) || !TF2Util_IsEntityWeapon(weapon))
+		|| weapon <= MaxClients || !IsValidEntity(weapon) || !WeaponsUtil_IsEntityWeapon(weapon))
 	{
 		return;
 	}
@@ -138,7 +138,7 @@ MRESReturn ApplyBiteEffects_Post(int entity, DHookParam parameters) {
 		return MRES_Ignored;
 	}
 
-	int lunchbox_type = TF2Attrib_HookValueInt(0, "set_weapon_mode", entity);
+	int lunchbox_type = WeaponsAttrib_HookValueInt(0, "set_weapon_mode", entity);
 	int client = parameters.Get(1);
 	if (
 		client >= 1 &&
@@ -175,7 +175,7 @@ MRESReturn CartDispenseMetal(int entity, DHookReturn returnValue, DHookParam par
 			float ammo_mult = TF2CustAttr_GetFloat(secondary, "mult metal from carts", 1.0);
 
 			if (ammo_mult != 1.0) {
-				TF2Attrib_AddCustomPlayerAttribute(client, "metal_pickup_decreased", ammo_mult, 0.001);
+				WeaponsAttrib_AddCustomPlayerAttribute(client, "metal_pickup_decreased", ammo_mult, 0.001);
 			}
 		}
 	}

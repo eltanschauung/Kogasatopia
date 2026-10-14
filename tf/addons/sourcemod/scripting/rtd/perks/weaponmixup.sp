@@ -55,9 +55,9 @@ public void WeaponMixup_RemovePerk(const int client, const RTDRemoveReason eRemo
 		if (iWeapon <= MaxClients || !IsValidEntity(iWeapon))
 			continue;
 
-		TF2Attrib_RemoveByDefIndex(iWeapon, Attribs.DeploySpeed);
-		TF2Attrib_RemoveByDefIndex(iWeapon, Attribs.ReloadSpeed);
-		TF2Attrib_RemoveByDefIndex(iWeapon, Attribs.SilentRev);
+		WeaponsAttrib_RemoveByDefIndex(iWeapon, Attribs.DeploySpeed);
+		WeaponsAttrib_RemoveByDefIndex(iWeapon, Attribs.ReloadSpeed);
+		WeaponsAttrib_RemoveByDefIndex(iWeapon, Attribs.SilentRev);
 	}
 }
 
@@ -69,9 +69,9 @@ void WeaponMixup_Apply(const int client)
 		if (iWeapon <= MaxClients || !IsValidEntity(iWeapon))
 			continue;
 
-		TF2Attrib_SetByDefIndex(iWeapon, Attribs.DeploySpeed, 0.5);
-		TF2Attrib_SetByDefIndex(iWeapon, Attribs.ReloadSpeed, 0.1);
-		TF2Attrib_SetByDefIndex(iWeapon, Attribs.SilentRev, 1.0);
+		WeaponsAttrib_SetByDefIndex(iWeapon, Attribs.DeploySpeed, 0.5);
+		WeaponsAttrib_SetByDefIndex(iWeapon, Attribs.ReloadSpeed, 0.1);
+		WeaponsAttrib_SetByDefIndex(iWeapon, Attribs.SilentRev, 1.0);
 	}
 }
 

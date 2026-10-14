@@ -17,7 +17,7 @@ static bool HasTakeMinicritsProjectileAirborne(int client)
 }
 
 
-public Action TF2_OnTakeDamage(
+public Action Weapons_OnTakeDamage(
 	int victim,
 	int &attacker,
 	int &inflictor,
@@ -30,12 +30,12 @@ public Action TF2_OnTakeDamage(
 	CritType &critType)
 {
 	int profile=KogasaPerfBegin();
-	Action result=WeaponsProfiled_TF2_OnTakeDamage(victim, attacker, inflictor, damage, damageType, weapon, critType);
-	KogasaPerfEnd(profile,"TF2_OnTakeDamage");
+	Action result=WeaponsProfiled_Weapons_OnTakeDamage(victim, attacker, inflictor, damage, damageType, weapon, critType);
+	KogasaPerfEnd(profile,"Weapons_OnTakeDamage");
 	return result;
 }
 
-Action WeaponsProfiled_TF2_OnTakeDamage(
+Action WeaponsProfiled_Weapons_OnTakeDamage(
 	int victim,
 	int &attacker,
 	int &inflictor,

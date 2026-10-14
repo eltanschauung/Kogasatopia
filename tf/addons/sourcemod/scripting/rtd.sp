@@ -21,7 +21,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <tf2_stocks>
-#include <tf2attributes>
+#include <weapons_attributes>
 #include <multicolors>
 
 #undef REQUIRE_PLUGIN

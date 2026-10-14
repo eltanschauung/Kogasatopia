@@ -30,11 +30,11 @@ public void Vital_ApplyPerk(const int client, const Perk perk)
 {
 	int iAddedHealth = perk.GetPrefCell("health", 300);
 
-	TF2Attrib_SetByDefIndex(client, Attribs.MaxHealth, float(iAddedHealth));
+	WeaponsAttrib_SetByDefIndex(client, Attribs.MaxHealth, float(iAddedHealth));
 	SetEntityHealth(client, GetClientHealth(client) + iAddedHealth);
 }
 
 public void Vital_RemovePerk(const int client, const RTDRemoveReason eRemoveReason)
 {
-	TF2Attrib_RemoveByDefIndex(client, Attribs.MaxHealth);
+	WeaponsAttrib_RemoveByDefIndex(client, Attribs.MaxHealth);
 }

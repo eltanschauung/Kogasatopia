@@ -116,7 +116,7 @@ void Weapons_ApplyEngineOverrides(int weapon)
 
 	if (GetFeatureStatus(FeatureType_Native, "TF2Scatter_SetWeaponPelletCount") == FeatureStatus_Available)
 	{
-		float pelletCount = TF2Attrib_HookValueFloat(10.0, "mult_bullets_per_shot", weapon);
+		float pelletCount = WeaponsAttrib_HookValueFloat(10.0, "mult_bullets_per_shot", weapon);
 		int pelletsFired = RoundToNearest(pelletCount);
 		if (pelletsFired < 1)
 		{
@@ -213,7 +213,7 @@ void WeaponsGameplay_DeleteConfigs()
 
 void WeaponsGameplay_RegisterNatives()
 {
-	MarkNativeAsOptional("TF2Util_GetPlayerFromSharedAddress");
+	MarkNativeAsOptional("WeaponsUtil_GetPlayerFromSharedAddress");
 	CreateNative("Weapons_GetWeaponInfo", Native_GetWeaponInfo);
 	CreateNative("Weapons_CanClassUseWeapon", Native_CanClassUseWeapon);
 }
@@ -342,19 +342,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 			SetFailState("Failed to create SDKCall for TeamFortress_SetSpeed");
 		}
 
-		StartPrepSDKCall(SDKCall_Player);
-		PrepSDKCall_SetFromConf(conf, SDKConf_Signature, "CBasePlayer::SetFOV");
-		PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-		PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-		PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
-		PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-		PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
-		g_SDKSetFOV = EndPrepSDKCall();
 
-		if (g_SDKSetFOV == null)
-		{
-			SetFailState("Failed to create SDKCall for CBasePlayer::SetFOV");
-		}
 
 		// Virtual dispatch preserves TF2's native ranged/melee crit algorithms.
 		StartPrepSDKCall(SDKCall_Entity);

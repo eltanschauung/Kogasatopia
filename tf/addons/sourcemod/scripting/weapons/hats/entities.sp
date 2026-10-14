@@ -123,7 +123,7 @@ int CreateWearableBase(int client, int itemIndex, int level, int quality)
 
 	DispatchSpawn(entity);
 	ActivateEntity(entity);
-	TF2Util_EquipPlayerWearable(client, entity);
+	WeaponsUtil_EquipPlayerWearable(client, entity);
 	Weapons_MarkValidatedAttachedEntity(entity, client, "custom_hat", true);
 
 	return entity;

@@ -86,6 +86,7 @@ void FetchLoadoutItems(int client)
 
 public void OnClientCookiesCached(int client)
 {
+    if (IsClientInGame(client)) WeaponsView_OnCookiesCached(client);
     CustomHats_OnClientCookiesCached(client);
     WeaponsHatVisibility_OnClientCookiesCached(client);
     bool wasRetrieved = g_bRetrievedLoadout[client];
@@ -597,11 +598,11 @@ int Native_GetItemUIDFromEntity(Handle plugin, int argc)
     }
     int length = GetNativeCell(3);
     if (length <= 0) return false;
-    Address attribute = TF2Attrib_GetByName(entity, ATTRIB_NAME_CUSTOM_UID);
+    Address attribute = WeaponsAttrib_GetByName(entity, ATTRIB_NAME_CUSTOM_UID);
     if (!attribute) return false;
     char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-    any rawValue = TF2Attrib_GetValue(attribute);
-    TF2Attrib_UnsafeGetStringValue(rawValue, uid, sizeof(uid));
+    any rawValue = WeaponsAttrib_GetValue(attribute);
+    WeaponsAttrib_UnsafeGetStringValue(rawValue, uid, sizeof(uid));
     if (!uid[0]) return false;
     SetNativeString(2, uid, length);
     return true;
@@ -808,7 +809,7 @@ static bool IsPlayerInRespawnRoom(int client)
     GetClientAbsOrigin(client, origin);
     GetCenterFromPoints(mins, maxs, center);
     AddVectors(origin, center, center);
-    return TF2Util_IsPointInRespawnRoom(center, client, true);
+    return WeaponsUtil_IsPointInRespawnRoom(center, client, true);
 }
 
 static bool IsPlayerAllowedToRespawnOnLoadoutChange(int client)

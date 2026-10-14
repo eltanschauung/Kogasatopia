@@ -66,9 +66,9 @@ void WeaponsCustomAttributes_OnPluginEnd() {
 			continue;
 		}
 
-		Address pAttrib = TF2Attrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
+		Address pAttrib = WeaponsAttrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
 		if (pAttrib) {
-			TF2Attrib_RemoveByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
+			WeaponsAttrib_RemoveByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
 		}
 	}
 	WeaponsCustomAttributes_Erase();
@@ -182,12 +182,12 @@ Action WeaponsProfiled_WeaponsCustomAttributes_GarbageCollect()
 }
 
 int WeaponsCustomAttributes_GetToken(int entity) {
-	Address pCustomAttr = TF2Attrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
+	Address pCustomAttr = WeaponsAttrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
 	if (pCustomAttr == Address_Null) {
 		return 0;
 	}
 
-	float storedValue = TF2Attrib_GetValue(pCustomAttr);
+	float storedValue = WeaponsAttrib_GetValue(pCustomAttr);
 	int storedBits = view_as<int>(storedValue);
 	if ((storedBits & 0x7F800000) == 0x7F800000) {
 		return 0;
@@ -234,8 +234,8 @@ public Action WeaponsCustomAttributes_PerfStatus(int client,int args) {
 KeyValues WeaponsCustomAttributes_ResolveStruct(int entity, bool validate) {
 	int token = WeaponsCustomAttributes_GetToken(entity);
 	if (token <= 0) {
-		if (validate && TF2Attrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE)) {
-			TF2Attrib_RemoveByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
+		if (validate && WeaponsAttrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE)) {
+			WeaponsAttrib_RemoveByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
 		}
 		return null;
 	}
@@ -248,8 +248,8 @@ KeyValues WeaponsCustomAttributes_ResolveStruct(int entity, bool validate) {
 		return kv;
 	}
 
-	if (validate && TF2Attrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE)) {
-		TF2Attrib_RemoveByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
+	if (validate && WeaponsAttrib_GetByDefIndex(entity, ATTRID_CUSTOM_STORAGE)) {
+		WeaponsAttrib_RemoveByDefIndex(entity, ATTRID_CUSTOM_STORAGE);
 	}
 	return null;
 }
@@ -458,7 +458,7 @@ void WeaponsCustomAttributes_SetStruct(int entity, KeyValues kv) {
 	char tokenKey[16];
 	IntToString(token, tokenKey, sizeof(tokenKey));
 	g_WeaponsCustomAttributeKVs.SetValue(tokenKey, kv);
-	TF2Attrib_SetByDefIndex(entity, ATTRID_CUSTOM_STORAGE, float(token));
+	WeaponsAttrib_SetByDefIndex(entity, ATTRID_CUSTOM_STORAGE, float(token));
 	WeaponsSound_ReconcileWeaponHooks(entity);
 }
 

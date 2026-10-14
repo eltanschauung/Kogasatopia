@@ -351,8 +351,8 @@ stock void Sproke_ClearEffect(int client, bool restoreClip, bool playSound)
             SetAmmo_Weapon(weapon, 0);
         }
 
-        TF2Attrib_RemoveByName(weapon, SPROKE_PRIMARY_ATTR);
-        TF2Attrib_RemoveByName(weapon, SPROKE_ALT_ATTR);
+        WeaponsAttrib_RemoveByName(weapon, SPROKE_PRIMARY_ATTR);
+        WeaponsAttrib_RemoveByName(weapon, SPROKE_ALT_ATTR);
         tf2_players[client].sprokeClipRecord = GetWeaponMaxClip(weapon);
 
         if (playSound && IsClientInGame(client) && IsPlayerAlive(client))
@@ -408,11 +408,11 @@ public void Sproke_TryActivate(int client, float duration)
 
     if (maxClip > 2)
     {
-        TF2Attrib_SetByName(primary, SPROKE_PRIMARY_ATTR, SPROKE_PRIMARY_FACTOR);
+        WeaponsAttrib_SetByName(primary, SPROKE_PRIMARY_ATTR, SPROKE_PRIMARY_FACTOR);
         SetClip_Weapon(primary, GetAmmo_Weapon(primary));
     }
 
-    TF2Attrib_SetByName(primary, SPROKE_ALT_ATTR, SPROKE_ALT_FACTOR);
+    WeaponsAttrib_SetByName(primary, SPROKE_ALT_ATTR, SPROKE_ALT_FACTOR);
     tf2_players[client].sprokePrimaryRef = EntIndexToEntRef(primary);
 
     // Refresh visual FX

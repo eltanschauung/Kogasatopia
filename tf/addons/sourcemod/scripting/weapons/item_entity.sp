@@ -227,11 +227,11 @@ bool TF2_RemoveItemByLoadoutSlot(int client, int loadoutSlot) {
     if (!Weapons_IsValidClient(client) || loadoutSlot < 0) {
         return false;
     }
-    int item = TF2Util_GetPlayerLoadoutEntity(client, loadoutSlot);
+    int item = WeaponsUtil_GetPlayerLoadoutEntity(client, loadoutSlot);
     if (item <= MaxClients || !IsValidEntity(item)) {
         // GPLE handles native class wearables only. Keep the original last-match policy.
-        for (int i, n = TF2Util_GetPlayerWearableCount(client); i < n; i++) {
-            int wearable = TF2Util_GetPlayerWearable(client, i);
+        for (int i, n = WeaponsUtil_GetPlayerWearableCount(client); i < n; i++) {
+            int wearable = WeaponsUtil_GetPlayerWearable(client, i);
             if (wearable <= MaxClients || !IsValidEntity(wearable)) {
                 continue;
             }
@@ -245,10 +245,10 @@ bool TF2_RemoveItemByLoadoutSlot(int client, int loadoutSlot) {
         return false;
     }
 
-    if (TF2Util_IsEntityWearable(item)) {
+    if (WeaponsUtil_IsEntityWearable(item)) {
         TF2_RemoveWearable(client, item);
     } else {
-        int slot = TF2Util_GetWeaponSlot(item);
+        int slot = WeaponsUtil_GetWeaponSlot(item);
         if (slot < 0) {
             return false;
         }
@@ -269,7 +269,7 @@ bool TF2_EquipPlayerEconItem(int client, int item) {
     bool wearable = StrContains(weaponClass, "tf_wearable", false) == 0;
 
     if (wearable) {
-        TF2Util_EquipPlayerWearable(client, item);
+        WeaponsUtil_EquipPlayerWearable(client, item);
     } else {
         EquipPlayerWeapon(client, item);
     }

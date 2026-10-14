@@ -7,7 +7,7 @@
 #include <tf2_stocks>
 #include <dhooks>
 #include <collisionhook>
-#include <tf2utils>
+#include <weapons_utils>
 #include <oblivion_net>
 
 #define VERSION "0.2.4"
@@ -282,7 +282,7 @@ public Action Command_Status(int client, int args)
 {
     ReplyToCommand(client, "[Oblivion] %s; %d persistent pairs; resource=%d; TF2Utils=%s.", VERSION,
         g_Pairs.Length, EntRefToEntIndex(g_Resource),
-        GetFeatureStatus(FeatureType_Native, "TF2Util_GetPlayerConditionProvider") == FeatureStatus_Available ? "available" : "unavailable");
+        GetFeatureStatus(FeatureType_Native, "WeaponsUtil_GetPlayerConditionProvider") == FeatureStatus_Available ? "available" : "unavailable");
     int snapshots, removed;
     OblivionNet_GetCounters(snapshots, removed);
     ReplyToCommand(client, "[Oblivion] Final transmission filter: %d snapshots, %d entity exclusions.", snapshots, removed);

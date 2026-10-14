@@ -212,6 +212,7 @@ public void WeaponsStats_OnLoadoutApplication(Event event, const char[] name, bo
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (client <= 0 || !IsClientInGame(client)) return;
+    WeaponsView_ReconcileInventory(client);
 
     char steamId[KOGASA_STEAMID_MAX] = "unknown";
     Kogasa_GetClientSteamId64(client, steamId, sizeof(steamId), true);

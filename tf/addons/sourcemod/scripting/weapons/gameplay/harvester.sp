@@ -234,7 +234,7 @@ void Harvester_SetCritBoost(int client, bool enabled)
 
 	int weapon = EntRefToEntIndex(tf2_players[client].harvesterRevengeWeaponRef);
 	bool present = TF2_IsPlayerInCondition(client, HARVESTER_CRIT_VISUAL_CONDITION);
-	int provider = present ? TF2Util_GetPlayerConditionProvider(client, HARVESTER_CRIT_VISUAL_CONDITION) : -1;
+	int provider = present ? WeaponsUtil_GetPlayerConditionProvider(client, HARVESTER_CRIT_VISUAL_CONDITION) : -1;
 	bool owned = present && tf2_players[client].harvesterCritBoostApplied
 		&& weapon > MaxClients && provider == weapon;
 	if (!enabled)
@@ -251,14 +251,14 @@ void Harvester_SetCritBoost(int client, bool enabled)
 	if (owned && now < tf2_players[client].harvesterCritVisualRefreshAt) return;
 	if (owned)
 	{
-		TF2Util_SetPlayerConditionDuration(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION);
+		WeaponsUtil_SetPlayerConditionDuration(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION);
 	}
 	else
 	{
 		// TF2_AddCondition accepts player inflictors only. Set the entity
 		// provider through TF2 Utils after adding the condition successfully.
 		TF2_AddCondition(client, HARVESTER_CRIT_VISUAL_CONDITION, HARVESTER_CRIT_VISUAL_DURATION, client);
-		TF2Util_SetPlayerConditionProvider(client, HARVESTER_CRIT_VISUAL_CONDITION, weapon);
+		WeaponsUtil_SetPlayerConditionProvider(client, HARVESTER_CRIT_VISUAL_CONDITION, weapon);
 	}
 	tf2_players[client].harvesterCritBoostApplied = true;
 	tf2_players[client].harvesterCritVisualRefreshAt = now + 0.10;

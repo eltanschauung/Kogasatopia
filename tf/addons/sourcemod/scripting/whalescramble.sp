@@ -11,7 +11,7 @@
 #include <entitylump>
 #include <tf2>
 #include <tf2_stocks>
-#include <tf2attributes>
+#include <weapons_attributes>
 #include <controlpoints>
 #include <morecolors>
 #include <nativevotes>

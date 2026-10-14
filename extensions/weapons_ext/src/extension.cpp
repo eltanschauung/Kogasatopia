@@ -13,6 +13,11 @@ static constexpr const char *kStandaloneFiles[] = {
     "scattergun_pellets.ext.2.tf2.so", "tf2_spread_patterns.ext.2.tf2.so",
     "whitelist_policy.ext.2.tf2.so", "tf2_sentry_newtarget_dist.ext.2.tf2.so"
 };
+static constexpr const char *kRetiredPlugins[] = {
+    "tf2attributes.smx", "tf_ontakedamage.smx", "tf_econ_dynamic_compat.smx",
+    "tf2_sentry_newtarget_dist.smx", "tf2utils.smx", "centerprojectiles.smx",
+    "tf2centerprojectiles.smx", "fov.smx"
+};
 static int FindStandaloneImage(dl_phdr_info *image, size_t, void *out) {
     const char *name = std::strrchr(image->dlpi_name, '/');
     name = name ? name + 1 : image->dlpi_name;
@@ -48,7 +53,7 @@ void ClientDispatch::OnClientDisconnected(int client) {
 }
 
 class WeaponsExtension final : public SDKExtension {
-    std::array<SDKExtension *, 7> modules_{};
+    std::array<SDKExtension *, 11> modules_{};
     size_t loaded_ = 0;
     size_t metamod_ = 0;
     bool listening_ = false;
@@ -56,7 +61,8 @@ class WeaponsExtension final : public SDKExtension {
 public:
     bool SDK_OnMetamodLoad(ISmmAPI *api, char *error, size_t length, bool late) override {
         modules_ = { &ToolsModule(), &ItemsModule(), &ConchModule(), &PelletsModule(),
-                     &SpreadModule(), &WhitelistModule(), &SentryModule() };
+                     &SpreadModule(), &WhitelistModule(), &SentryModule(),
+                     &AttributesModule(), &UtilitiesModule(), &DamageModule(), &ViewModule() };
         // Component hooks wait until SourceMod interfaces are available and
         // the duplicate-owner guard succeeds. Merely dlopen'ing a candidate
         // must not attach hooks beside the original seven extensions.
@@ -83,6 +89,15 @@ public:
                 return false;
             }
         }
+        for (const char *file : kRetiredPlugins) {
+            char path[PLATFORM_MAX_PATH];
+            g_pSM->BuildPath(Path_SM, path, sizeof(path), "plugins/%s", file);
+            struct stat info;
+            if (!stat(path, &info)) {
+                std::snprintf(error, length, "Retire %s before loading unified Weapons services", file);
+                return false;
+            }
+        }
         for (; metamod_ < modules_.size();) {
             auto *module = modules_[metamod_++];
             if (!module->SDK_OnMetamodLoad(metamod_api_, error, length, late)) {
@@ -104,6 +119,12 @@ public:
     }
     void SDK_OnAllLoaded() override {
         for (size_t i = 0; i < loaded_; ++i) modules_[i]->SDK_OnAllLoaded();
+    }
+    void OnCoreMapStart(edict_t *edicts, int count, int clients) override {
+        for (size_t i = 0; i < loaded_; ++i) modules_[i]->OnCoreMapStart(edicts, count, clients);
+    }
+    void OnCoreMapEnd() override {
+        for (size_t i = loaded_; i; --i) modules_[i - 1]->OnCoreMapEnd();
     }
     size_t LoadedModules() const { return loaded_; }
     bool QueryRunning(char *error, size_t length) override {
@@ -138,7 +159,7 @@ SDKExtension *g_pExtensionIface = &extension;
 
 CON_COMMAND(sm_weapons_ext_status, "Report unified Weapons native module ownership")
 {
-    META_CONPRINTF("[weapons_ext] modules=%u/7 extension_interfaces=1 client_dispatchers=1 detour_runtimes=1\n",
+    META_CONPRINTF("[weapons_ext] modules=%u/11 extension_interfaces=1 client_dispatchers=1 detour_runtimes=1\n",
         unsigned(extension.LoadedModules()));
     META_CONPRINTF("[weapons_ext] shared_trace_vtables=%u\n", unsigned(PelletSharedTraceTables()));
 }

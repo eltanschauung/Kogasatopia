@@ -47,9 +47,9 @@ Action ExportActiveWeapon(int client, int argc) {
 		
 		// TODO: we should implement native accessors iterating runtime attribs in tf2attributes
 		int attrdefs[32];
-		int nAttrs = TF2Attrib_ListDefIndices(weapon, attrdefs, sizeof(attrdefs));
+		int nAttrs = WeaponsAttrib_ListDefIndices(weapon, attrdefs, sizeof(attrdefs));
 		for (int i = 0; i < nAttrs; i++) {
-			Address pAttrib = TF2Attrib_GetByDefIndex(weapon, attrdefs[i]);
+			Address pAttrib = WeaponsAttrib_GetByDefIndex(weapon, attrdefs[i]);
 			if (!pAttrib) {
 				continue;
 			}
@@ -57,14 +57,14 @@ Action ExportActiveWeapon(int client, int argc) {
 			char attrName[128];
 			TF2Econ_GetAttributeName(attrdefs[i], attrName, sizeof(attrName));
 			
-			any attrValue = TF2Attrib_GetValue(pAttrib);
+			any attrValue = WeaponsAttrib_GetValue(pAttrib);
 			
 			char attribType[64];
 			if (TF2Econ_GetAttributeDefinitionString(attrdefs[i], "attribute_type",
 					attribType, sizeof(attribType)) && StrEqual(attribType, "string")) {
 				// not the most ideal detection method but it'll do
 				char attrStrValue[128];
-				TF2Attrib_UnsafeGetStringValue(attrValue, attrStrValue, sizeof(attrStrValue));
+				WeaponsAttrib_UnsafeGetStringValue(attrValue, attrStrValue, sizeof(attrStrValue));
 				exportedWeapon.SetString(attrName, attrStrValue);
 			} else {
 				// everything else that matters are float values

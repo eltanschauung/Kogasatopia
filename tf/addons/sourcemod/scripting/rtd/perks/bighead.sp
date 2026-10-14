@@ -39,12 +39,12 @@ public void BigHead_ApplyPerk(const int client, const Perk perk)
 
 	Cache[client].Scale = fScale;
 
-	TF2Attrib_SetByDefIndex(client, Attribs.VoicePitch, 1.0 / Min(fScale, 3.0));
+	WeaponsAttrib_SetByDefIndex(client, Attribs.VoicePitch, 1.0 / Min(fScale, 3.0));
 }
 
 public void BigHead_RemovePerk(const int client, const RTDRemoveReason eRemoveReason)
 {
-	TF2Attrib_RemoveByDefIndex(client, Attribs.VoicePitch);
+	WeaponsAttrib_RemoveByDefIndex(client, Attribs.VoicePitch);
 }
 
 bool BigHead_OnPlayerRunCmd(const int client, int& iButtons, float fVel[3], float fAng[3])

@@ -335,12 +335,12 @@ static void HuntingRevolver_RecalculateSpeed(int client)
 
 static void HuntingRevolver_SetFOV(int client, int fov)
 {
-	if (g_SDKSetFOV == null || !Weapons_IsValidPlayerIndex(client) || !IsClientInGame(client))
+	if (!Weapons_IsValidPlayerIndex(client) || !IsClientInGame(client))
 	{
 		return;
 	}
 
-	SDKCall(g_SDKSetFOV, client, client, fov, HUNTING_REVOLVER_ZOOM_TIME, 0);
+	WeaponsView_SetZoom(client, fov, HUNTING_REVOLVER_ZOOM_TIME);
 }
 
 static void HuntingRevolver_SetZoom(int client, bool enabled)

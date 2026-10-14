@@ -1,8 +1,8 @@
 #pragma once
 #define SMEXT_CONF_NAME "weapons_ext"
 #define SMEXT_CONF_DESCRIPTION "Unified TF2 inventory, equipment, conditions and ballistics"
-#define SMEXT_CONF_VERSION "1.0.0"
-#define SMEXT_CONF_AUTHOR "Hombre; AlliedModders LLC; Asher Baker; AzuiSleet"
+#define SMEXT_CONF_VERSION "2.0.0"
+#define SMEXT_CONF_AUTHOR "Hombre; AlliedModders LLC; Asher Baker; AzuiSleet; FlaminSarge; nosoop; AndrewBetson; rtldg; pufftwitt"
 #define SMEXT_CONF_URL "https://github.com/eltanschauung/Kogasatopia"
 #define SMEXT_CONF_LOGTAG "weapons_ext"
 #define SMEXT_CONF_LICENSE "GPL-3.0"

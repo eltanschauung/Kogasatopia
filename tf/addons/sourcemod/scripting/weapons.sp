@@ -8,11 +8,12 @@
 #include <sdktools>
 #include <sdktools_sound>
 #include <weapons_ext>
-#include <tf2utils>
+#include <weapons_view>
+#include <weapons_utils>
 #include <tf_econ_data>
-#include <tf2attributes>
+#include <weapons_attributes>
 #include <tf2_stocks>
-#include <tf_ontakedamage>
+#include <weapons_damage>
 #include <morecolors>
 #include <sourcescramble>
 #include <dhooks>
@@ -52,9 +53,9 @@
 public Plugin myinfo =
 {
     name = "Weapons",
-    author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
+    author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, FlaminSarge, AndrewBetson, rtldg, pufftwitt, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.2.5" ... VERSION_SUFFIX,
+    version = "7.3.0" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -101,6 +102,9 @@ int g_attrdef_AllowedInMedievalMode;
 
 #include "weapons/custom_attributes.sp"
 #include "weapons/whitelist.sp"
+#include "weapons/view_preferences.sp"
+#include "weapons/sentry_settings.sp"
+#include "weapons/econ_attributes.sp"
 #include "weapons/movement_attributes.sp"
 #include "weapons/item_config.sp"
 #include "weapons/item_entity.sp"
@@ -147,6 +151,9 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
 
 public void OnPluginStart()
 {
+    WeaponsEcon_OnPluginStart();
+    WeaponsView_OnPluginStart();
+    WeaponsSentry_OnPluginStart();
     WeaponsCustomAttributes_OnPluginStart();
     WeaponsMovement_OnPluginStart();
     CustomHats_OnPluginStart();
@@ -244,6 +251,8 @@ public void OnPluginStart()
 public void OnPluginEnd()
 {
     WeaponsLoadout_Unbind();
+    WeaponsView_Reset();
+    TF2SentryNewTarget_SetEnabled(false);
     CustomHats_OnPluginEnd();
     WeaponsGameplay_OnPluginEnd();
     WeaponsModels_OnPluginEnd();
@@ -258,6 +267,8 @@ public void OnPluginEnd()
 
 public void OnConfigsExecuted()
 {
+    WeaponsView_PublishLimits();
+    WeaponsSentry_Apply();
     WeaponsMovement_OnConfigsExecuted();
     CustomHats_OnConfigsExecuted();
 }
@@ -275,6 +286,7 @@ void Weapons_NotifyItemRuntimeStateReadyImpl(int client, int entity)
     {
         return;
     }
+    WeaponsView_ReconcileWeapon(client, entity);
     int serial = GetClientSerial(client);
     int ref = EntIndexToEntRef(entity);
     int profile = KogasaPerfBegin();
@@ -346,6 +358,7 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnMapStart()
 {
+    WeaponsEcon_OnMapStart();
     WhitelistPolicy_ResetTransactions();
     WeaponsBuildings_ResetAll();
     WeaponsMovement_OnMapStart();
@@ -375,6 +388,7 @@ public void OnMapEnd()
 
 public void OnClientPutInServer(int client)
 {
+    if (AreClientCookiesCached(client)) WeaponsView_OnCookiesCached(client);
     WeaponsBuildings_ResetClient(client);
     WeaponsMovement_OnClientPutInServer(client);
     WeaponsSound_ResetClient(client, true);
@@ -394,6 +408,7 @@ public void OnClientDisconnect(int client)
     WeaponsBuildings_ResetClient(client);
     WeaponsCommands_ResetClient(client);
     Weapons_ResetLoadoutRequests(client);
+    WeaponsView_OnDisconnect(client);
     CustomHats_OnClientDisconnect(client);
     WeaponsHatVisibility_OnClientDisconnect(client);
     WeaponsMovement_OnClientDisconnect(client);

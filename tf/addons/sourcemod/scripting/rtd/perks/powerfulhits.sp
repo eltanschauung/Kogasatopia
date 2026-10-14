@@ -46,7 +46,7 @@ public void PowerfulHits_RemovePerk(const int client, const RTDRemoveReason eRem
 	{
 		int iWeapon = GetPlayerWeaponSlot(client, i);
 		if (iWeapon > MaxClients && IsValidEntity(iWeapon))
-			TF2Attrib_RemoveByDefIndex(iWeapon, Attribs.Damage);
+			WeaponsAttrib_RemoveByDefIndex(iWeapon, Attribs.Damage);
 	}
 }
 
@@ -56,7 +56,7 @@ public void PowerfulHits_Apply(const int client)
 	{
 		int iWeapon = GetPlayerWeaponSlot(client, i);
 		if (iWeapon > MaxClients && IsValidEntity(iWeapon))
-			TF2Attrib_SetByDefIndex(iWeapon, Attribs.Damage, Cache[client].Multiplier);
+			WeaponsAttrib_SetByDefIndex(iWeapon, Attribs.Damage, Cache[client].Multiplier);
 	}
 }
 

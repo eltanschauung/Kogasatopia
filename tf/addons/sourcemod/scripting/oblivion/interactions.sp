@@ -96,7 +96,7 @@ void ClearBlockedConditions()
         {
             TFCond condition = view_as<TFCond>(i);
             if (!TF2_IsPlayerInCondition(client, condition)) continue;
-            int provider = TF2Util_GetPlayerConditionProvider(client, condition);
+            int provider = WeaponsUtil_GetPlayerConditionProvider(client, condition);
             if (EntitiesBlocked(client, provider)) TF2_RemoveCondition(client, condition);
         }
     }

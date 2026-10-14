@@ -197,5 +197,5 @@ void FullPelletIgnite_TryConsumePost(int victim, int attacker, int weapon, int i
 		return;
 	}
 
-	TF2Util_IgnitePlayer(victim, attacker, burnDuration, damageWeapon);
+	WeaponsUtil_IgnitePlayer(victim, attacker, burnDuration, damageWeapon);
 }

@@ -12,7 +12,7 @@
 #include <sdkhooks>
 
 #include <tf2_stocks>
-#include <tf2attributes>
+#include <weapons_attributes>
 
 #include <morecolors>
 #undef REQUIRE_PLUGIN
@@ -403,9 +403,9 @@ public void ObjectBuilt(Event event, const char[] name, bool dontBroadcast)
 
     int wrench = GetPlayerWeaponSlot(builder, 2);
     if (padsEnabled)
-        TF2Attrib_SetByName(wrench, ATTRIBUTE_BUILD_SPEED, ATTRIBUTE_BUILD_SPEED_FACTOR);
+        WeaponsAttrib_SetByName(wrench, ATTRIBUTE_BUILD_SPEED, ATTRIBUTE_BUILD_SPEED_FACTOR);
     else
-        TF2Attrib_RemoveByName(wrench, ATTRIBUTE_BUILD_SPEED);
+        WeaponsAttrib_RemoveByName(wrench, ATTRIBUTE_BUILD_SPEED);
 
     QueueMinimumTeleporter(obj);
 }

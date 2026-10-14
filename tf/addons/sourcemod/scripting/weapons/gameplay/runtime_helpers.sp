@@ -42,7 +42,7 @@ int WeaponsProfiled_OnGiveNamedItemPost(int client, int itemDefinitionIndex, int
 	if (WeaponsGameplay_IsEnabled()) {
 		ShockCharge_StopTimer(client);
 		tf2_players[client].shockCharge = 30;
-		TF2Attrib_SetByName(entityIndex, "crit mod disabled hidden", 0.00);
+		WeaponsAttrib_SetByName(entityIndex, "crit mod disabled hidden", 0.00);
 
 		char auth[32];
 		if (g_hFallingStompAllWeapons != null
@@ -51,15 +51,15 @@ int WeaponsProfiled_OnGiveNamedItemPost(int client, int itemDefinitionIndex, int
 		{
 			if (!(StrEqual(auth, "STEAM_0:1:101494818")))
 			{
-				TF2Attrib_SetByName(entityIndex, "boots falling stomp", 1.00);
+				WeaponsAttrib_SetByName(entityIndex, "boots falling stomp", 1.00);
 			}
 		}
 
 		if (entityIndex > MaxClients
 			&& IsValidEntity(entityIndex)
-			&& TF2Attrib_HookValueInt(0, "killstreak tier", entityIndex) <= 0)
+			&& WeaponsAttrib_HookValueInt(0, "killstreak tier", entityIndex) <= 0)
 		{
-			TF2Attrib_SetByName(entityIndex, "killstreak tier", 1.0);
+			WeaponsAttrib_SetByName(entityIndex, "killstreak tier", 1.0);
 		}
 
 		int oldMax = GetWeaponMaxClip(entityIndex);

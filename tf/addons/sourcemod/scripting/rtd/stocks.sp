@@ -414,7 +414,7 @@ stock float GetCaptureValue(const int client)
 				fValue += 1.0;
 	}
 
-	// We could iterate weapons and use TF2Attrib_ListDefIndices on each of them instead of checking
+	// We could iterate weapons and use WeaponsAttrib_ListDefIndices on each of them instead of checking
 	// for Pain Train directly, but native attributes cannot be read without parsing the itemschema,
 	// which I don't think is worth for the ~1% of cases when it's needed.
 
@@ -423,15 +423,15 @@ stock float GetCaptureValue(const int client)
 
 stock void ApplyPreventCapture(const int client)
 {
-	TF2Attrib_SetByDefIndex(client, 400, 1.0); // cannot pick up intel
-	TF2Attrib_SetByDefIndex(client, 68, -GetCaptureValue(client)); // balance capture value to 0
+	WeaponsAttrib_SetByDefIndex(client, 400, 1.0); // cannot pick up intel
+	WeaponsAttrib_SetByDefIndex(client, 68, -GetCaptureValue(client)); // balance capture value to 0
 	FakeClientCommandEx(client, "dropitem"); // in case intel is already picked up
 }
 
 stock void RemovePreventCapture(const int client)
 {
-	TF2Attrib_RemoveByDefIndex(client, 400);
-	TF2Attrib_RemoveByDefIndex(client, 68);
+	WeaponsAttrib_RemoveByDefIndex(client, 400);
+	WeaponsAttrib_RemoveByDefIndex(client, 68);
 }
 
 stock int GetUniqueId(const int client, const int iOther)
@@ -1292,12 +1292,12 @@ stock void SetSpeed(int client, float fBase, float fMul=1.0)
 {
 	if (fMul == 1.0)
 	{
-		TF2Attrib_RemoveByDefIndex(client, 107);
+		WeaponsAttrib_RemoveByDefIndex(client, 107);
 		SetEntPropFloat(client, Prop_Send, "m_flMaxspeed", fBase);
 	}
 	else
 	{
-		TF2Attrib_SetByDefIndex(client, 107, fMul);
+		WeaponsAttrib_SetByDefIndex(client, 107, fMul);
 		SetEntPropFloat(client, Prop_Send, "m_flMaxspeed", fBase *fMul);
 	}
 }
@@ -1307,11 +1307,11 @@ stock void SetSpeedEx(int client, float fMul=1.0)
 {
 	if (fMul == 1.0)
 	{
-		TF2Attrib_RemoveByDefIndex(client, 107);
+		WeaponsAttrib_RemoveByDefIndex(client, 107);
 	}
 	else
 	{
-		TF2Attrib_SetByDefIndex(client, 107, fMul);
+		WeaponsAttrib_SetByDefIndex(client, 107, fMul);
 	}
 
 	TriggerSpeedRecalc(client);

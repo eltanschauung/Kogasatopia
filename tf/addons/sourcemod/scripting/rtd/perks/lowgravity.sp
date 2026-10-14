@@ -48,7 +48,7 @@ public void LowGravity_ApplyPerk(int client, Perk perk)
 
 	if (Cache[client].JumpMode)
 	{
-		TF2Attrib_SetByDefIndex(client, Attribs.JumpHeight, 1.0 / fMultiplier);
+		WeaponsAttrib_SetByDefIndex(client, Attribs.JumpHeight, 1.0 / fMultiplier);
 	}
 	else
 	{
@@ -56,14 +56,14 @@ public void LowGravity_ApplyPerk(int client, Perk perk)
 	}
 
 	if (!Cache[client].FallDamage)
-		TF2Attrib_SetByDefIndex(client, Attribs.NoFallDamage, 1.0);
+		WeaponsAttrib_SetByDefIndex(client, Attribs.NoFallDamage, 1.0);
 }
 
 public void LowGravity_RemovePerk(const int client, const RTDRemoveReason eRemoveReason)
 {
 	if (Cache[client].JumpMode)
 	{
-		TF2Attrib_RemoveByDefIndex(client, Attribs.JumpHeight);
+		WeaponsAttrib_RemoveByDefIndex(client, Attribs.JumpHeight);
 	}
 	else
 	{
@@ -71,7 +71,7 @@ public void LowGravity_RemovePerk(const int client, const RTDRemoveReason eRemov
 	}
 
 	if (!Cache[client].FallDamage)
-		TF2Attrib_RemoveByDefIndex(client, Attribs.NoFallDamage);
+		WeaponsAttrib_RemoveByDefIndex(client, Attribs.NoFallDamage);
 }
 
 bool LowGravity_OnPlayerRunCmd(const int client, int& iButtons, float fVel[3], float fAng[3])

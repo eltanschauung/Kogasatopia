@@ -157,7 +157,7 @@ void WeaponsModels_ApplyProjectileModelFrame(any projectileRef) {
 
 	int launcher = GetEntPropEnt(projectile, Prop_Send, "m_hLauncher");
 	if (launcher <= MaxClients || !IsValidEntity(launcher)
-			|| !TF2Util_IsEntityWeapon(launcher)) {
+			|| !WeaponsUtil_IsEntityWeapon(launcher)) {
 		return;
 	}
 
@@ -325,7 +325,7 @@ void WeaponsModels_OnItemRuntimeStateReady(int client, int entity) {
 	if (!Weapons_IsValidClient(client) || !IsValidEntity(entity)) {
 		return;
 	}
-	if (TF2Util_IsEntityWearable(entity)) {
+	if (WeaponsUtil_IsEntityWearable(entity)) {
 		char model[PLATFORM_MAX_PATH];
 		if (GetEntityClientModelOverride(entity, model, sizeof(model))) {
 			ApplyWearableModelOverride(entity, model);
@@ -352,7 +352,7 @@ static void CopyKillstreakSheen(int weapon, int wearable) {
 		return;
 	}
 
-	int sheen = TF2Attrib_HookValueInt(0, ATTR_CLASS_KILLSTREAK_IDLEEFFECT, weapon);
+	int sheen = WeaponsAttrib_HookValueInt(0, ATTR_CLASS_KILLSTREAK_IDLEEFFECT, weapon);
 	if (sheen <= 0) {
 		return;
 	}
@@ -360,7 +360,7 @@ static void CopyKillstreakSheen(int weapon, int wearable) {
 	char value[16];
 	IntToString(sheen, value, sizeof(value));
 
-	TF2Attrib_SetFromStringValue(
+	WeaponsAttrib_SetFromStringValue(
 		wearable,
 		ATTR_NAME_KILLSTREAK_IDLEEFFECT,
 		value
@@ -368,7 +368,7 @@ static void CopyKillstreakSheen(int weapon, int wearable) {
 }
 
 static void EquipWeaponModelWearable(int client, int wearable, int weapon) {
-	TF2Util_EquipPlayerWearable(client, wearable);
+	WeaponsUtil_EquipPlayerWearable(client, wearable);
 
 	if (IsValidEntity(weapon)
 			&& HasEntProp(wearable, Prop_Send, "m_hWeaponAssociatedWith")) {
@@ -549,17 +549,17 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 	
 	if (TF2_GetPlayerClass(client) == TFClass_DemoMan) {
 		// display shield if player has their melee weapon out on demoman
-		int shield = TF2Util_GetPlayerLoadoutEntity(client, 1);
+		int shield = WeaponsUtil_GetPlayerLoadoutEntity(client, 1);
 		char ohvm[PLATFORM_MAX_PATH];
-		if (IsValidEntity(shield) && TF2Util_IsEntityWearable(shield)
+		if (IsValidEntity(shield) && WeaponsUtil_IsEntityWearable(shield)
 				&& TF2CustAttr_GetString(shield, "clientmodel override", ohvm, sizeof(ohvm))
 				&& FileExistsAndLog(ohvm, true)) {
 			PrecacheModelAndLog(ohvm);
 			SetEntityModel(shield, ohvm);
 			Weapons_MarkValidatedAttachedEntity(shield, client, "demoman_shield", false, weapon);
 			
-			if (TF2Util_IsEntityWeapon(weapon)
-					&& TF2Util_GetWeaponSlot(weapon) == TFWeaponSlot_Melee) {
+			if (WeaponsUtil_IsEntityWeapon(weapon)
+					&& WeaponsUtil_GetWeaponSlot(weapon) == TFWeaponSlot_Melee) {
 				int offhandwearable = TF2_SpawnWearableViewmodel();
 				if (IsValidEntity(offhandwearable)) {
 					SetEntityModel(offhandwearable, ohvm);
@@ -636,9 +636,9 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 }
 
 void UpdateClientWearableModels(int client) {
-	int count = TF2Util_GetPlayerWearableCount(client);
+	int count = WeaponsUtil_GetPlayerWearableCount(client);
 	for (int i = 0; i < count; i++) {
-		int wearable = TF2Util_GetPlayerWearable(client, i);
+		int wearable = WeaponsUtil_GetPlayerWearable(client, i);
 		if (!IsValidEntity(wearable)) {
 			continue;
 		}
@@ -669,7 +669,7 @@ bool GetExtraWearableModelOverride(int client, int wearable, char[] model, int m
 	}
 
 	for (int slot = 0; slot < 7; slot++) {
-		int loadoutEntity = TF2Util_GetPlayerLoadoutEntity(client, slot);
+		int loadoutEntity = WeaponsUtil_GetPlayerLoadoutEntity(client, slot);
 		if (TryGetExtraWearableModelOverrideFromEntity(loadoutEntity, wearableDefIndex, model, maxlen)) {
 			return true;
 		}
@@ -722,7 +722,7 @@ int GetEntityItemDefinitionIndex(int entity) {
 }
 
 bool ApplyWearableModelOverride(int wearable, const char[] model) {
-	if (!IsValidEntity(wearable) || !TF2Util_IsEntityWearable(wearable)) {
+	if (!IsValidEntity(wearable) || !WeaponsUtil_IsEntityWearable(wearable)) {
 		return false;
 	}
 

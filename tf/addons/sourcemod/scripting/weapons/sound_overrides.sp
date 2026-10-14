@@ -136,10 +136,10 @@ void WeaponsSound_ReconcileWeaponHooks(int weapon)
 		features |= WEAPONS_SOUND_FEATURE_MELEE_SWING;
 	if (TF2CustAttr_GetString(weapon, Weapons_ATTR_CUSTOM_DEPLOY_FINISHED_SOUND, value, sizeof(value)))
 		features |= WEAPONS_SOUND_FEATURE_DEPLOY_FINISHED;
-	if (features && !TF2Util_IsEntityWeapon(weapon))
+	if (features && !WeaponsUtil_IsEntityWeapon(weapon))
 		features = 0;
 	if ((features & WEAPONS_SOUND_FEATURE_MELEE_SWING)
-		&& TF2Util_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
+		&& WeaponsUtil_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
 		features &= ~WEAPONS_SOUND_FEATURE_MELEE_SWING;
 	g_iWeaponsSoundFeatures[weapon] = features;
 
@@ -177,7 +177,7 @@ public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)
 	if (weapon <= MaxClients || weapon >= WEAPONS_SOUND_MAX_ENTITIES || !IsValidEntity(weapon)
 		|| !(g_iWeaponsSoundFeatures[weapon] & WEAPONS_SOUND_FEATURE_MELEE_SWING))
 		return MRES_Ignored;
-	g_WeaponsSoundPendingSwing[weapon] = TF2Util_GetWeaponSlot(weapon) == TFWeaponSlot_Melee;
+	g_WeaponsSoundPendingSwing[weapon] = WeaponsUtil_GetWeaponSlot(weapon) == TFWeaponSlot_Melee;
 	if (g_WeaponsSoundPendingSwing[weapon])
 		g_WeaponsSoundAttackTimeBefore[weapon] = GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack");
 	return MRES_Ignored;
@@ -286,7 +286,7 @@ void WeaponsSound_OnWeaponSwitchPost(int client, int weapon)
 static void WeaponsSound_PlayCustomDeploySound(int client, int weapon, bool finished = false)
 {
 	if (!Weapons_IsValidClient(client) || !Weapons_IsValidWeaponEntity(weapon)
-		|| !TF2Util_IsEntityWeapon(weapon))
+		|| !WeaponsUtil_IsEntityWeapon(weapon))
 	{
 		return;
 	}
@@ -296,7 +296,7 @@ static void WeaponsSound_PlayCustomDeploySound(int client, int weapon, bool fini
 		return;
 	}
 
-	int slot = view_as<int>(TF2Util_GetWeaponSlot(weapon));
+	int slot = view_as<int>(WeaponsUtil_GetWeaponSlot(weapon));
 	if (slot < 0 || slot > WEAPONS_LAST_WEAPON_SLOT)
 	{
 		slot = WEAPONS_DEPLOY_COOLDOWN_UNKNOWN_SLOT;
@@ -379,8 +379,8 @@ void WeaponsSound_PlayCustomMeleeHit(int attacker, int weapon)
 {
 	if (weapon <= MaxClients
 			|| !IsValidEntity(weapon)
-			|| !TF2Util_IsEntityWeapon(weapon)
-			|| TF2Util_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
+			|| !WeaponsUtil_IsEntityWeapon(weapon)
+			|| WeaponsUtil_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
 	{
 		return;
 	}

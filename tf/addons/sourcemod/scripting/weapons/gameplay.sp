@@ -167,7 +167,7 @@ enum struct tf2_player
 Handle g_SDKGetMaxClip1 = null;
 Handle g_SDKGetAfterburnRateOnHit = null;
 Handle g_SDKTeamFortressSetSpeed = null;
-Handle g_SDKSetFOV = null;
+
 int g_iMetalOffset = -1;
 int g_iAfterburnDurationOffset = -1;
 bool g_bWarnedMetalOffset = false;

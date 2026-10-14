@@ -79,7 +79,7 @@ static bool WeaponsBuildings_CheckRestriction(int client, bool incomingInventory
         // Engine regeneration replaces custom items from the selected loadout.
         // Do not let an outgoing Super Gunslinger suppress the restored tools.
         // Ordinary externally attributed weapons still retain their restriction.
-        if (incomingInventory && TF2Attrib_GetByName(weapon, ATTRIB_NAME_CUSTOM_UID))
+        if (incomingInventory && WeaponsAttrib_GetByName(weapon, ATTRIB_NAME_CUSTOM_UID))
         {
             continue;
         }
