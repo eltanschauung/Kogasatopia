@@ -1,6 +1,6 @@
-# Unified Weapons services (2.0)
+# Unified Weapons services (2.1)
 
-`weapons_ext` now contains eleven internal modules, behind one extension identity,
+`weapons_ext` now contains twelve internal modules, behind one extension identity,
 one client dispatcher, and one detour runtime. The seven listed SourcePawn
 providers are retired, not wrapped:
 
@@ -15,10 +15,17 @@ providers are retired, not wrapped:
   commands and the existing `fov_override` / `tf2centerprojectiles` cookies.
   Hunting Revolver calls `WeaponsView_SetZoom` directly; it does not rely on
   a separate FOV plugin intercepting a SourcePawn SDKCall.
-- `tf_econ_dynamic_compat`: its config loader is a Weapons module. The existing
-  **dynamic-econ engine injector extension remains**; only its standalone
-  compatibility/config-loader plugin was listed for retirement. Registration
-  is cold-path work and explicitly invalidates native definition caches.
+- `tf_econ_dynamic_compat` and `tf2econdynamic`: the config loader is a Weapons
+  module and the engine injector is now a native schema service. Use
+  `WeaponsSchemaAttribute` from `weapons_schema.inc`; the old methodmap and
+  extension dependency are not exported. Registration directly invalidates the
+  native attribute caches, including when the schema tree backing store moves.
+  Map reinstallation uses the root's lifecycle dispatch, not another LevelInit
+  hook. The October TF2 secondary name-lookup index fix is retained.
+  KeyValues remain opaque engine allocations: creation/cloning, access and
+  destruction all use resolved server functions, not the incompatible SDK
+  KeyValues layout. The empty handle template is cloned from an engine-owned
+  definition and cleared by the engine, avoiding a guessed allocation size.
 - `tf2_sentry_newtarget_dist`: its existing engine module was already merged;
   its convars and config execution now belong to Weapons.
 
@@ -32,7 +39,8 @@ providers beside this extension; the startup guard rejects their active files.
 
 Target remains **Linux x86 TF2**, not a new 64-bit port. Borrowed attribute
 addresses expire on runtime-list mutation, entity deletion, or schema reload.
-Call `WeaponsAttrib_InvalidateDefinitions` after replacing/injecting definitions.
+Schema service insertions automatically invalidate definitions. Call
+`WeaponsAttrib_InvalidateDefinitions` only for modifications made outside it.
 Missing definitions are never cached. Managed non-networked values are removed
 from live lists before freeing, and networked values are left alone.
 
@@ -56,6 +64,11 @@ The Original remains centered when the user's preference is off.
 - Use an isolated server without production databases, cookies or configs.
   Use valid player attackers with player-owned weapons in damage fixtures.
 - Run probes again after map changes and check the server's error log.
+- `tests/schema_probe.sp` exercises schema handle ownership/cloning, auto/explicit
+  IDs, Valve protection, name-index replacement, injected string types, 512
+  insertions with warm caches, and reinstallation before plugin OnMapStart.
+- `schema_loader_probe.sp` with `schema_fixture.txt` verifies the actual Weapons
+  SMC loader on startup and map changes in an isolated test configuration.
 - Compile every caller, verify no old provider dependencies/symbols remain,
   stop both shared-tree servers, back up exact files, install atomically, retire
   providers recoverably, restart both screens, and verify plugin/extension status.

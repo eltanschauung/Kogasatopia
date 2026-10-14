@@ -8,18 +8,17 @@
 
 #pragma newdecls required
 
-#include <tf_econ_dynamic>
+#include <weapons_schema>
 
 
-static TF2EconDynAttribute s_AttributeContext;
+static WeaponsSchemaAttribute s_AttributeContext;
 bool g_WeaponsEconSkipInitialMapReload;
 
 public void WeaponsEcon_OnPluginStart() {
-	s_AttributeContext = new TF2EconDynAttribute();
+	s_AttributeContext = new WeaponsSchemaAttribute();
 
 	WeaponsEcon_CreateAttributeConfigParsers();
     WeaponsEcon_LoadAttributes();
-    WeaponsAttrib_InvalidateDefinitions();
     g_WeaponsEconSkipInitialMapReload = true;
 }
 
@@ -30,7 +29,6 @@ public void WeaponsEcon_OnMapStart() {
     }
 	// this loads relatively late, but it should be fine
 	WeaponsEcon_LoadAttributes();
-    WeaponsAttrib_InvalidateDefinitions();
 }
 
 enum HiddenAttributeConfigParseState {
@@ -130,7 +128,10 @@ SMCResult WeaponsEcon_OnAttributeConfigLeaveSection(SMCParser smc) {
 	switch (s_ParseState) {
 		case HiddenAttributeConfigParseState_AttributeProperties: {
 			s_ParseState = HiddenAttributeConfigParseState_AttributeList;
-			s_AttributeContext.Register();
+			if (!s_AttributeContext.Register()) {
+				LogError("[Weapons Schema] Attribute registration failed; definition rejected");
+				return SMCParse_HaltFail;
+			}
 		}
 		case HiddenAttributeConfigParseState_AttributeList: {
 			s_ParseState = HiddenAttributeConfigParseState_Root;
@@ -191,7 +192,7 @@ void WeaponsEcon_LoadAttributes() {
 		Format(filename, sizeof(filename), "%s/%s", configDir, filename);
 
 		if (strlen(filename) < 4 || strncmp(filename[strlen(filename) - 4], ".txt", 4, false) != 0) {
-			PrintToServer("[TF2 Econ Dynamic] "
+			PrintToServer("[Weapons Schema] "
 					... "Attributes file %s does not have a txt extension. "
 					... "Attributes will not be loaded",
 					filename);
@@ -199,7 +200,7 @@ void WeaponsEcon_LoadAttributes() {
 		}
 
 		if (s_HiddenDevAttributeParser.ParseFile(filename) != SMCError_Okay) {
-			PrintToServer("[TF2 Econ Dynamic] "
+			PrintToServer("[Weapons Schema] "
 					... "Failed to load file %s. Attributes will not be loaded",
 					filename);
 		}

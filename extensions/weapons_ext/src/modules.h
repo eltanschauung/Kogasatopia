@@ -9,6 +9,7 @@ SDKExtension &PelletsModule();
 SDKExtension &SpreadModule();
 SDKExtension &WhitelistModule();
 SDKExtension &SentryModule();
+SDKExtension &SchemaModule();
 SDKExtension &AttributesModule();
 SDKExtension &UtilitiesModule();
 SDKExtension &DamageModule();

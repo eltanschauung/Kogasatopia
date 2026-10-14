@@ -11,7 +11,8 @@ static constexpr const char *kStandaloneFiles[] = {
     "game.tf2.ext.2.tf2.so", "game.tf2.ext.so", "tf2items.ext.2.ep2v.so",
     "tf2items.ext.2.tf2.so", "tf2items.ext.so", "conch_no_speed.ext.2.tf2.so",
     "scattergun_pellets.ext.2.tf2.so", "tf2_spread_patterns.ext.2.tf2.so",
-    "whitelist_policy.ext.2.tf2.so", "tf2_sentry_newtarget_dist.ext.2.tf2.so"
+    "whitelist_policy.ext.2.tf2.so", "tf2_sentry_newtarget_dist.ext.2.tf2.so",
+    "tf2econdynamic.ext.2.tf2.so", "tf2econdynamic.ext.so"
 };
 static constexpr const char *kRetiredPlugins[] = {
     "tf2attributes.smx", "tf_ontakedamage.smx", "tf_econ_dynamic_compat.smx",
@@ -53,7 +54,7 @@ void ClientDispatch::OnClientDisconnected(int client) {
 }
 
 class WeaponsExtension final : public SDKExtension {
-    std::array<SDKExtension *, 11> modules_{};
+    std::array<SDKExtension *, 12> modules_{};
     size_t loaded_ = 0;
     size_t metamod_ = 0;
     bool listening_ = false;
@@ -62,10 +63,10 @@ public:
     bool SDK_OnMetamodLoad(ISmmAPI *api, char *error, size_t length, bool late) override {
         modules_ = { &ToolsModule(), &ItemsModule(), &ConchModule(), &PelletsModule(),
                      &SpreadModule(), &WhitelistModule(), &SentryModule(),
-                     &AttributesModule(), &UtilitiesModule(), &DamageModule(), &ViewModule() };
+                     &SchemaModule(), &AttributesModule(), &UtilitiesModule(), &DamageModule(), &ViewModule() };
         // Component hooks wait until SourceMod interfaces are available and
         // the duplicate-owner guard succeeds. Merely dlopen'ing a candidate
-        // must not attach hooks beside the original seven extensions.
+        // must not attach hooks beside their standalone counterparts.
         metamod_api_ = api;
         return true;
     }
@@ -159,7 +160,7 @@ SDKExtension *g_pExtensionIface = &extension;
 
 CON_COMMAND(sm_weapons_ext_status, "Report unified Weapons native module ownership")
 {
-    META_CONPRINTF("[weapons_ext] modules=%u/11 extension_interfaces=1 client_dispatchers=1 detour_runtimes=1\n",
+    META_CONPRINTF("[weapons_ext] modules=%u/12 extension_interfaces=1 client_dispatchers=1 detour_runtimes=1\n",
         unsigned(extension.LoadedModules()));
     META_CONPRINTF("[weapons_ext] shared_trace_vtables=%u\n", unsigned(PelletSharedTraceTables()));
 }

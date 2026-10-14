@@ -11,7 +11,7 @@ project.sources += [
     'conch/extension.cpp', 'pellets/extension.cpp', 'spread/extension.cpp',
     'whitelist/extension.cpp', 'sentry/extension.cpp', 'sentry/natives.cpp',
     'sentry/range_override.cpp',
-    'services/attributes.cpp', 'services/utilities.cpp', 'services/damage.cpp', 'services/view.cpp',
+    'services/schema.cpp', 'services/attributes.cpp', 'services/utilities.cpp', 'services/damage.cpp', 'services/view.cpp',
     os.path.join(root, 'public', 'smsdk_ext.cpp'),
     os.path.join(root, 'public', 'CDetour', 'detours.cpp'),
 ]

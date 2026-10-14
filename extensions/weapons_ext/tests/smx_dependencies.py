@@ -6,7 +6,8 @@ import struct
 import zlib
 
 LEGACY = {'game.tf2.ext', 'tf2items.ext', 'conch_no_speed.ext', 'scattergun_pellets.ext',
-          'tf2_spread_patterns.ext', 'whitelist_policy.ext', 'tf2_sentry_newtarget_dist.ext'}
+          'tf2_spread_patterns.ext', 'whitelist_policy.ext', 'tf2_sentry_newtarget_dist.ext',
+          'tf2econdynamic.ext'}
 
 def extension_dependencies(path):
     raw = Path(path).read_bytes()

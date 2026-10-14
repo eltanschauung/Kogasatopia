@@ -2,13 +2,15 @@
 
 One Linux x86 SourceMod extension owns TF2Items, the stable TF2Tools derivative,
 Conch No Speed, Scattergun Pellets, TF2 Spread Patterns, TF2 Whitelist Policy and
-TF2 Sentry NewTarget Distance. There are no legacy binary aliases or shim
+TF2 Sentry NewTarget Distance. Native attribute, utility, damage, view and dynamic
+schema services are also consolidated; see [SERVICES.md](SERVICES.md).
+There are no legacy binary aliases or shim
 extensions. Consumers must be rebuilt with the updated includes.
 
 ## Architecture and overhead
 
 - One extension interface, SourceMod SDK bootstrap, Metamod identity and native
-  owner, instead of seven. One CDetour/SafetyHook/Zydis runtime is linked once.
+  owner for twelve internal modules. One CDetour/SafetyHook/Zydis runtime is linked once.
 - One player-manager listener dispatches the relevant lifecycle callbacks to
   the component state. Conditions remain demand-driven inside TF2Tools.
 - Concheror hooks bypass irrelevant conditions immediately. Relevant conditions
@@ -52,8 +54,9 @@ The dependency's file key is `weapons_ext.ext`, matching `weapons_ext.autoload`.
 SourceMod resolves the engine suffix itself. An explicit `.2.tf2` dependency
 creates a second owner for the same DSO and invalidates handle identities.
 
-All existing gamedata filenames are retained to preserve their updater/ABI
-ownership. This is not a compatibility extension. TF2Tools reads `sm-tf2.games`
+Existing feature gamedata filenames retain their updater/ABI ownership, except
+the retired injector: its validated schema offsets/signatures now live in
+`weapons.schema.txt`. This is not a compatibility extension. TF2Tools reads `sm-tf2.games`
 from the installed stable SourceMod package; TF2Items reads `tf2.items.txt`.
 The other five feature gamedata files remain in the repository's gamedata tree.
 Before creating a demand-driven TF2Tools detour, its own config is explicitly

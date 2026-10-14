@@ -1,0 +1,15 @@
+"attributes"
+{
+    "auto"
+    {
+        "name" "schema loader auto"
+        "attribute_class" "schema_loader_add"
+        "description_format" "value_is_additive"
+    }
+    "42000"
+    {
+        "name" "schema loader explicit"
+        "attribute_class" "schema_loader_mult"
+        "description_format" "value_is_percentage"
+    }
+}

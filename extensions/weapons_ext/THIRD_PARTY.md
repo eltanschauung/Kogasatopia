@@ -9,7 +9,7 @@ provided for the services merged here.
 | Attributes | FlaminSarge, [TF2Attributes v1.7.5](https://github.com/FlaminSarge/tf2attributes/tree/v1.7.5) |
 | Utilities | nosoop, [TF2 Utils 1.4.0](https://github.com/nosoop/SM-TFUtils/tree/1.4.0), GPL-3.0 |
 | Damage forwards | nosoop, [SM-TFOnTakeDamage 1.3.3](https://github.com/nosoop/SM-TFOnTakeDamage/tree/1.3.3), GPL-3.0 |
-| Dynamic attribute configuration | nosoop, [SMExt-TFEconDynamic](https://github.com/nosoop/SMExt-TFEconDynamic), GPL-3.0 with SourceMod linking exception |
+| Dynamic attribute configuration and native injector | nosoop, [SMExt-TFEconDynamic](https://github.com/nosoop/SMExt-TFEconDynamic), GPL-3.0 with SourceMod linking exception; port includes name-index fix from local revision `fcd588f` |
 | FOV preferences | Andrew Betson, [TF-FOV](https://github.com/AndrewBetson/TF-FOV), AGPL-3.0-or-later |
 | Projectile centering | rtldg and pufftwitt, [v8.0](https://github.com/rtldg/tf2centerprojectiles/tree/v8.0) |
 | Bunnyhop caller migration | Mikusch, [tf-bhop 1.9.0](https://github.com/Mikusch/tf-bhop/tree/1.9.0), GPL-3.0; only API include/call changed |
