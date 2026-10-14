@@ -170,12 +170,11 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
     if (sourceModCommand && Filters_IsGradientChatCommand(sArgs))
         return Plugin_Handled;
 
-    // Slash commands are silent chat triggers. Saysounds also recognizes
-    // /soundname through a say listener, so do not render or relay them here.
-    // Continue lets the listener handle known sounds and preserves ordinary
-    // chat behavior for an unrecognized slash command.
+    // All slash-prefixed chat is silent, including unknown commands. Handled
+    // suppresses stock chat without blocking SourceMod command execution or
+    // Saysounds' /soundname listener. Do not render or relay these messages.
     if (sArgs[0] == '/')
-        return Plugin_Continue;
+        return Plugin_Handled;
 
     char dead[64];
     BuildDeathPrefix(client, dead, sizeof(dead));

@@ -160,10 +160,7 @@ public Action Timer_DoSwap(Handle timer, DataPack pack)
                 BuildFallbackName(b, useTeamColorB, nameB, sizeof(nameB));
             }
 
-            if (r > 0 && IsClientInGame(r) && !IsFakeClient(r))
-                CPrintToChatEx(r, srcClient, "%s <-> %s", nameR, nameB);
-            if (b > 0 && IsClientInGame(b) && !IsFakeClient(b))
-                CPrintToChatEx(b, srcClient, "%s <-> %s", nameR, nameB);
+            CPrintToChatAllEx(srcClient, "%s <-> %s", nameR, nameB);
             LogWhale("Pair %d: %N <-> %N.", i + 1, r, b);
         }
 
@@ -466,7 +463,10 @@ void NotifyFailure(int issuer, bool broadcastFailures, const char[] fmt, any ...
         return;
     }
     if (broadcastFailures)
+    {
+        CPrintToChatAll("{blue}[WhaleScramble]{default} %s", buffer);
         LogWhale("Scramble failed: %s", buffer);
+    }
 }
 
 void InsertTopN(int client, int score, int clients[MAX_SWAP_BUFFER], int scores[MAX_SWAP_BUFFER], int maxCount)

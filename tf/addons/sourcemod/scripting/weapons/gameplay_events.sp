@@ -4,8 +4,11 @@ GlobalForward g_OnMeatshotKill = null;
 GlobalForward g_OnEnvironmentalKill = null;
 GlobalForward g_OnSandmanMoonshot = null;
 GlobalForward g_OnDoubleDonk = null;
+GlobalForward g_OnMeleeKill = null;
 
 #define BONUS_EFFECT_DOUBLE_DONK 2
+// TF2's tf_shareddefs.h aliases DMG_MELEE to this Source damage bit.
+#define WEAPONS_DMG_MELEE DMG_BLAST_SURFACE
 
 void WeaponsGameplayEvents_Init()
 {
@@ -16,6 +19,7 @@ void WeaponsGameplayEvents_Init()
 	g_OnEnvironmentalKill = new GlobalForward("OnEnvironmentalKill", ET_Ignore, Param_Cell, Param_Cell);
 	g_OnSandmanMoonshot = new GlobalForward("OnSandmanMoonshot", ET_Ignore, Param_Cell, Param_Cell);
 	g_OnDoubleDonk = new GlobalForward("OnDoubleDonk", ET_Ignore, Param_Cell, Param_Cell);
+	g_OnMeleeKill = new GlobalForward("Weapons_OnMeleeKill", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 }
 
 void WeaponsGameplayEvents_Shutdown()
@@ -26,6 +30,7 @@ void WeaponsGameplayEvents_Shutdown()
 	delete g_OnEnvironmentalKill;
 	delete g_OnSandmanMoonshot;
 	delete g_OnDoubleDonk;
+	delete g_OnMeleeKill;
 }
 
 void WeaponsEvent_Fire(GlobalForward event, int attacker, int victim)
@@ -47,6 +52,33 @@ void FireMeatshotKill(int attacker, int victim) { WeaponsEvent_Fire(g_OnMeatshot
 void FireEnvironmentalKill(int attacker, int victim) { WeaponsEvent_Fire(g_OnEnvironmentalKill, attacker, victim); }
 void FireSandmanMoonshot(int attacker, int victim) { WeaponsEvent_Fire(g_OnSandmanMoonshot, attacker, victim); }
 void FireDoubleDonk(int attacker, int victim) { WeaponsEvent_Fire(g_OnDoubleDonk, attacker, victim); }
+
+void TryFireMeleeKill(Event event, int attacker, int victim, int weapon)
+{
+	// DoMeleeDamage marks actual swings/stabs with TF2's DMG_MELEE.
+	// DMG_CLUB alone is insufficient: Sandman/Wrap Assassin balls also use it.
+	if (g_OnMeleeKill == null
+		|| (event.GetInt("death_flags") & TF_DEATHFLAG_DEADRINGER) != 0
+		|| (event.GetInt("damagebits") & WEAPONS_DMG_MELEE) == 0
+		|| !Weapons_IsClientInGame(attacker)
+		|| !Weapons_IsClientInGame(victim)
+		|| attacker == victim
+		|| GetClientTeam(attacker) <= 1
+		|| GetClientTeam(victim) <= 1
+		|| GetClientTeam(attacker) == GetClientTeam(victim)
+		|| !Weapons_IsValidWeaponEntity(weapon)
+		|| !WeaponsUtil_IsEntityWeapon(weapon)
+		|| WeaponsUtil_GetWeaponSlot(weapon) != TFWeaponSlot_Melee)
+	{
+		return;
+	}
+
+	Call_StartForward(g_OnMeleeKill);
+	Call_PushCell(attacker);
+	Call_PushCell(victim);
+	Call_PushCell(weapon);
+	Call_Finish();
+}
 
 public void Event_PlayerHurt_DoubleDonk(Event event, const char[] name, bool dontBroadcast)
 {

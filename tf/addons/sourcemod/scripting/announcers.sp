@@ -16,6 +16,7 @@
 #include <filters_api>
 #include <saysounds>
 #include <whaletracker_api>
+#include <weapons>
 #define REQUIRE_PLUGIN
 #include <plugin_statistics>
 
@@ -67,6 +68,7 @@ enum AnnouncerConfigMode
     AnnouncerConfig_ShutdownTheirs,
     AnnouncerConfig_MedicDrops,
     AnnouncerConfig_Airshots,
+    AnnouncerConfig_MeleeKills,
     AnnouncerConfig_UberTeam,
     AnnouncerConfig_UberEnemy,
     AnnouncerConfig_UberYou
@@ -93,6 +95,7 @@ StringMap g_ShutdownSoundMap = null;
 StringMap g_ShutdownTheirsSoundMap = null;
 StringMap g_MedicDropSoundMap = null;
 StringMap g_AirshotSoundMap = null;
+StringMap g_MeleeKillSoundMap = null;
 StringMap g_UberSoundMaps[3]; // teammate, enemy, self/patient
 AnnouncerConfigMode g_ConfigMode = AnnouncerConfig_None;
 int g_ConfigDepth = 0;
@@ -121,6 +124,7 @@ public void OnPluginStart()
     g_ShutdownTheirsSoundMap = new StringMap();
     g_MedicDropSoundMap = new StringMap();
     g_AirshotSoundMap = new StringMap();
+    g_MeleeKillSoundMap = new StringMap();
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)g_UberSoundMaps[i]=new StringMap();
     HookEvent("player_chargedeployed",Announcer_UberDeployed,EventHookMode_Post);
     g_hAnnouncerGroupsCookie = RegClientCookie(
@@ -308,6 +312,7 @@ public void OnPluginEnd()
     ClearSoundMap(g_ShutdownTheirsSoundMap);
     ClearSoundMap(g_MedicDropSoundMap);
     ClearSoundMap(g_AirshotSoundMap);
+    ClearSoundMap(g_MeleeKillSoundMap);
 
     if (g_KillstreakSoundMap != null)
     {
@@ -344,6 +349,9 @@ public void OnPluginEnd()
         delete g_AirshotSoundMap;
         g_AirshotSoundMap = null;
     }
+
+    delete g_MeleeKillSoundMap;
+    g_MeleeKillSoundMap = null;
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -405,6 +413,17 @@ public int Native_PlayAirshot(Handle plugin, int numParams)
 {
     int attacker = GetNativeCell(1);
     int victim = GetNativeCell(2);
+    return PlayAnnouncerKillSound(g_AirshotSoundMap, attacker, victim);
+}
+
+public void Weapons_OnMeleeKill(int attacker, int victim, int weapon)
+{
+    #pragma unused weapon
+    PlayAnnouncerKillSound(g_MeleeKillSoundMap, attacker, victim);
+}
+
+bool PlayAnnouncerKillSound(StringMap soundMap, int attacker, int victim)
+{
     if (!IsValidAnnouncerClient(attacker)
         || !IsValidAnnouncerClient(victim)
         || !Announcer_ShouldPlaySound(true))
@@ -413,7 +432,7 @@ public int Native_PlayAirshot(Handle plugin, int numParams)
     }
 
     char commandName[ANNOUNCER_MAX_COMMAND_NAME];
-    if (!GetAnnouncerSoundCommand(g_AirshotSoundMap, 0, "", attacker,
+    if (!GetAnnouncerSoundCommand(soundMap, 0, "", attacker,
         commandName, sizeof(commandName)))
     {
         return false;
@@ -473,6 +492,7 @@ public int Native_IsAnnouncerGroupEnabled(Handle plugin, int numParams)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_AirshotSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MeleeKillSoundMap);
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)AddPurchasedAnnouncerGroupsFromMap(client,groups,g_UberSoundMaps[i]);
 
     bool enabled = false;
@@ -523,6 +543,7 @@ void ShowAnnouncerGroupsMenu(int client)
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_ShutdownTheirsSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MedicDropSoundMap);
     AddPurchasedAnnouncerGroupsFromMap(client, groups, g_AirshotSoundMap);
+    AddPurchasedAnnouncerGroupsFromMap(client, groups, g_MeleeKillSoundMap);
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)AddPurchasedAnnouncerGroupsFromMap(client,groups,g_UberSoundMaps[i]);
 
     if (groups.Length == 0)
@@ -1206,6 +1227,10 @@ void LoadAnnouncerConfig()
     {
         g_AirshotSoundMap = new StringMap();
     }
+    if (g_MeleeKillSoundMap == null)
+    {
+        g_MeleeKillSoundMap = new StringMap();
+    }
 
     ClearSoundMap(g_KillstreakSoundMap);
     ClearSoundMap(g_MultikillSoundMap);
@@ -1213,6 +1238,7 @@ void LoadAnnouncerConfig()
     ClearSoundMap(g_ShutdownTheirsSoundMap);
     ClearSoundMap(g_MedicDropSoundMap);
     ClearSoundMap(g_AirshotSoundMap);
+    ClearSoundMap(g_MeleeKillSoundMap);
 
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)
     {
@@ -1285,6 +1311,10 @@ public SMCResult AnnouncerConfig_EnterSection(SMCParser parser, const char[] nam
         {
             g_ConfigMode = AnnouncerConfig_Airshots;
         }
+        else if (StrEqual(sectionName, "melee_kill"))
+        {
+            g_ConfigMode = AnnouncerConfig_MeleeKills;
+        }
         else if(StrEqual(sectionName,"uber_team"))g_ConfigMode=AnnouncerConfig_UberTeam;
         else if(StrEqual(sectionName,"uber_enemy"))g_ConfigMode=AnnouncerConfig_UberEnemy;
         else if(StrEqual(sectionName,"uber_you"))g_ConfigMode=AnnouncerConfig_UberYou;
@@ -1343,6 +1373,7 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
 
     if (g_ConfigMode == AnnouncerConfig_MedicDrops
         || g_ConfigMode == AnnouncerConfig_Airshots
+        || g_ConfigMode == AnnouncerConfig_MeleeKills
         || (g_ConfigMode >= AnnouncerConfig_UberTeam && g_ConfigMode <= AnnouncerConfig_UberYou))
     {
         if (g_ConfigDepth != 2)
@@ -1356,6 +1387,8 @@ public SMCResult AnnouncerConfig_KeyValue(SMCParser parser, const char[] key, co
         {
             StringMap map = g_ConfigMode == AnnouncerConfig_MedicDrops
                 ? g_MedicDropSoundMap : g_AirshotSoundMap;
+            if (g_ConfigMode == AnnouncerConfig_MeleeKills)
+                map = g_MeleeKillSoundMap;
             if(g_ConfigMode>=AnnouncerConfig_UberTeam)
                 map=g_UberSoundMaps[view_as<int>(g_ConfigMode)-view_as<int>(AnnouncerConfig_UberTeam)];
             AddAnnouncerSoundCommand(map, 0, commandName);
@@ -1710,6 +1743,8 @@ static ArrayList FindAnnouncerSoundCommandList(const char[] commandName)
 
     commands=FindAnnouncerSoundCommandListInMap(g_AirshotSoundMap,commandName);
     if(commands!=null)return commands;
+    commands = FindAnnouncerSoundCommandListInMap(g_MeleeKillSoundMap, commandName);
+    if (commands != null) return commands;
     for(int i=0;i<sizeof(g_UberSoundMaps);i++)
     {
         commands=FindAnnouncerSoundCommandListInMap(g_UberSoundMaps[i],commandName);

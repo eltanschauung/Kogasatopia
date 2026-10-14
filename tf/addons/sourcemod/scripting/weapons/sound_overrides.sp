@@ -156,6 +156,7 @@ void WeaponsSound_ReconcileWeaponHooks(int weapon)
 	if (!features)
 		return;
 
+	int profile = KogasaPerfBegin();
 	if (features & WEAPONS_SOUND_FEATURE_MELEE_SWING)
 	{
 		if (g_iWeaponsSoundSwingPreHook[weapon] == INVALID_HOOK_ID)
@@ -170,6 +171,7 @@ void WeaponsSound_ReconcileWeaponHooks(int weapon)
 		WeaponsSound_HookDeployFinishedWeapon(weapon);
 		WeaponsSound_ResumeLateDeployFinish(weapon);
 	}
+	KogasaPerfEnd(profile, "EntityHooks/weapon_sound");
 }
 
 public MRESReturn WeaponsSound_PrimaryAttackPre(int weapon)

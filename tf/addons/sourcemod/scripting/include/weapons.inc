@@ -157,6 +157,15 @@ native bool Weapons_CanClassUseWeapon(const char[] className, int weaponIndex);
  */
 native int Weapons_GetKillingWeapon(int attacker, int victim);
 
+/**
+ * Fired once for a confirmed enemy melee-contact kill (including backstabs).
+ * Uses the actual damage weapon, never the active weapon; excludes feigned
+ * deaths and ranged/explosive damage from weapons in the melee slot.
+ *
+ * weapon is an entity index valid only during this synchronous callback.
+ */
+forward void Weapons_OnMeleeKill(int attacker, int victim, int weapon);
+
 forward void OnAmbassadorHeadshotKill(int attacker, int victim);
 forward void OnSandmanCleaverCombo(int attacker, int victim);
 forward void OnMeatshotKill(int attacker, int victim);

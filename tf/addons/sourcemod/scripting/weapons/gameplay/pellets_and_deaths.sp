@@ -148,6 +148,8 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	}
 
 	int killWeapon = DamageSource_GetKillingWeapon(attacker, client);
+	KunaiNerf_RecordBackstab(event, attacker, killWeapon);
+	TryFireMeleeKill(event, attacker, client, killWeapon);
 	TryAwardAmbassadorHeadshotKill(event, attacker, client, killWeapon);
 
 	if (attacker > 0 && attacker <= MaxClients && IsClientInGame(attacker))

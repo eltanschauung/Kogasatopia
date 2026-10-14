@@ -1,3 +1,70 @@
+enum struct DeathEventSaySound
+{
+    bool available;
+    bool played;
+    bool publicPlayback;
+    int source;
+    int initiator;
+    char path[PLATFORM_MAX_PATH];
+    char groupName[MAX_GROUP_NAME];
+    char command[MAX_COMMAND_NAME];
+    bool fromGroup;
+    char sourceGroup[MAX_GROUP_NAME];
+}
+
+static void ResolveDeathEventSaySound(int client, const char[] command, DeathEventSaySound sound)
+{
+    sound.source = client;
+    sound.initiator = client;
+    bool restricted, paidRestricted;
+    sound.available = GetCommandSoundDataForClientEx(client, command,
+        sound.path, PLATFORM_MAX_PATH, sound.groupName, MAX_GROUP_NAME,
+        restricted, paidRestricted, sound.command, MAX_COMMAND_NAME,
+        sound.fromGroup, sound.sourceGroup, MAX_GROUP_NAME);
+}
+
+static bool PlayDeathEventSaySoundToClient(DeathEventSaySound sound, int client)
+{
+    if (!sound.available || client <= 0)
+        return false;
+
+    bool played = PlaySaySoundToTarget(client, sound.path, sound.groupName, false, sound.initiator);
+    sound.played = sound.played || played;
+    return played;
+}
+
+static bool PlayDeathEventSaySoundToOthers(DeathEventSaySound sound, int victim, int attacker)
+{
+    bool played;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        // Participants never receive the shared selection on top of their own.
+        if (client == victim || client == attacker)
+            continue;
+        if (PlayDeathEventSaySoundToClient(sound, client))
+            played = true;
+    }
+    sound.publicPlayback = sound.publicPlayback || played;
+    return played;
+}
+
+static bool CanHearDeathEventSaySound(DeathEventSaySound sound, int client)
+{
+    float emitVolume;
+    return sound.available
+        && CanPlaySaySoundToClient(client, sound.groupName, emitVolume)
+        && !Oblivion_ShouldHide(client, sound.initiator);
+}
+
+static void LogDeathEventSaySound(DeathEventSaySound sound, const char[] eventName, const char[] kind)
+{
+    if (!sound.played)
+        return;
+    // One usage per resolved sound/event, even if both personal and public.
+    LogSaySoundUsage(eventName, sound.source, sound.publicPlayback ? 0 : sound.source,
+        sound.command, sound.path, sound.groupName, sound.fromGroup, sound.sourceGroup, false, kind);
+}
+
 void LoadDeathSoundPreference(int client)
 {
     g_szDeathSound[client][0] = '\0';
@@ -62,82 +129,62 @@ public void Event_PlayerDeathPost(Event event, const char[] name, bool dontBroad
 {
     int victim = GetClientOfUserId(event.GetInt("userid"));
     int attacker = GetClientOfUserId(event.GetInt("attacker"));
+    DeathEventSaySound deathSound, killSound, weaponSound;
+    bool explicitDeathPreference;
 
-    if (attacker > 0 && attacker != victim && PlayWeaponKillSaySound(attacker, victim))
+    if (attacker > 0 && attacker <= MaxClients && attacker != victim
+        && IsClientInGame(attacker) && g_szKillSound[attacker][0])
     {
-        return;
-    }
-
-    char victimPath[PLATFORM_MAX_PATH];
-    char attackerPath[PLATFORM_MAX_PATH];
-    char victimGroup[MAX_GROUP_NAME];
-    char attackerGroup[MAX_GROUP_NAME];
-    char victimCommand[MAX_COMMAND_NAME];
-    char attackerCommand[MAX_COMMAND_NAME];
-    char victimSourceGroup[MAX_GROUP_NAME];
-    char attackerSourceGroup[MAX_GROUP_NAME];
-    bool victimFromGroup = false;
-    bool attackerFromGroup = false;
-    bool haveVictim = false;
-    bool haveAttacker = false;
-    bool restricted = false;
-    bool paidRestricted = false;
-
-    if (attacker > 0 && attacker <= MaxClients && IsClientInGame(attacker) && attacker != victim && g_szKillSound[attacker][0])
-    {
-        haveAttacker = GetCommandSoundDataForClientEx(attacker, g_szKillSound[attacker], attackerPath, sizeof(attackerPath), attackerGroup, sizeof(attackerGroup), restricted, paidRestricted, attackerCommand, sizeof(attackerCommand), attackerFromGroup, attackerSourceGroup, sizeof(attackerSourceGroup));
+        ResolveDeathEventSaySound(attacker, g_szKillSound[attacker], killSound);
     }
 
     if (victim > 0 && victim <= MaxClients && IsClientInGame(victim))
     {
-        if (g_szDeathSound[victim][0])
+        explicitDeathPreference = g_szDeathSound[victim][0] != '\0';
+        if (explicitDeathPreference)
         {
-            haveVictim = GetCommandSoundDataForClientEx(victim, g_szDeathSound[victim], victimPath, sizeof(victimPath), victimGroup, sizeof(victimGroup), restricted, paidRestricted, victimCommand, sizeof(victimCommand), victimFromGroup, victimSourceGroup, sizeof(victimSourceGroup));
-        }
-        else if (!haveAttacker)
-        {
-            char defaultDeathCommand[MAX_COMMAND_NAME * 4];
-            GetDefaultDeathSound(defaultDeathCommand, sizeof(defaultDeathCommand));
-            if (defaultDeathCommand[0])
-            {
-                haveVictim = GetCommandSoundDataForClientEx(victim, defaultDeathCommand, victimPath, sizeof(victimPath), victimGroup, sizeof(victimGroup), restricted, paidRestricted, victimCommand, sizeof(victimCommand), victimFromGroup, victimSourceGroup, sizeof(victimSourceGroup));
-            }
-        }
-    }
-
-    if (haveVictim && haveAttacker)
-    {
-        if (GetRandomInt(0, 1) == 0)
-        {
-            if (PlaySaySound(victimPath, victimGroup, victim))
-            {
-                LogSaySoundUsage("diesound_used", victim, 0, victimCommand, victimPath, victimGroup, victimFromGroup, victimSourceGroup, false, "diesound");
-            }
+            ResolveDeathEventSaySound(victim, g_szDeathSound[victim], deathSound);
         }
         else
         {
-            if (PlaySaySound(attackerPath, attackerGroup, attacker))
-            {
-                LogSaySoundUsage("killsound_used", attacker, 0, attackerCommand, attackerPath, attackerGroup, attackerFromGroup, attackerSourceGroup, false, "killsound");
-            }
+            // The victim's personal default is independent of the killer's preference.
+            char command[MAX_COMMAND_NAME * 4];
+            GetDefaultDeathSound(command, sizeof(command));
+            if (command[0])
+                ResolveDeathEventSaySound(victim, command, deathSound);
         }
-        return;
     }
 
-    if (haveVictim)
+    PlayDeathEventSaySoundToClient(deathSound, victim);
+    if (attacker != victim)
+        PlayDeathEventSaySoundToClient(killSound, attacker);
+
+    bool weaponHandled = PlayWeaponKillSaySoundForOthers(attacker, victim, weaponSound);
+    if (!weaponHandled)
     {
-        if (PlaySaySound(victimPath, victimGroup, victim))
+        // Preserve the old public fallback: a default death sound only competes
+        // when no killer sound resolved. Explicit death sounds keep the 50/50 draw.
+        bool publicDeath = deathSound.available && (explicitDeathPreference || !killSound.available);
+        if (publicDeath && killSound.available)
         {
-            LogSaySoundUsage("diesound_used", victim, 0, victimCommand, victimPath, victimGroup, victimFromGroup, victimSourceGroup, false, "diesound");
+            if (GetRandomInt(0, 1) == 0)
+                PlayDeathEventSaySoundToOthers(deathSound, victim, attacker);
+            else
+                PlayDeathEventSaySoundToOthers(killSound, victim, attacker);
+        }
+        else if (publicDeath)
+        {
+            PlayDeathEventSaySoundToOthers(deathSound, victim, attacker);
+        }
+        else if (killSound.available)
+        {
+            PlayDeathEventSaySoundToOthers(killSound, victim, attacker);
         }
     }
-    else if (haveAttacker)
-    {
-        if (PlaySaySound(attackerPath, attackerGroup, attacker))
-        {
-            LogSaySoundUsage("killsound_used", attacker, 0, attackerCommand, attackerPath, attackerGroup, attackerFromGroup, attackerSourceGroup, false, "killsound");
-        }
-    }
+
+    LogDeathEventSaySound(deathSound, "diesound_used", "diesound");
+    LogDeathEventSaySound(killSound, "killsound_used", "killsound");
+    LogDeathEventSaySound(weaponSound, "weapon_killsound_used", "weapon_killsound");
 }
 
 void GetDefaultDeathSound(char[] buffer, int maxlen)
@@ -180,32 +227,25 @@ static bool GetWeaponKillSaySoundCommand(int attacker, int victim, char[] comman
     return commandName[0] != '\0';
 }
 
-static bool PlayWeaponKillSaySound(int attacker, int victim)
+static bool PlayWeaponKillSaySoundForOthers(int attacker, int victim, DeathEventSaySound sound)
 {
-    char commandName[MAX_COMMAND_NAME * 4];
-    if (!GetWeaponKillSaySoundCommand(attacker, victim, commandName, sizeof(commandName)))
-    {
+    if (attacker == victim)
         return false;
-    }
-
-    char soundPath[PLATFORM_MAX_PATH];
-    char groupName[MAX_GROUP_NAME];
-    char selectedCommand[MAX_COMMAND_NAME];
-    char sourceGroup[MAX_GROUP_NAME];
-    bool fromGroup = false;
-    bool restricted = false;
-    bool paidRestricted = false;
-    if (!GetCommandSoundDataForClientEx(attacker, commandName, soundPath, sizeof(soundPath), groupName, sizeof(groupName), restricted, paidRestricted, selectedCommand, sizeof(selectedCommand), fromGroup, sourceGroup, sizeof(sourceGroup)))
-    {
+    char command[MAX_COMMAND_NAME * 4];
+    if (!GetWeaponKillSaySoundCommand(attacker, victim, command, sizeof(command)))
         return false;
-    }
 
-    PrecacheSound(soundPath, true);
-    if (!PlaySaySoundToTarget(0, soundPath, groupName))
-    {
+    ResolveDeathEventSaySound(attacker, command, sound);
+    if (!sound.available)
         return false;
-    }
 
-    LogSaySoundUsage("weapon_killsound_used", attacker, 0, selectedCommand, soundPath, groupName, fromGroup, sourceGroup, false, "weapon_killsound");
-    return true;
+    // Weapon-attribute broadcasts historically had no initiating client.
+    sound.initiator = 0;
+    PrecacheSound(sound.path, true);
+    if (PlayDeathEventSaySoundToOthers(sound, victim, attacker))
+        return true;
+
+    // Keep the old global override/fallback decision even when its only eligible
+    // listeners were participants, who now hear their personal preferences.
+    return CanHearDeathEventSaySound(sound, victim) || CanHearDeathEventSaySound(sound, attacker);
 }
