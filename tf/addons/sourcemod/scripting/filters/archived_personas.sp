@@ -313,14 +313,19 @@ bool Filters_TryReplaceConnectedParseeMessage(
     int client, const char[] message, const char[] senderMessage = "",
     const char[] rawMessage = "")
 {
+    int replacementMode = g_hParseeMode.IntValue;
+    if (replacementMode == 0
+        || !Filters_IsConnectedParseeClient(client)
+        || GetConVarInt(g_sEnabled) == 0
+        || !Filters_DbAvailable())
+    {
+        return false;
+    }
+
     bool forceReplacement = Filters_GetUtf8CharacterCount(rawMessage)
         > PARSEE_LIVE_FORCE_REPLACEMENT_LENGTH;
-    if (!Filters_IsConnectedParseeClient(client)
-        || (!forceReplacement && !g_hParseeEnabled.BoolValue && !g_hParseeMode.BoolValue)
-        || GetConVarInt(g_sEnabled) == 0
-        || !Filters_DbAvailable()
-        || (!forceReplacement && !g_hParseeMode.BoolValue
-            && GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT))
+    if (replacementMode == 2 && !forceReplacement
+        && GetRandomInt(1, 100) > PARSEE_LIVE_REPLACEMENT_PERCENT)
     {
         return false;
     }
