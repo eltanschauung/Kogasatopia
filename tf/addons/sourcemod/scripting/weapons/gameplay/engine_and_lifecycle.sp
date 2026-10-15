@@ -309,8 +309,6 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 		HookEvent("player_changeclass", Event_PlayerChangeClass, EventHookMode_Post);
 		HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
 
-		GameData overrideConf = new GameData("weapon_overrides.games");
-		if (overrideConf == null) SetFailState("Failed to load weapon_overrides.games.txt conf!");
 
 		// Setup SDKCall for GetMaxClip1
 		StartPrepSDKCall(SDKCall_Entity);
@@ -346,7 +344,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 
 		// Virtual dispatch preserves TF2's native ranged/melee crit algorithms.
 		StartPrepSDKCall(SDKCall_Entity);
-		PrepSDKCall_SetFromConf(overrideConf, SDKConf_Virtual, "CTFWeaponBase::CalcIsAttackCriticalHelper()");
+		PrepSDKCall_SetFromConf(conf, SDKConf_Virtual, "CTFWeaponBase::CalcIsAttackCriticalHelper()");
 		PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
 		g_SDKCalcIsAttackCriticalHelper = EndPrepSDKCall();
 
@@ -359,7 +357,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 		dhook_CTFLunchBox_ApplyBiteEffects = DynamicDetour.FromConf(conf, "CTFLunchBox::ApplyBiteEffects");
 		dhook_CTFPlayerShared_StunPlayer = DynamicDetour.FromConf(conf, "CTFPlayerShared::StunPlayer");
 		dhook_CTFPlayerShared_Burn = DynamicDetour.FromConf(conf, "CTFPlayerShared::Burn");
-		dhook_IsFixedWeaponSpreadEnabled = DynamicDetour.FromConf(overrideConf, "IsFixedWeaponSpreadEnabled");
+		dhook_IsFixedWeaponSpreadEnabled = DynamicDetour.FromConf(conf, "IsFixedWeaponSpreadEnabled");
 		dhook_CObjectCartDispenser_DispenseMetal = DynamicHook.FromConf(conf, "CObjectCartDispenser::DispenseMetal");
 		dhook_CTFWeaponBase_CanFireCriticalShot = DynamicHook.FromConf(conf, "CTFWeaponBase::CanFireCriticalShot");
 		dhook_CTFWeaponBase_PrimaryAttack = DynamicHook.FromConf(conf, "CTFWeaponBase::PrimaryAttack");
@@ -390,7 +388,7 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 
 		// Create the patches
 		patch_RevertCozyCamper_FlinchNerf = MemoryPatch.CreateFromConf(conf, "CTFPlayer::ApplyPunchImpulseX_FakeFullyChargedCondition");
-		patch_AllowRandomCritOverride = MemoryPatch.CreateFromConf(overrideConf, "CTFWeaponBaseMelee::CalcIsAttackCriticalHelper_AllowOverride");
+		patch_AllowRandomCritOverride = MemoryPatch.CreateFromConf(conf, "CTFWeaponBaseMelee::CalcIsAttackCriticalHelper_AllowOverride");
 		patch_Wrangler_CustomShieldRepair = MemoryPatch.CreateFromConf(conf, "CObjectSentrygun::OnWrenchHit_CustomShieldRepair");
 		patch_Wrangler_CustomShieldShellRefill = MemoryPatch.CreateFromConf(conf, "CObjectSentrygun::OnWrenchHit_CustomShieldShellRefill");
 		patch_Wrangler_CustomShieldRocketRefill = MemoryPatch.CreateFromConf(conf, "CObjectSentrygun::OnWrenchHit_CustomShieldRocketRefill");
@@ -406,7 +404,6 @@ void WeaponsGameplay_OnPluginStart(GameData conf) {
 		if (!ValidateAndNullCheck(patch_Wrangler_RescueRanger_CustomShieldRepair)) SetFailState("Failed to create patch_Wrangler_RescueRanger_CustomShieldRepair");
 
 		WeaponsGameplay_SetPatchesEnabled(WeaponsGameplay_IsEnabled());
-		delete overrideConf;
 
 		for (int i = 1; i <= MaxClients; i++)
 		{

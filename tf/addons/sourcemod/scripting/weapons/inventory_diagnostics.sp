@@ -10,7 +10,7 @@ void WeaponsInventoryDiagnostics_Init()
 {
     g_WeaponsInventoryDiagnostics = CreateConVar("sm_weapons_inventory_diagnostics", "1",
         "Measure complete inventory item creation for CheckLag; read-only diagnostics.", _, true, 0.0, true, 1.0);
-    GameData data = new GameData("weapons.inventory_diagnostics");
+    GameData data = new GameData("weapons.games");
     if (data != null)
     {
         g_WeaponsItemDiagnosticDetour = DynamicDetour.FromConf(data, "CTFPlayer::GiveNamedItem");

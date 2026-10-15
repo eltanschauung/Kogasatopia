@@ -171,15 +171,15 @@ bool ScattergunPellets::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t max
 bool ScattergunPellets::SetupTraceAttackHook(char *error, size_t maxlen)
 {
 	char confError[255] = "";
-	if (!gameconfs->LoadGameConfigFile("scattergun_pellets.games", &m_gameConf, confError, sizeof(confError)))
+	if (!gameconfs->LoadGameConfigFile(WEAPONS_GAMECONFIG_NAME, &m_gameConf, confError, sizeof(confError)))
 	{
 		if (confError[0])
 		{
-			g_pSM->Format(error, maxlen, "Could not read scattergun_pellets.games.txt: %s", confError);
+			g_pSM->Format(error, maxlen, "Could not read weapons.games.txt: %s", confError);
 		}
 		else
 		{
-			g_pSM->Format(error, maxlen, "Could not read scattergun_pellets.games.txt.");
+			g_pSM->Format(error, maxlen, "Could not read weapons.games.txt.");
 		}
 		return false;
 	}
@@ -187,7 +187,7 @@ bool ScattergunPellets::SetupTraceAttackHook(char *error, size_t maxlen)
 	int offset = -1;
 	if (!m_gameConf->GetOffset("TraceAttack", &offset) || offset < 0)
 	{
-		g_pSM->Format(error, maxlen, "Could not find TraceAttack offset in scattergun_pellets.games.txt.");
+		g_pSM->Format(error, maxlen, "Could not find TraceAttack offset in weapons.games.txt.");
 		return false;
 	}
 

@@ -100,7 +100,7 @@ public:
         return events!=nullptr;
     }
     bool SDK_OnLoad(char *error,size_t length,bool) override {
-        if(!OpenConfig("tf2.ontakedamage",config,error,length)) return false;
+        if(!OpenConfig(WEAPONS_GAMECONFIG_NAME,config,error,length)) return false;
         damageForward=forwards->CreateForward("Weapons_OnTakeDamage",ET_Event,10,nullptr,Param_Cell,Param_CellByRef,Param_CellByRef,Param_FloatByRef,Param_CellByRef,Param_CellByRef,Param_Array,Param_Array,Param_Cell,Param_CellByRef);
         postForward=forwards->CreateForward("Weapons_OnTakeDamagePost",ET_Ignore,10,nullptr,Param_Cell,Param_Cell,Param_Cell,Param_Float,Param_Cell,Param_Cell,Param_Array,Param_Array,Param_Cell,Param_Cell);
         rulesForward=forwards->CreateForward("Weapons_OnTakeDamageModifyRules",ET_Event,10,nullptr,Param_Cell,Param_CellByRef,Param_CellByRef,Param_FloatByRef,Param_CellByRef,Param_CellByRef,Param_Array,Param_Array,Param_Cell,Param_CellByRef);

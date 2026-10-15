@@ -8,10 +8,10 @@ DynamicDetour g_AmmoPickupsGiveAmmo;
 
 void AmmoPickups_Init()
 {
-	GameData data = new GameData("weapons.ammo_pickups");
+	GameData data = new GameData("weapons.games");
 	if (data == null)
 	{
-		SetFailState("Missing weapons.ammo_pickups gamedata");
+		SetFailState("Missing weapons.games gamedata (ammo_pickups)");
 		return;
 	}
 	g_AmmoPickupsGiveAmmo = DynamicDetour.FromConf(data, "CTFPlayer::GiveAmmoWithSource");

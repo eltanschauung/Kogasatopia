@@ -24,7 +24,7 @@ public Plugin myinfo = {
 public void OnPluginStart()
 {
     RegAdminCmd("sm_weapons_ext_probe", Probe, ADMFLAG_ROOT);
-    GameData data = new GameData("tf2.whitelist_policy");
+    GameData data = new GameData("weapons.games");
     StartPrepSDKCall(SDKCall_Raw);
     PrepSDKCall_SetFromConf(data, SDKConf_Signature, "GetLoadoutItem");
     PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);

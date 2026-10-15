@@ -61,7 +61,7 @@ bool SentryRangeOverride::Init(IGameConfig *gameconf, char *error, size_t maxlen
         if (error && maxlength)
         {
             ke::SafeSprintf(error, maxlength,
-                "Could not create detour for CObjectSentrygun::FindTarget. Check tf2_sentry_newtarget_dist.games.txt.");
+                "Could not create detour for CObjectSentrygun::FindTarget. Check weapons.games.txt.");
         }
         return false;
     }

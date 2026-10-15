@@ -10,7 +10,7 @@ public Plugin myinfo = { name = "Inventory diagnostic ABI probe", author = "Homb
 int probeClient;
 Handle getLoadout, giveItem;
 public void OnPluginStart() {
-    GameData loadoutData = new GameData("weapons");
+    GameData loadoutData = new GameData("weapons.games");
     StartPrepSDKCall(SDKCall_Player);
     PrepSDKCall_SetFromConf(loadoutData, SDKConf_Signature, "CTFPlayer::GetLoadoutItem()");
     PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
@@ -19,7 +19,7 @@ public void OnPluginStart() {
     PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
     getLoadout = EndPrepSDKCall();
     delete loadoutData;
-    GameData itemData = new GameData("weapons.inventory_diagnostics");
+    GameData itemData = new GameData("weapons.games");
     StartPrepSDKCall(SDKCall_Player);
     PrepSDKCall_SetFromConf(itemData, SDKConf_Signature, "CTFPlayer::GiveNamedItem");
     PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);

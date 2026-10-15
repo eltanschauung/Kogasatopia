@@ -271,7 +271,7 @@ sp_nativeinfo_t natives[] = {
 class Attributes final : public SDKExtension {
 public:
     bool SDK_OnLoad(char *error,size_t length,bool) override {
-        if (!OpenConfig("tf2.attributes",config,error,length)) return false;
+        if (!OpenConfig(WEAPONS_GAMECONFIG_NAME,config,error,length)) return false;
         const char *message=config->GetKeyValue("PluginFailMessage");
         if(message && *message) { std::snprintf(error,length,"%s",message); return false; }
 #define BIND(variable,key) variable=Symbol<decltype(variable)>(config,key); if(!variable) { std::snprintf(error,length,"Attributes: missing %s",key); return false; }
@@ -285,10 +285,7 @@ public:
         BIND(hookString,"CAttributeManager::ApplyAttributeStringWrapper");
         BIND(copyString,"CopyStringAttributeValueToCharPointerOutput");
 #undef BIND
-        IGameConfig *services=nullptr;
-        if(!OpenConfig("weapons.services",services,error,length)) return false;
-        pooledString=Symbol<decltype(pooledString)>(services,"AllocPooledString");
-        gameconfs->CloseGameConfigFile(services);
+        pooledString=Symbol<decltype(pooledString)>(config,"AllocPooledString");
         if(!pooledString) { std::snprintf(error,length,"Missing AllocPooledString"); return false; }
 #define SLOT(variable,key) if(!Offset(config,key,variable)) { std::snprintf(error,length,"Attributes: missing %s",key); return false; }
         SLOT(changedSlot,"CAttributeManager::OnAttributeValuesChanged");

@@ -282,7 +282,7 @@ sp_nativeinfo_t natives[]={
 class Utilities final : public SDKExtension,public IClientListener {
 public:
     bool SDK_OnLoad(char *error,size_t length,bool) override {
-        if(!OpenConfig("tf2.utils.nosoop",config,error,length)) return false;
+        if(!OpenConfig(WEAPONS_GAMECONFIG_NAME,config,error,length)) return false;
 #define BIND(variable,key) variable=Symbol<decltype(variable)>(config,key); if(!variable) { std::snprintf(error,length,"Utilities: missing %s",key); return false; }
         BIND(speed,"CTFPlayer::TeamFortress_SetSpeed()"); BIND(maxAmmo,"CTFPlayer::GetMaxAmmo()");
         BIND(buffedHealth,"CTFPlayerShared::GetMaxBuffedHealth()"); BIND(loadout,"CTFPlayer::GetEntityForLoadoutSlot()");

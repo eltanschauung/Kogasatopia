@@ -1,0 +1,1362 @@
+// Weapons-owned engine bindings. Source files and ownership audit: extensions/weapons_ext/GAMEDATA.md
+"Games"
+{
+    "tf"
+    {
+        "Signatures"
+        {
+            "ParseParticleEffectsMap"
+            {
+                "library" "server"
+                "linux" "@_Z23ParseParticleEffectsMapPKcb"
+                "linux64" "@_Z23ParseParticleEffectsMapPKcb"
+            }
+            "CTFPlayer::GetLoadoutItem()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer14GetLoadoutItemEiib"
+                "windows" "\x55\x8B\xEC\x83\xEC\x10\x53\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A"
+            }
+            "CTFPlayer::ManageRegularWeapons()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer20ManageRegularWeaponsEP19TFPlayerClassData_t"
+                "windows" "\x55\x8B\xEC\x83\xEC\x6C\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x8D\x8F\x2A\x1A\x00\x00"
+            }
+            "CTFPlayer::ApplyPunchImpulseX"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer18ApplyPunchImpulseXEf"
+            }
+            "CTFPlayer::TeamFortress_SetSpeed()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer21TeamFortress_SetSpeedEv"
+                "windows" "\x55\x8B\xEC\x83\xEC\x24\xA1\x2A\x2A\x2A\x2A\x56\x8B\xF1\x89\x75\xF0"
+            }
+            "CBasePlayer::SetFOV"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer6SetFOVEP11CBaseEntityifi"
+            }
+            "CObjectSentrygun::OnWrenchHit"
+            {
+                "library" "server"
+                "linux" "@_ZN16CObjectSentrygun11OnWrenchHitEP9CTFPlayerP9CTFWrench6Vector"
+            }
+            "CObjectSentrygun::OnTakeDamage"
+            {
+                "library" "server"
+                "linux" "@_ZN16CObjectSentrygun12OnTakeDamageERK15CTakeDamageInfo"
+            }
+            "CTFProjectile_Arrow::BuildingHealingArrow"
+            {
+                "library" "server"
+                "linux" "@_ZN19CTFProjectile_Arrow20BuildingHealingArrowEP11CBaseEntity"
+            }
+            "CTFPlayer::TeamFortress_CalculateMaxSpeed"
+            {
+                "library" "server"
+                "linux" "@_ZNK9CTFPlayer30TeamFortress_CalculateMaxSpeedEb"
+            }
+            "CTFLunchBox::ApplyBiteEffects"
+            {
+                "library" "server"
+                "linux" "@_ZN11CTFLunchBox16ApplyBiteEffectsEP9CTFPlayer"
+            }
+            "CTFPlayerShared::StunPlayer"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared10StunPlayerEffiP9CTFPlayer"
+            }
+            "CTFPlayerShared::Burn"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared4BurnEP9CTFPlayerP13CTFWeaponBasef"
+                "linux64" "@_ZN15CTFPlayerShared4BurnEP9CTFPlayerP13CTFWeaponBasef"
+            }
+            "CTFPlayer::GiveAmmoWithSource"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer8GiveAmmoEiib11EAmmoSource"
+            }
+            "CTFPlayer::ValidateWearables"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer17ValidateWearablesEP19TFPlayerClassData_t"
+                "linux64" "@_ZN9CTFPlayer17ValidateWearablesEP19TFPlayerClassData_t"
+            }
+            "CTFPlayer::ValidateWeapons"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer15ValidateWeaponsEP19TFPlayerClassData_tb"
+                "linux64" "@_ZN9CTFPlayer15ValidateWeaponsEP19TFPlayerClassData_tb"
+            }
+            "CBaseCombatWeapon::GiveTo"
+            {
+                "library" "server"
+                "linux" "@_ZN17CBaseCombatWeapon6GiveToEP11CBaseEntity"
+                "linux64" "@_ZN17CBaseCombatWeapon6GiveToEP11CBaseEntity"
+            }
+            "CEconWearable::GiveTo"
+            {
+                "library" "server"
+                "linux" "@_ZN13CEconWearable6GiveToEP11CBaseEntity"
+                "linux64" "@_ZN13CEconWearable6GiveToEP11CBaseEntity"
+            }
+            "CEconEntity::GiveTo"
+            {
+                "library" "server"
+                "linux" "@_ZN11CEconEntity6GiveToEP11CBaseEntity"
+                "linux64" "@_ZN11CEconEntity6GiveToEP11CBaseEntity"
+            }
+            "CTFWeaponBase::UpdateExtraWearables"
+            {
+                "library" "server"
+                "linux" "@_ZN13CTFWeaponBase20UpdateExtraWearablesEv"
+                "linux64" "@_ZN13CTFWeaponBase20UpdateExtraWearablesEv"
+            }
+            "CTFPlayer::PostInventoryApplication"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer24PostInventoryApplicationEv"
+                "linux64" "@_ZN9CTFPlayer24PostInventoryApplicationEv"
+            }
+            "CBaseEntity::PrecacheModel"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBaseEntity13PrecacheModelEPKcb"
+                "linux64" "@_ZN11CBaseEntity13PrecacheModelEPKcb"
+            }
+            "CTFPlayer::GiveNamedItem"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer13GiveNamedItemEPKciPK13CEconItemViewb"
+                "linux64" "@_ZN9CTFPlayer13GiveNamedItemEPKciPK13CEconItemViewb"
+            }
+            "CTFKnife::PrimaryAttack"
+            {
+                "library" "server"
+                "linux" "@_ZN8CTFKnife13PrimaryAttackEv"
+                "linux64" "@_ZN8CTFKnife13PrimaryAttackEv"
+            }
+            "GEconItemSchema"
+            {
+                "library" "server"
+                "linux" "@_Z15GEconItemSchemav"
+                "windows" "\xE8\x2A\x2A\x2A\x2A\x83\xC0\x04\xC3"
+                "mac" "@_Z15GEconItemSchemav"
+            }
+            "CEconItemAttributeDefinition::BInitFromKV"
+            {
+                "library" "server"
+                "linux" "@_ZN28CEconItemAttributeDefinition11BInitFromKVEP9KeyValuesP10CUtlVectorI10CUtlString10CUtlMemoryIS3_iEE"
+            }
+            "KeyValues::MakeCopy"
+            {
+                "library" "server"
+                "linux" "@_ZNK9KeyValues8MakeCopyEv"
+            }
+            "KeyValues::deleteThis"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues10deleteThisEv"
+            }
+            "KeyValues::Clear"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues5ClearEv"
+            }
+            "KeyValues::GetName"
+            {
+                "library" "server"
+                "linux" "@_ZNK9KeyValues7GetNameEv"
+            }
+            "KeyValues::SetName"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues7SetNameEPKc"
+            }
+            "KeyValues::GetString"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues9GetStringEPKcS1_"
+            }
+            "KeyValues::SetString"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues9SetStringEPKcS1_"
+            }
+            "KeyValues::GetBool"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues7GetBoolEPKcbPb"
+            }
+            "KeyValues::SetInt"
+            {
+                "library" "server"
+                "linux" "@_ZN9KeyValues6SetIntEPKci"
+            }
+            "AllocPooledString"
+            {
+                "library" "server"
+                "linux" "@_Z17AllocPooledStringPKc"
+            }
+            "CBasePlayer::SetDefaultFOV"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer13SetDefaultFOVEi"
+            }
+            "CBasePlayer::Weapon_ShootPosition"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer20Weapon_ShootPositionEv"
+            }
+            "CTFWeaponBaseMelee::CalcIsAttackCriticalHelper"
+            {
+                "library" "server"
+                "linux" "@_ZN18CTFWeaponBaseMelee26CalcIsAttackCriticalHelperEv"
+            }
+            "IsFixedWeaponSpreadEnabled"
+            {
+                "library" "server"
+                "linux" "\x55\x89\xE5\x56\x53\x83\xEC\x1C\xA1\x2A\x2A\x2A\x2A\x8B\x5D\x08\x8B\x70\x30\xFF\x35\x2A\x2A\x2A\x2A"
+            }
+            "CEconItemSchema::GetItemDefinition"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x56\x8B\xF1\x8D\x45\x08\x50\x8D\x8E\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\xC0"
+                "linux" "@_ZN15CEconItemSchema17GetItemDefinitionEi"
+                "mac" "@_ZN15CEconItemSchema17GetItemDefinitionEi"
+            }
+            "CEconItemView::GetSOCData"
+            {
+                "library" "server"
+                "windows" "\x56\x8B\xF1\x8B\x46\x2A\x85\xC0\x75\x2A\xE8\x2A\x2A\x2A\x2A\xFF\x76\x20\x8B\xC8\x8B\x10\xFF\x52\x44\x85\xC0\x74\x2A\xFF\x76\x14\x8B\xC8\xFF\x76\x10\xE8\x2A\x2A\x2A\x2A\x5E"
+                "linux" "@_ZNK13CEconItemView10GetSOCDataEv"
+                "mac" "@_ZNK13CEconItemView10GetSOCDataEv"
+            }
+            "CEconItemSchema::GetAttributeDefinition"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x56\x8B\xF1\x8D\x45\x08\x50\x8D\x8E\xBC\x01\x00\x00"
+                "linux" "@_ZN15CEconItemSchema22GetAttributeDefinitionEi"
+                "mac" "@_ZN15CEconItemSchema22GetAttributeDefinitionEi"
+            }
+            "CEconItemSchema::GetAttributeDefinitionByName"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x83\xEC\x1C\x83\x7D\x08\x00"
+                "linux" "@_ZN15CEconItemSchema28GetAttributeDefinitionByNameEPKc"
+                "mac" "@_ZN15CEconItemSchema28GetAttributeDefinitionByNameEPKc"
+            }
+            "CAttributeList::RemoveAttribute"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x51\x53\x8B\xD9\x56\x33\xF6\x8B\x43\x10\x89\x45\xFC\x85\xC0\x7E\x2A\x57\x33\xFF"
+                "linux" "@_ZN14CAttributeList15RemoveAttributeEPK28CEconItemAttributeDefinition"
+                "mac" "@_ZN14CAttributeList15RemoveAttributeEPK28CEconItemAttributeDefinition"
+            }
+            "CAttributeList::SetRuntimeAttributeValue"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x83\xEC\x2A\x33\x2A\x53\x8B\xD9\x56\x57\x8B\x2A\x2A\x8B\x2A\x2A"
+                "linux" "@_ZN14CAttributeList24SetRuntimeAttributeValueEPK28CEconItemAttributeDefinitionf"
+                "mac" "@_ZN14CAttributeList24SetRuntimeAttributeValueEPK28CEconItemAttributeDefinitionf"
+            }
+            "CAttributeList::GetAttributeByID"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x51\x8B\xC1\x53\x56\x33\xF6\x89\x45\xFC\x8B\x58\x10"
+                "linux" "@_ZNK14CAttributeList16GetAttributeByIDEi"
+                "mac" "@_ZNK14CAttributeList16GetAttributeByIDEi"
+            }
+            "CAttributeList::DestroyAllAttributes"
+            {
+                "library" "server"
+                "windows" "\x56\x8B\xF1\x83\x7E\x10\x00\x74\x2A\x83\x7E\x0C\x00"
+                "linux" "@_ZN14CAttributeList20DestroyAllAttributesEv"
+                "mac" "@_ZN14CAttributeList20DestroyAllAttributesEv"
+            }
+            "CAttributeManager::AttribHookValue<float>"
+            {
+                "library" "server"
+                "linux" "@_ZN17CAttributeManager15AttribHookValueIfEET_S1_PKcPK11CBaseEntityP10CUtlVectorIPS4_10CUtlMemoryIS8_iEEb"
+                "windows" "\x55\x8B\xEC\x83\xEC\x18\x8B\x0D\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xFF\x33\xDB\x89\x7D\xE8\x89\x5D\xEC\x8B\x41\x08\x85\xC0\x74\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x6A\x6B\x68\x2A\x2A\x2A\x2A\x53\x53\x53\x53\x8D\x4D\xE8\x51\x50\x8B\x40\x50\xFF\xD0\x8B\x5D\xEC\x83\xC4\x30\x8B\x7D\xE8\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x71\x08\x8B\x0D\x2A\x2A\x2A\x2A\x89\x75\xFC\x8B\x81\x0C\x10\x00\x00\x89\x45\xF8\x85\xC0\x74\x2A\x6A\x04\x6A\x00\x68\x2A\x2A\x2A\x2A\x6A\x00\x68\x2A\x2A\x2A\x2A\xFF\x15\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x45\x0C\x85\xC0\x74\x2A\x80\x38\x00\x74\x2A\x8B\x55\x10\x85\xD2\x74\x2A\x8B\x92\xE4\x00\x00\x00\x89\x55\x0C\x85\xD2\x74\x2A\x80\x7D\x18\x00\x50\x74\x2A\x8D\x45\xF4\x50\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x8D\x45\xF0\x50\xE8\x2A\x2A\x2A\x2A\x8B\x4D\x0C\x83\xC4\x08\x8B\x30\x8B\x01\xFF\x10\xFF\x75\x14\xD9\x45\x08"
+            }
+            "CAttributeManager::AttribHookValue<int>"
+            {
+                "library" "server"
+                "linux" "@_ZN17CAttributeManager15AttribHookValueIiEET_S1_PKcPK11CBaseEntityP10CUtlVectorIPS4_10CUtlMemoryIS8_iEEb"
+                "windows" "\x55\x8B\xEC\x83\xEC\x18\x8B\x0D\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xFF\x33\xDB\x89\x7D\xE8\x89\x5D\xEC\x8B\x41\x08\x85\xC0\x74\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x6A\x6B\x68\x2A\x2A\x2A\x2A\x53\x53\x53\x53\x8D\x4D\xE8\x51\x50\x8B\x40\x50\xFF\xD0\x8B\x5D\xEC\x83\xC4\x30\x8B\x7D\xE8\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x71\x08\x8B\x0D\x2A\x2A\x2A\x2A\x89\x75\xFC\x8B\x81\x0C\x10\x00\x00\x89\x45\xF8\x85\xC0\x74\x2A\x6A\x04\x6A\x00\x68\x2A\x2A\x2A\x2A\x6A\x00\x68\x2A\x2A\x2A\x2A\xFF\x15\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x45\x0C\x85\xC0\x74\x2A\x80\x38\x00\x74\x2A\x8B\x55\x10\x85\xD2\x74\x2A\x8B\x92\xE4\x00\x00\x00\x89\x55\x0C\x85\xD2\x74\x2A\x80\x7D\x18\x00\x50\x74\x2A\x8D\x45\xF4\x50\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x8D\x45\xF0\x50\xE8\x2A\x2A\x2A\x2A\x8B\x4D\x0C\x83\xC4\x08\x8B\x30\x8B\x01\xFF\x10\xFF\x75\x14\xF3\x0F\x2A\x45\x08"
+            }
+            "CAttributeManager::ApplyAttributeStringWrapper"
+            {
+                "library" "server"
+                "linux" "@_ZN17CAttributeManager27ApplyAttributeStringWrapperE8string_tP11CBaseEntityS0_P10CUtlVectorIS2_10CUtlMemoryIS2_iEE"
+            }
+            "CTFPlayer::AddCustomAttribute"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\xF3\x0F\x10\x45\x10\x83\xEC\x10"
+                "linux" "@_ZN9CTFPlayer18AddCustomAttributeEPKcff"
+                "mac" "@_ZN9CTFPlayer18AddCustomAttributeEPKcff"
+            }
+            "CTFPlayer::RemoveCustomAttribute"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x83\xEC\x08\x53\x56\x57\xFF\x75\x08\x8B\xD9"
+                "linux" "@_ZN9CTFPlayer21RemoveCustomAttributeEPKc"
+                "mac" "@_ZN9CTFPlayer21RemoveCustomAttributeEPKc"
+            }
+            "CopyStringAttributeValueToCharPointerOutput"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x8B\x45\x08\x8B\x48\x10"
+                "linux" "@_Z43CopyStringAttributeValueToCharPointerOutputPK17CAttribute_StringPPKc"
+                "mac" "@_Z43CopyStringAttributeValueToCharPointerOutputPK17CAttribute_StringPPKc"
+            }
+            "CTFPlayerShared::IsImmuneToPushback()"
+            {
+                "library" "server"
+                "linux" "@_ZNK15CTFPlayerShared18IsImmuneToPushbackEv"
+                "windows" "\x55\x8B\xEC\x51\x56\x8B\xF1\x6A\x1C"
+            }
+            "CTFPlayerShared::Burn()"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared4BurnEP9CTFPlayerP13CTFWeaponBasef"
+                "windows" "\x55\x8B\xEC\x83\xEC\x08\x56\x8B\xF1\x8B\x8E\x2A\x01\x00\x00\x8B\x01"
+            }
+            "CTFPlayer::AddObject()"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x51\x53\x56\x57\x8B\x7D\x08\x8B\xD9\x85\xFF\x74\x2A\x8B\x07\x8B\xCF\xFF\x50\x08\x8B\x00\xEB\x2A\x83\xC8\xFF\x33\xF6\x89\x45\xFC\x39\xB3\x2A\x23\x00\x00"
+            }
+            "CTFPlayer::GetEntityForLoadoutSlot()"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x51\x53\x56\x8B\x75\x08\x8B\xC1"
+                "linux" "@_ZN9CTFPlayer23GetEntityForLoadoutSlotEib"
+                "mac" "@_ZN9CTFPlayer23GetEntityForLoadoutSlotEib"
+            }
+            "CTFPlayer::GetMaxAmmo()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer10GetMaxAmmoEii"
+                "windows" "\x55\x8B\xEC\x8B\x45\x0C\x53\x8B\xD9"
+            }
+            "CTFPlayer::GetObject()"
+            {
+                "library" "server"
+                "linux" "@_ZNK9CTFPlayer9GetObjectEi"
+            }
+            "CTFPlayer::IsReadyToSpawn()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer14IsReadyToSpawnEv"
+                "windows" "\x56\x8B\xF1\x57\x80\xBE\x2A\x2A\x00\x00\x00\x0F\x85\x2A\x00\x00\x00\x8B"
+            }
+            "CTFPlayerShared::GetMaxBuffedHealth()"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared18GetMaxBuffedHealthEbb"
+                "windows" "\x55\x8B\xEC\x83\xEC\x14\x53\x8B\xD9\x56\x57\x8B\x8B\x2A\x01\x00\x00"
+            }
+            "CTFPlayerShared::MakeBleed()"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared9MakeBleedEP9CTFPlayerP13CTFWeaponBasefibi"
+                "windows" "\x55\x8B\xEC\x83\xEC\x10\x53\x8B\xD9\x89\x5D\x2A\x8B\x8B"
+            }
+            "CTFPlayerShared::PulseRageBuff()"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared13PulseRageBuffENS_13ERageBuffSlotE"
+            }
+            "CTFPlayerShared::RemoveAllCond()"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTFPlayerShared13RemoveAllCondEv"
+                "windows" "\x55\x8B\xEC\x83\xEC\x0C\x53\x56\x8B\xF1\x57\x8D\x9E\xE0\x00\x00\x00"
+            }
+            "GetTFConditionName()"
+            {
+                "library" "server"
+                "linux" "@_Z18GetTFConditionName7ETFCond"
+                "windows" "\x55\x8B\xEC\x8B\x45\x08\x3D\x2A\x00\x00\x00\x73\x0D"
+            }
+            "PointInRespawnRoom()"
+            {
+                "library" "server"
+                "linux" "@_Z18PointInRespawnRoomPK11CBaseEntityRK6Vectorb"
+                "windows" "\x55\x8B\xEC\x53\x33\xDB\x56\x57"
+            }
+            "CLagCompensationManager::StartLagCompensation()"
+            {
+                "library" "server"
+                "linux" "@_ZN23CLagCompensationManager20StartLagCompensationEP11CBasePlayerP8CUserCmd"
+                "linux64" "@_ZN23CLagCompensationManager20StartLagCompensationEP11CBasePlayerP8CUserCmd"
+                "windows" "\x55\x8B\xEC\x83\xEC\x28\x57\x8B\xF9\x89\x7D\xE4"
+                "windows64" "\x40\x55\x57\x41\x55\x48\x81\xEC\xA0\x00\x00\x00"
+            }
+            "CLagCompensationManager::FinishLagCompensation()"
+            {
+                "library" "server"
+                "linux" "@_ZN23CLagCompensationManager21FinishLagCompensationEP11CBasePlayer"
+                "linux64" "@_ZN23CLagCompensationManager21FinishLagCompensationEP11CBasePlayer"
+                "windows" "\x55\x8B\xEC\x83\xEC\x44\x8B\x15\x2A\x2A\x2A\x2A\x53\x56\x33\xF6"
+                "windows64" "\x4C\x8B\xDC\x49\x89\x4B\x08\x53\x48\x81\xEC\xD0\x00\x00\x00"
+            }
+            "CTFWeaponBaseMelee::Smack()"
+            {
+                "library" "server"
+                "linux" "@_ZN18CTFWeaponBaseMelee5SmackEv"
+                "windows" "\x55\x8B\xEC\x83\xEC\x74\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x89\x45\xF8\x85\xC0"
+            }
+            "g_LagCompensationManager"
+            {
+                "library" "server"
+                "linux" "@_ZL24g_LagCompensationManager"
+            }
+            "CTFGameRules::ApplyOnDamageModifyRules()"
+            {
+                "library" "server"
+                "linux" "@_ZN12CTFGameRules24ApplyOnDamageModifyRulesER15CTakeDamageInfoP11CBaseEntityb"
+                "windows" "\x55\x8B\xEC\x81\xEC\x8C\x00\x00\x00\x56\x57\x8B\x7D\x08\x89\x4D\xC0"
+            }
+            "CTFPlayer::OnTakeDamage()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer12OnTakeDamageERK15CTakeDamageInfo"
+                "windows" "\x53\x8B\xDC\x83\xEC\x2A\x83\xE4\xF0\x83\xC4\x2A\x55\x8B\x6B\x2A\x89\x6C\x2A\x2A\x8B\xEC\x81\xEC\x2A\x2A\x00\x00\x56\x57\xFF\x73\x08\x8B\xF9\x8D\x8D"
+            }
+            "CTFPlayer::OnTakeDamage_Alive()"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer18OnTakeDamage_AliveERK15CTakeDamageInfo"
+                "windows" "\x55\x8B\xEC\x81\xEC\x2A\x01\x00\x00\x56\x57\x8B\xF9\x8B\x0D\x2A\x2A\x2A\x2A\x89\x7D\x2A"
+            }
+            "TFInventoryManager"
+            {
+                "library" "server"
+                "linux" "@_Z18TFInventoryManagerv"
+                "linux64" "@_Z18TFInventoryManagerv"
+            }
+            "GetItemInLoadout"
+            {
+                "library" "server"
+                "linux" "@_ZN18CTFPlayerInventory16GetItemInLoadoutEii"
+                "linux64" "@_ZN18CTFPlayerInventory16GetItemInLoadoutEii"
+            }
+            "GetBaseItemForClass"
+            {
+                "library" "server"
+                "linux" "@_ZN19CTFInventoryManager19GetBaseItemForClassEii"
+                "linux64" "@_ZN19CTFInventoryManager19GetBaseItemForClassEii"
+            }
+            "GetItemDefIndex"
+            {
+                "library" "server"
+                "linux" "@_ZNK13CEconItemView15GetItemDefIndexEv"
+                "linux64" "@_ZNK13CEconItemView15GetItemDefIndexEv"
+            }
+            "GetLoadoutItem"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer14GetLoadoutItemEiib"
+                "linux64" "@_ZN9CTFPlayer14GetLoadoutItemEiib"
+            }
+            "InventoryOffsetGuard"
+            {
+                "library" "server"
+                "linux" "\x8D\x87\x1C\x13\x00\x00\x83\xEC\x04\x56\x53\x50\xE8"
+                "linux64" "\x49\x8D\xBE\xF0\x15\x00\x00\x44\x89\xEA\x44\x89\xE6\xE8"
+            }
+            "AddCondition"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x83\xEC\x08\x56\x8B\xF1\x8B\x8E\x2A\x2A\x2A\x2A\x85\xC9\x0F\x84\x2A\x2A\x2A\x2A\x8B\x01\x8B"
+                "linux" "@_ZN15CTFPlayerShared7AddCondE7ETFCondfP11CBaseEntity"
+                "mac" "@_ZN15CTFPlayerShared7AddCondE7ETFCondfP11CBaseEntity"
+            }
+            "RemoveCondition"
+            {
+                "library" "server"
+                "windows" "\x55\x8B\xEC\x83\xEC\x08\x53\x8B\x5D\x08\x56\x53"
+                "linux" "@_ZN15CTFPlayerShared10RemoveCondE7ETFCondb"
+                "mac" "@_ZN15CTFPlayerShared10RemoveCondE7ETFCondb"
+            }
+            "FX_FireBullets"
+            {
+                "library" "server"
+                "linux" "@_Z14FX_FireBulletsP13CTFWeaponBaseiRK6VectorRK6QAngleiiiffb"
+            }
+            "CTFPlayer::FireBullet"
+            {
+                "library" "server"
+                "linux" "@_ZN9CTFPlayer10FireBulletEP13CTFWeaponBaseRK17FireBulletsInfo_tbii"
+            }
+            "CTFWeaponBaseGun::GetWeaponSpread"
+            {
+                "library" "server"
+                "linux" "@_ZN16CTFWeaponBaseGun15GetWeaponSpreadEv"
+            }
+            "CTFWeaponBaseGun::UpdatePunchAngles"
+            {
+                "library" "server"
+                "linux" "@_ZN16CTFWeaponBaseGun17UpdatePunchAnglesEP9CTFPlayer"
+            }
+            "CBasePlayer::SetPunchAngle"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBasePlayer13SetPunchAngleERK6QAngle"
+            }
+            "SharedRandomInt"
+            {
+                "library" "server"
+                "linux" "@_Z15SharedRandomIntPKciii"
+            }
+            "FixedSpreadWideLargeReference"
+            {
+                "library" "server"
+                "linux" "\xF3\x0F\x10\x3C\x85\x2A\x2A\x2A\x2A\xF3\x0F\x11\xBD\x54\xFF\xFF\xFF"
+            }
+            "CObjectSentrygun::FindTarget"
+            {
+                "library" "server"
+                "linux" "@_ZN16CObjectSentrygun10FindTargetEv"
+                "windows" ""
+            }
+        }
+        "Offsets"
+        {
+            "CTFPlayerShared::m_flAfterburnDuration"
+            {
+                "linux" "516"
+                "linux64" "596"
+            }
+            "CTFWeaponBase::PrimaryAttack"
+            {
+                "windows" "287"
+                "linux" "293"
+            }
+            "CTFWeaponBase::SecondaryAttack"
+            {
+                "windows" "288"
+                "linux" "294"
+            }
+            "CTFWeaponBase::CanFireCriticalShot"
+            {
+                "windows" "439"
+                "linux" "446"
+            }
+            "CTFWeaponBase::GetMaxClip1()"
+            {
+                "windows" "325"
+                "linux" "331"
+            }
+            "CTFWeaponBase::GetAfterburnRateOnHit()"
+            {
+                "windows" "460"
+                "linux" "467"
+            }
+            "CObjectCartDispenser::DispenseMetal"
+            {
+                "windows" "404"
+                "linux" "418"
+            }
+            "CTFStunBall::ApplyBallImpactEffectOnVictim"
+            {
+                "windows" "267"
+                "linux" "268"
+            }
+            "CTFWeaponBase::Deploy"
+            {
+                "linux" "268"
+                "linux64" "268"
+            }
+            "CTFWeaponBase::ItemPostFrame"
+            {
+                "linux" "279"
+                "linux64" "279"
+            }
+            "SchemaAttributes"
+            {
+                "linux" "444"
+            }
+            "SchemaAttributeNames"
+            {
+                "linux" "480"
+            }
+            "IsViewModelFlipped"
+            {
+                "linux" "450"
+            }
+            "GetSlot"
+            {
+                "linux" "340"
+            }
+            "CTFWeaponBase::CalcIsAttackCriticalHelper()"
+            {
+                "windows" "401"
+                "windows64" "401"
+                "linux" "408"
+                "linux64" "408"
+            }
+            "GiveNamedItem"
+            {
+                "windows64" "487"
+                "windows" "487"
+                "linux" "494"
+                "linux64" "494"
+            }
+            "CAttributeManager::OnAttributeValuesChanged"
+            {
+                "windows" "13"
+                "linux" "14"
+                "mac" "14"
+            }
+            "CAttributeManager::ApplyAttributeStringWrapper"
+            {
+                "windows" "15"
+            }
+            "ISchemaAttributeTypeBase::BConvertStringToEconAttributeValue"
+            {
+                "windows" "4"
+                "linux" "5"
+            }
+            "ISchemaAttributeTypeBase::InitializeNewEconAttributeValue"
+            {
+                "windows" "7"
+                "linux" "8"
+            }
+            "ISchemaAttributeTypeBase::UnloadEconAttributeValue"
+            {
+                "windows" "8"
+                "linux" "9"
+            }
+            "ISchemaAttributeTypeBase::BSupportsGame..."
+            {
+                "windows" "10"
+                "linux" "11"
+            }
+            "CBaseCombatCharacter::Weapon_Switch()"
+            {
+                "windows" "275"
+                "linux" "276"
+            }
+            "CBaseCombatCharacter::Weapon_ShootPosition()"
+            {
+                "windows" "276"
+                "linux" "277"
+            }
+            "CBaseCombatWeapon::GetSlot()"
+            {
+                "windows" "334"
+                "linux" "340"
+            }
+            "CBaseEntity::GetMaxHealth()"
+            {
+                "windows" "123"
+                "linux" "124"
+            }
+            "CBaseEntity::IsBaseCombatWeapon()"
+            {
+                "windows" "92"
+                "linux" "93"
+            }
+            "CBaseEntity::IsWearable()"
+            {
+                "windows" "93"
+                "linux" "94"
+            }
+            "CBaseEntity::TakeHealth()"
+            {
+                "windows" "66"
+                "linux" "67"
+            }
+            "CTFWeaponBase::CanAttack()"
+            {
+                "windows" "428"
+                "linux" "435"
+            }
+            "CTFWeaponBase::GetWeaponID()"
+            {
+                "windows" "382"
+                "linux" "388"
+            }
+            "CTFPlayer::EquipWearable()"
+            {
+                "windows" "439"
+                "linux" "440"
+            }
+            "CTFPlayer::m_hMyWearables"
+            {
+                "linux" "3848"
+                "windows" "3824"
+            }
+            "CTFPlayer::m_flLastDamageTime"
+            {
+                "linux" "8980"
+                "windows" "8972"
+            }
+            "CTFPlayerShared::m_pOuter"
+            {
+                "linux" "396"
+                "windows" "396"
+            }
+            "CTFPlayerShared::m_ConditionData"
+            {
+                "linux" "8"
+                "windows" "8"
+            }
+            "CTFPlayerShared::m_flBurnDuration"
+            {
+                "linux" "516"
+                "windows" "516"
+            }
+            "CTFPlayerShared::m_BleedList"
+            {
+                "linux" "520"
+                "windows" "520"
+            }
+            "TFCondInfo_t::m_flDuration"
+            {
+                "linux" "8"
+                "windows" "8"
+            }
+            "TFCondInfo_t::m_hProvider"
+            {
+                "linux" "12"
+                "windows" "12"
+            }
+            "sizeof(TFCondInfo_t)"
+            {
+                "linux" "20"
+                "windows" "20"
+            }
+            "BleedStruct_t::m_hAttacker"
+            {
+                "linux" "0"
+                "windows" "0"
+            }
+            "BleedStruct_t::m_hWeapon"
+            {
+                "linux" "4"
+                "windows" "4"
+            }
+            "BleedStruct_t::m_flNextTickTime"
+            {
+                "linux" "8"
+                "windows" "8"
+            }
+            "BleedStruct_t::m_flExpireTime"
+            {
+                "linux" "12"
+                "windows" "12"
+            }
+            "BleedStruct_t::m_nDamage"
+            {
+                "linux" "16"
+                "windows" "16"
+            }
+            "BleedStruct_t::m_bPermanent"
+            {
+                "linux" "20"
+                "windows" "20"
+            }
+            "BleedStruct_t::m_nCustomDamageType"
+            {
+                "linux" "24"
+                "windows" "24"
+            }
+            "sizeof(BleedStruct_t)"
+            {
+                "linux" "28"
+                "windows" "28"
+            }
+            "CEconWearable::m_bAlwaysValid"
+            {
+                "linux" "1476"
+                "windows" "1464"
+            }
+            "Inventory"
+            {
+                "linux" "4892"
+                "linux64" "5616"
+            }
+            "GuardInventoryDisplacement"
+            {
+                "linux" "2"
+                "linux64" "3"
+            }
+            "GuardCallDisplacement"
+            {
+                "linux" "13"
+                "linux64" "14"
+            }
+            "TraceAttack"
+            {
+                "windows" "62"
+                "windows64" "62"
+                "linux" "63"
+                "linux64" "63"
+            }
+        }
+        "MemPatches"
+        {
+            "CTFPlayer::ApplyPunchImpulseX_FakeFullyChargedCondition"
+            {
+                "signature" "CTFPlayer::ApplyPunchImpulseX"
+                "linux"
+                {
+                    "offset" "149"
+                    "verify" "\x83\xEC\x0C\x57\xE8\x2A\x2A\x2A\x2A\x83\xC4\x10"
+                    "patch" "\x90\x90\x90\x90\xB0\x01\x90\x90\x90\x90\x90\x90"
+                }
+            }
+            "CObjectSentrygun::OnWrenchHit_CustomShieldRepair"
+            {
+                "signature" "CObjectSentrygun::OnWrenchHit"
+                "linux"
+                {
+                    "offset" "592"
+                    "verify" "\xF3\x0F\x59\x05\x2A\x2A\x2A\x2A"
+                    "patch" "\xF3\x0F\x59\x05\x00\x00\x00\x00"
+                }
+            }
+            "CObjectSentrygun::OnWrenchHit_CustomShieldShellRefill"
+            {
+                "signature" "CObjectSentrygun::OnWrenchHit"
+                "linux"
+                {
+                    "offset" "708"
+                    "verify" "\xF3\x0F\x59\x05\x2A\x2A\x2A\x2A"
+                    "patch" "\xF3\x0F\x59\x05\x00\x00\x00\x00"
+                }
+            }
+            "CObjectSentrygun::OnWrenchHit_CustomShieldRocketRefill"
+            {
+                "signature" "CObjectSentrygun::OnWrenchHit"
+                "linux"
+                {
+                    "offset" "896"
+                    "verify" "\xF3\x0F\x59\x05\x2A\x2A\x2A\x2A"
+                    "patch" "\xF3\x0F\x59\x05\x00\x00\x00\x00"
+                }
+            }
+            "CObjectSentrygun::OnTakeDamage_CustomShieldDamageTaken"
+            {
+                "signature" "CObjectSentrygun::OnTakeDamage"
+                "linux"
+                {
+                    "offset" "628"
+                    "verify" "\xF3\x0F\x10\x05\x2A\x2A\x2A\x2A"
+                    "patch" "\xF3\x0F\x10\x05\x00\x00\x00\x00"
+                }
+            }
+            "CTFProjectile_Arrow::BuildingHealingArrow_CustomShieldRepair"
+            {
+                "signature" "CTFProjectile_Arrow::BuildingHealingArrow"
+                "linux"
+                {
+                    "offset" "260"
+                    "verify" "\xF3\x0F\x59\x05\x2A\x2A\x2A\x2A"
+                    "patch" "\xF3\x0F\x59\x05\x00\x00\x00\x00"
+                }
+            }
+            "CTFWeaponBaseMelee::CalcIsAttackCriticalHelper_AllowOverride"
+            {
+                "signature" "CTFWeaponBaseMelee::CalcIsAttackCriticalHelper"
+                "linux"
+                {
+                    "offset" "17"
+                    "verify" "\x75\x0D"
+                    "patch" "\xEB\x0D"
+                }
+            }
+        }
+        "Functions"
+        {
+            "CTFWeaponBase::PrimaryAttack"
+            {
+                "offset" "CTFWeaponBase::PrimaryAttack"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "void"
+            }
+            "CTFWeaponBase::SecondaryAttack"
+            {
+                "offset" "CTFWeaponBase::SecondaryAttack"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "void"
+            }
+            "CTFPlayer::GetLoadoutItem()"
+            {
+                "signature" "CTFPlayer::GetLoadoutItem()"
+                "callconv" "thiscall"
+                "return" "int"
+                "this" "entity"
+                "arguments"
+                {
+                    "player_class"
+                    {
+                        "type" "int"
+                    }
+                    "loadout_position"
+                    {
+                        "type" "int"
+                    }
+                    "unknown_bool"
+                    {
+                        "type" "bool"
+                    }
+                }
+            }
+            "CTFPlayer::ManageRegularWeapons()"
+            {
+                "signature" "CTFPlayer::ManageRegularWeapons()"
+                "callconv" "thiscall"
+                "return" "void"
+                "this" "entity"
+                "arguments"
+                {
+                    "class_data"
+                    {
+                        "type" "int"
+                    }
+                }
+            }
+            "CTFPlayer::TeamFortress_CalculateMaxSpeed"
+            {
+                "signature" "CTFPlayer::TeamFortress_CalculateMaxSpeed"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "float"
+                "arguments"
+                {
+                    "bIgnoreSpecialAbility"
+                    {
+                        "type" "bool"
+                    }
+                }
+            }
+            "CObjectCartDispenser::DispenseMetal"
+            {
+                "offset" "CObjectCartDispenser::DispenseMetal"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "int"
+                "arguments"
+                {
+                    "pPlayer"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CTFWeaponBase::CanFireCriticalShot"
+            {
+                "offset" "CTFWeaponBase::CanFireCriticalShot"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "bool"
+                "arguments"
+                {
+                    "bIsHeadshot"
+                    {
+                        "type" "bool"
+                    }
+                    "pTarget"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CTFLunchBox::ApplyBiteEffects"
+            {
+                "signature" "CTFLunchBox::ApplyBiteEffects"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "pPlayer"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CTFStunBall::ApplyBallImpactEffectOnVictim"
+            {
+                "offset" "CTFStunBall::ApplyBallImpactEffectOnVictim"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "pOther"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CTFPlayerShared::StunPlayer"
+            {
+                "signature" "CTFPlayerShared::StunPlayer"
+                "callconv" "thiscall"
+                "this" "address"
+                "return" "void"
+                "arguments"
+                {
+                    "flTime"
+                    {
+                        "type" "float"
+                    }
+                    "flReductionAmount"
+                    {
+                        "type" "float"
+                    }
+                    "iStunFlags"
+                    {
+                        "type" "int"
+                    }
+                    "pAttacker"
+                    {
+                        "type" "int"
+                    }
+                }
+            }
+            "CTFPlayerShared::Burn"
+            {
+                "signature" "CTFPlayerShared::Burn"
+                "callconv" "thiscall"
+                "this" "address"
+                "return" "void"
+                "arguments"
+                {
+                    "pAttacker"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "pWeapon"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "flBurningTime"
+                    {
+                        "type" "float"
+                    }
+                }
+            }
+            "CTFPlayer::GiveAmmoWithSource"
+            {
+                "signature" "CTFPlayer::GiveAmmoWithSource"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "int"
+                "arguments"
+                {
+                    "iCount"
+                    {
+                        "type" "int"
+                    }
+                    "iAmmoIndex"
+                    {
+                        "type" "int"
+                    }
+                    "bSuppressSound"
+                    {
+                        "type" "bool"
+                    }
+                    "eAmmoSource"
+                    {
+                        "type" "int"
+                    }
+                }
+            }
+            "CTFWeaponBase::Deploy"
+            {
+                "offset" "CTFWeaponBase::Deploy"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "bool"
+            }
+            "CTFWeaponBase::ItemPostFrame"
+            {
+                "offset" "CTFWeaponBase::ItemPostFrame"
+                "hooktype" "entity"
+                "this" "entity"
+                "return" "void"
+            }
+            "CTFPlayer::ValidateWearables"
+            {
+                "signature" "CTFPlayer::ValidateWearables"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "classData"
+                    {
+                        "type" "objectptr"
+                    }
+                }
+            }
+            "CTFPlayer::ValidateWeapons"
+            {
+                "signature" "CTFPlayer::ValidateWeapons"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "classData"
+                    {
+                        "type" "objectptr"
+                    }
+                    "reset"
+                    {
+                        "type" "bool"
+                    }
+                }
+            }
+            "CBaseCombatWeapon::GiveTo"
+            {
+                "signature" "CBaseCombatWeapon::GiveTo"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "recipient"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CEconWearable::GiveTo"
+            {
+                "signature" "CEconWearable::GiveTo"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "recipient"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CEconEntity::GiveTo"
+            {
+                "signature" "CEconEntity::GiveTo"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+                "arguments"
+                {
+                    "recipient"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CTFWeaponBase::UpdateExtraWearables"
+            {
+                "signature" "CTFWeaponBase::UpdateExtraWearables"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+            }
+            "CTFPlayer::PostInventoryApplication"
+            {
+                "signature" "CTFPlayer::PostInventoryApplication"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+            }
+            "CBaseEntity::PrecacheModel"
+            {
+                "signature" "CBaseEntity::PrecacheModel"
+                "callconv" "cdecl"
+                "this" "ignore"
+                "return" "int"
+                "arguments"
+                {
+                    "model"
+                    {
+                        "type" "charptr"
+                    }
+                    "preload"
+                    {
+                        "type" "bool"
+                    }
+                }
+            }
+            "CTFPlayer::GiveNamedItem"
+            {
+                "signature" "CTFPlayer::GiveNamedItem"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "cbaseentity"
+                "arguments"
+                {
+                    "name"
+                    {
+                        "type" "charptr"
+                    }
+                    "subtype"
+                    {
+                        "type" "int"
+                    }
+                    "item"
+                    {
+                        "type" "objectptr"
+                    }
+                    "force"
+                    {
+                        "type" "bool"
+                    }
+                }
+            }
+            "CTFKnife::PrimaryAttack"
+            {
+                "signature" "CTFKnife::PrimaryAttack"
+                "callconv" "thiscall"
+                "this" "entity"
+                "return" "void"
+            }
+            "IsFixedWeaponSpreadEnabled"
+            {
+                "signature" "IsFixedWeaponSpreadEnabled"
+                "callconv" "cdecl"
+                "this" "ignore"
+                "return" "bool"
+                "arguments"
+                {
+                    "pWeapon"
+                    {
+                        "type" "cbaseentity"
+                    }
+                }
+            }
+            "CTFGameRules::ApplyOnDamageModifyRules()"
+            {
+                "signature" "CTFGameRules::ApplyOnDamageModifyRules()"
+                "callconv" "thiscall"
+                "return" "bool"
+                "this" "address"
+                "arguments"
+                {
+                    "damage_info"
+                    {
+                        "type" "int"
+                    }
+                    "target"
+                    {
+                        "type" "cbaseentity"
+                    }
+                    "some_bool"
+                    {
+                        "type" "bool"
+                    }
+                }
+            }
+        }
+        "Keys"
+        {
+            "PluginFailMessage"
+            {
+                "windows" ""
+                "windows64" "This plugin is currently not supported on 64-bit servers.  See https://github.com/FlaminSarge/tf2attributes/issues/50 and make sure you are NOT launching the server with srcds_win64 / tf_win64."
+                "linux" ""
+                "linux64" "This plugin is currently not supported on 64-bit servers.  See https://github.com/FlaminSarge/tf2attributes/issues/50 and make sure you are NOT launching the server with srcds_run_64."
+                "mac" "This plugin is no longer supported on Mac."
+                "mac64" "This plugin is no longer supported on Mac.  Especially not on the nonexistent 64-bit version of SRCDS."
+            }
+            "DOTDamageTypes" "03 08 11 22"
+        }
+        "Addresses"
+        {
+            "g_aConditionNames"
+            {
+                "signature" "GetTFConditionName()"
+                "linux"
+                {
+                    "read" "16"
+                }
+                "windows"
+                {
+                    "read" "20"
+                }
+            }
+            "&TF_COND_LAST"
+            {
+                "linux"
+                {
+                    "signature" "CTFPlayerShared::PulseRageBuff()"
+                    "offset" "496"
+                }
+                "windows"
+                {
+                    "signature" "CTFPlayerShared::RemoveAllCond()"
+                    "offset" "155"
+                }
+            }
+            "offsetof(CTFPlayer::m_aObjects)"
+            {
+                "linux"
+                {
+                    "signature" "CTFPlayer::GetObject()"
+                    "offset" "18"
+                }
+                "windows"
+                {
+                    "signature" "CTFPlayer::AddObject()"
+                    "offset" "53"
+                }
+            }
+            "offsetof(CTFPlayer::m_flRespawnTimeOverride)"
+            {
+                "signature" "CTFPlayer::IsReadyToSpawn()"
+                "linux"
+                {
+                    "offset" "108"
+                }
+                "windows"
+                {
+                    "offset" "129"
+                }
+            }
+            "g_LagCompensationManager"
+            {
+                "linux"
+                {
+                    "signature" "g_LagCompensationManager"
+                }
+                "windows"
+                {
+                    "signature" "CTFWeaponBaseMelee::Smack()"
+                    "read" "27"
+                    "read" "0"
+                }
+            }
+            "offsetof(CTFPlayer::m_pCurrentCommand)"
+            {
+                "signature" "CTFWeaponBaseMelee::Smack()"
+                "linux"
+                {
+                    "offset" "52"
+                }
+                "windows"
+                {
+                    "offset" "35"
+                }
+            }
+        }
+    }
+}

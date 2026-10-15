@@ -68,7 +68,7 @@ bool CustomHats_ReserveParticleRevisions(ArrayList files)
 void CustomHats_InitParticles()
 {
 	CustomHats_ResetParticles();
-	GameData data = new GameData("weapons");
+	GameData data = new GameData("weapons.games");
 	if (data != null)
 	{
 		StartPrepSDKCall(SDKCall_Static);

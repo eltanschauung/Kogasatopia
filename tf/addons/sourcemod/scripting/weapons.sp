@@ -55,7 +55,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, FlaminSarge, AndrewBetson, rtldg, pufftwitt, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.3.0" ... VERSION_SUFFIX,
+    version = "7.3.1" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -162,10 +162,10 @@ public void OnPluginStart()
     LoadTranslations("weapons.phrases");
     LoadTranslations("common.phrases");
     LoadTranslations("core.phrases");
-    GameData gameConf = new GameData("weapons");
+    GameData gameConf = new GameData("weapons.games");
     if (gameConf == null)
     {
-        SetFailState("Failed to load gamedata (weapons.txt).");
+        SetFailState("Failed to load gamedata (weapons.games.txt).");
     }
     Handle manageWeapons = DHookCreateFromConf(gameConf, "CTFPlayer::ManageRegularWeapons()");
     if (manageWeapons == null)

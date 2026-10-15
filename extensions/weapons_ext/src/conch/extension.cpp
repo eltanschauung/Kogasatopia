@@ -412,15 +412,15 @@ bool ConchNoSpeed::SetupSharedOffset(char *error, size_t maxlen)
 bool ConchNoSpeed::SetupGameConfig(char *error, size_t maxlen)
 {
 	char confError[255] = "";
-	if (!gameconfs->LoadGameConfigFile("conch_no_speed.games", &m_gameConf, confError, sizeof(confError)))
+	if (!gameconfs->LoadGameConfigFile(WEAPONS_GAMECONFIG_NAME, &m_gameConf, confError, sizeof(confError)))
 	{
 		if (confError[0])
 		{
-			g_pSM->Format(error, maxlen, "Could not read conch_no_speed.games.txt: %s", confError);
+			g_pSM->Format(error, maxlen, "Could not read weapons.games.txt: %s", confError);
 		}
 		else
 		{
-			g_pSM->Format(error, maxlen, "Could not read conch_no_speed.games.txt.");
+			g_pSM->Format(error, maxlen, "Could not read weapons.games.txt.");
 		}
 		return false;
 	}

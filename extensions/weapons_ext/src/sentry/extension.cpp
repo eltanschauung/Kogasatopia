@@ -21,12 +21,12 @@ bool TF2SentryNewTargetExt::SDK_OnLoad(char *error, size_t maxlength, bool late)
     }
 
     char confError[255] = "";
-    if (!gameconfs->LoadGameConfigFile("tf2_sentry_newtarget_dist.games", &g_SentryGameConf, confError, sizeof(confError)))
+    if (!gameconfs->LoadGameConfigFile(WEAPONS_GAMECONFIG_NAME, &g_SentryGameConf, confError, sizeof(confError)))
     {
         if (confError[0])
-            ke::SafeSprintf(error, maxlength, "Could not load tf2_sentry_newtarget_dist.games.txt: %s", confError);
+            ke::SafeSprintf(error, maxlength, "Could not load weapons.games.txt: %s", confError);
         else
-            ke::SafeSprintf(error, maxlength, "Could not load tf2_sentry_newtarget_dist.games.txt");
+            ke::SafeSprintf(error, maxlength, "Could not load weapons.games.txt");
         return false;
     }
 

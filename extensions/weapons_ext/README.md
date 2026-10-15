@@ -54,11 +54,11 @@ The dependency's file key is `weapons_ext.ext`, matching `weapons_ext.autoload`.
 SourceMod resolves the engine suffix itself. An explicit `.2.tf2` dependency
 creates a second owner for the same DSO and invalidates handle identities.
 
-Existing feature gamedata filenames retain their updater/ABI ownership, except
-the retired injector: its validated schema offsets/signatures now live in
-`weapons.schema.txt`. This is not a compatibility extension. TF2Tools reads `sm-tf2.games`
-from the installed stable SourceMod package; TF2Items reads `tf2.items.txt`.
-The other five feature gamedata files remain in the repository's gamedata tree.
+All package-owned engine bindings now live in `weapons.games.txt`, shared with
+the Weapons plugin. See [GAMEDATA.md](GAMEDATA.md) for the seventeen-file ownership
+audit, migration contract, and validation procedure. This is not a compatibility
+extension. TF2Tools still reads the shared, upstream-managed `sm-tf2.games`
+from the installed stable SourceMod package; it is deliberately not consolidated.
 Before creating a demand-driven TF2Tools detour, its own config is explicitly
 selected in the shared CDetour manager.
 

@@ -92,7 +92,7 @@ public Action Command_Probe(int client, int args)
             Check(!human, "engine test no humans");
             if (!human)
             {
-                GameData data=new GameData("weapons.inventory_diagnostics");
+                GameData data=new GameData("weapons.games");
                 WeaponsInventoryStages_Init(data);
                 delete data;
                 for (int stage=0; stage<view_as<int>(InventoryStage_Count); stage++)

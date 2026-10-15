@@ -123,7 +123,7 @@ class View final : public SDKExtension,public IClientListener {
 public:
     bool SDK_OnLoad(char *error,size_t length,bool) override {
         preferred.fill(-1);
-        if(!OpenConfig("weapons.services",config,error,length)) return false;
+        if(!OpenConfig(WEAPONS_GAMECONFIG_NAME,config,error,length)) return false;
         setFOV=Symbol<decltype(setFOV)>(config,"CBasePlayer::SetFOV");
         const char *props[]={"m_iFOV","m_iDefaultFOV","m_hActiveWeapon","m_angEyeAngles[0]","m_nPlayerCond","_condition_bits"};
         int *values[]={&fovOffset,&defaultOffset,&activeOffset,&eyeOffset,&condOffset,&alternateOffset};

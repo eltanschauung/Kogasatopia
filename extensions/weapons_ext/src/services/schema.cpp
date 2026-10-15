@@ -265,7 +265,7 @@ static const sp_nativeinfo_t natives[] = {
 class Schema final : public SDKExtension {
     bool SDK_OnLoad(char *error, size_t length, bool) override {
         IGameConfig *config = nullptr;
-        if (!weapons_services::OpenConfig("weapons.schema", config, error, length)) return false;
+        if (!weapons_services::OpenConfig(WEAPONS_GAMECONFIG_NAME, config, error, length)) return false;
         getSchema = weapons_services::Symbol<decltype(getSchema)>(config, "GEconItemSchema");
         initialize = weapons_services::Symbol<decltype(initialize)>(config, "CEconItemAttributeDefinition::BInitFromKV");
 #define KEY_BIND(variable, name) variable = weapons_services::Symbol<decltype(variable)>(config, name)

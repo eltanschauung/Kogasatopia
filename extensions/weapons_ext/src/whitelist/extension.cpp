@@ -340,8 +340,8 @@ bool WhitelistPolicy::SDK_OnLoad(char *error, size_t length, bool) {
         return false;
     };
     char configError[256];
-    if (!gameconfs->LoadGameConfigFile("tf2.whitelist_policy", &g_Config, configError, sizeof(configError)))
-        return fail("Could not load tf2.whitelist_policy gamedata");
+    if (!gameconfs->LoadGameConfigFile(WEAPONS_GAMECONFIG_NAME, &g_Config, configError, sizeof(configError)))
+        return fail("Could not load weapons.games gamedata");
     void *managerFn, *selectedFn, *baseFn, *indexFn, *loadoutFn, *guardFn;
     if (!g_Config->GetMemSig("TFInventoryManager", &managerFn) || !managerFn
         || !g_Config->GetMemSig("GetItemInLoadout", &selectedFn) || !selectedFn

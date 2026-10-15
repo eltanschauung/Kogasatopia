@@ -9,4 +9,5 @@ for test_name in hot_paths policy loadout_cache shared_vtable_lifetime; do
     "$test_output/$test_name"
 done
 python3 "$test_root/tests/smx_relink_test.py"
+python3 "$test_root/tests/gamedata_test.py"
 echo "Test binaries retained in $test_output"

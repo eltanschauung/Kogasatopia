@@ -15,10 +15,10 @@ float g_flWeaponsRecentDeployDeadline[MAXPLAYERS + 1];
 
 void WeaponsSound_InitDeployFinishedHooks()
 {
-    GameData data = new GameData("weapons.deploy_finished");
+    GameData data = new GameData("weapons.games");
     if (data == null)
     {
-        SetFailState("Missing weapons.deploy_finished gamedata");
+        SetFailState("Missing weapons.games gamedata (deploy_finished)");
         return;
     }
     g_WeaponsSoundDeployHook = DynamicHook.FromConf(data, "CTFWeaponBase::Deploy");

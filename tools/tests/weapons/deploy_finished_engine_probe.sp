@@ -63,7 +63,7 @@ public void OnPluginStart() {
 public Action Command_Probe(int client, int args) {
     #pragma unused client, args
     checks = 0; failures = 0; readyCalls = 0; frameCalls = 0; removedCalls = 0; failedDeploys = 0;
-    GameData data = new GameData("weapons.deploy_finished");
+    GameData data = new GameData("weapons.games");
     if (data == null) { PrintToServer("[DeployFinishedEngineProbe] Missing gamedata"); return Plugin_Handled; }
     deployHook = DynamicHook.FromConf(data, "CTFWeaponBase::Deploy");
     g_WeaponsSoundDeployFinishFrameHook = DynamicHook.FromConf(data, "CTFWeaponBase::ItemPostFrame");

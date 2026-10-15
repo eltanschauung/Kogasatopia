@@ -18,10 +18,10 @@ int g_KunaiNerfAttackDepth;
 
 void KunaiNerf_Init()
 {
-    GameData data = new GameData("weapons.kunai_nerf");
+    GameData data = new GameData("weapons.games");
     if (data == null)
     {
-        SetFailState("Missing weapons.kunai_nerf gamedata");
+        SetFailState("Missing weapons.games gamedata (kunai_nerf)");
         return;
     }
     g_KunaiNerfPrimaryAttack = DynamicDetour.FromConf(data, "CTFKnife::PrimaryAttack");

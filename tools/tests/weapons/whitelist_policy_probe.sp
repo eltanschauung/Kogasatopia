@@ -11,7 +11,7 @@ Handle getSelected, getBase, getIndex;
 Address manager;
 int inventoryOffset, qualityOffset, initializedOffset, checks, failures;
 public void OnPluginStart() {
-    GameData config = new GameData("tf2.whitelist_policy");
+    GameData config = new GameData("weapons.games");
     inventoryOffset = config.GetOffset("Inventory");
     getSelected = Prepare(config, SDKCall_Raw, "GetItemInLoadout", 2);
     getBase = Prepare(config, SDKCall_Raw, "GetBaseItemForClass", 2);

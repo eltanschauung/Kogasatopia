@@ -529,9 +529,9 @@ bool TF2SpreadPatterns::SetupGameConfig(char *error, size_t maxlen)
 {
 	char confError[255] = "";
 	if (!gameconfs->LoadGameConfigFile(
-		"tf2_spread_patterns.games", &m_gameConf, confError, sizeof(confError)))
+		WEAPONS_GAMECONFIG_NAME, &m_gameConf, confError, sizeof(confError)))
 	{
-		g_pSM->Format(error, maxlen, "Could not read tf2_spread_patterns.games.txt: %s", confError);
+		g_pSM->Format(error, maxlen, "Could not read weapons.games.txt: %s", confError);
 		return false;
 	}
 
