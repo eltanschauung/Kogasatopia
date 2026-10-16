@@ -1,0 +1,21 @@
+[Unit]
+Description=TF2 and MGE screens with a shared update gate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=kogasa
+Group=kogasa
+WorkingDirectory=/home/kogasa/hlserver/tf2
+ExecStart=/usr/bin/python3 /home/kogasa/Kogasatopia/tools/tf2_service.py start
+ExecStop=/usr/bin/python3 /home/kogasa/Kogasatopia/tools/tf2_service.py stop
+ExecStopPost=/usr/bin/python3 /home/kogasa/Kogasatopia/tools/tf2_service.py stop
+TimeoutStartSec=25min
+TimeoutStopSec=60
+KillMode=control-group
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -184,11 +184,14 @@ class StoreTests(unittest.TestCase):
 
 class ActionTests(unittest.TestCase):
     @patch("resource_guard.main.subprocess.run")
-    def test_only_mge_service_is_stopped(self, run):
+    def test_only_mge_screen_is_stopped(self, run):
         run.return_value.returncode = 0
         self.assertEqual(stop_mge()[0], "mge_stopped")
-        self.assertEqual(run.call_args_list[-1].args[0],
-                         ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "stop", "mge.service"])
+        command = run.call_args.args[0]
+        self.assertTrue(command[1].endswith("/tools/tf2_service.py"))
+        self.assertEqual(command[2:], ["stop-mge"])
+        self.assertNotIn("systemctl", command)
+        self.assertEqual(run.call_count, 1)
 
     @patch("resource_guard.main.subprocess.run")
     def test_inactive_has_no_stop(self, run):
@@ -198,7 +201,7 @@ class ActionTests(unittest.TestCase):
 
     @patch("resource_guard.main.subprocess.run")
     def test_stop_failure_recorded(self, run):
-        run.side_effect = [Mock(returncode=0), Mock(returncode=1)]
+        run.return_value.returncode = 1
         self.assertEqual(stop_mge()[0], "mge_stop_failed")
 
 

@@ -24,19 +24,16 @@ from resource_guard.storage import Publisher, Store
 
 
 def stop_mge():
-    # Fixed service target only: never shell commands, arbitrary PIDs, or TF2.
+    # Fixed MGE-only action in the shared owner; never stop tf2.service itself.
     try:
-        active = subprocess.run(
-            ["/usr/bin/systemctl", "is-active", "--quiet", "mge.service"], timeout=3)
-        if active.returncode == 3:
-            return "mge_already_inactive", ""
-        if active.returncode != 0:
-            return "mge_stop_failed", f"Status check exit {active.returncode}"
+        manager = Path(__file__).resolve().parent.parent / "tf2_service.py"
         result = subprocess.run(
-            ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "stop", "mge.service"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+            [sys.executable, str(manager), "stop-mge"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=40)
+        if result.returncode == 3:
+            return "mge_already_inactive", ""
         if result.returncode:
-            return "mge_stop_failed", f"systemctl exit {result.returncode}"
+            return "mge_stop_failed", f"Shared manager exit {result.returncode}"
         return "mge_stopped", ""
     except (OSError, subprocess.TimeoutExpired) as error:
         return "mge_stop_failed", type(error).__name__
