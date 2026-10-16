@@ -588,11 +588,11 @@
             }
             "SchemaAttributes"
             {
-                "linux" "444"
+                "linux" "472"
             }
             "SchemaAttributeNames"
             {
-                "linux" "480"
+                "linux" "508"
             }
             "IsViewModelFlipped"
             {
