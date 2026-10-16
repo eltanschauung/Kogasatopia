@@ -55,7 +55,7 @@ public Plugin myinfo =
     name = "Weapons",
     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, FlaminSarge, AndrewBetson, rtldg, pufftwitt, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
-    version = "7.3.1" ... VERSION_SUFFIX,
+    version = "7.4.0" ... VERSION_SUFFIX,
     url = "https://kogasa.tf"
 };
 
@@ -116,6 +116,7 @@ int g_attrdef_AllowedInMedievalMode;
 #include "weapons/sound_overrides.sp"
 #include "weapons/model_overrides.sp"
 #include "weapons/gameplay.sp"
+#include "weapons/building_crit_damage.sp"
 #include "weapons/building_restrictions.sp"
 #include "weapons/commands.sp"
 #include "weapons/equip_commands.sp"

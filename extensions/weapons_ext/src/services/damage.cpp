@@ -1,29 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Based on nosoop's SM-TFOnTakeDamage 1.3.3. Native hook owner; no provider plugin.
 #include "engine.h"
+#include "damage_info.h"
 #include <CDetour/detours.h>
 #include <igameevents.h>
 #include <cstddef>
 
 namespace weapons_services { namespace {
-// Runtime TF2 x86 layout, matching SM-TFOnTakeDamage's class definitions.
-// Deliberately not the SDK's potentially stale CTakeDamageInfo class.
-struct DamageInfo {
-    float force[3],position[3],reported[3];
-    uint32_t inflictor,attacker,weapon;
-    float damage,maxDamage,baseDamage;
-    int type,custom,stats,ammo,otherPlayers,penetration;
-    float bonus;
-    uint32_t bonusProvider;
-    bool friendlyFire;
-    uint8_t padding[3];
-    float damageForForce;
-    int crit;
-};
-static_assert(sizeof(DamageInfo)==104 && offsetof(DamageInfo,crit)==100,"TF2 x86 damage ABI");
 IGameConfig *config;
-CDetour *damageDetour,*aliveDetour,*rulesDetour;
-IForward *damageForward,*postForward,*rulesForward;
+CDetour *damageDetour,*aliveDetour,*rulesDetour,*buildingDetour;
+IForward *damageForward,*postForward,*rulesForward,*buildingForward;
 IGameEventManager2 *events;
 bool eventHook;
 // Scope is restored after nested/reentrant damage; an unrelated hurt event can
@@ -64,9 +50,32 @@ public:
     explicit CritScope(int value):previous_(critContext) { critContext=value; }
     ~CritScope() { critContext=previous_; }
 };
+void ForwardBuilding(int building,DamageInfo &info) {
+    if(!buildingForward || !buildingForward->GetFunctionCount()) return;
+    float damage=info.damage;
+    buildingForward->PushCell(building);
+    buildingForward->PushCell(HandleIndex(info.attacker));
+    buildingForward->PushCell(HandleIndex(info.inflictor));
+    buildingForward->PushFloatByRef(&damage);
+    buildingForward->PushCell(info.type);
+    buildingForward->PushCell(HandleIndex(info.weapon));
+    buildingForward->PushCell(info.custom);
+    buildingForward->PushCell(info.crit);
+    cell_t result=Pl_Continue;
+    if(buildingForward->Execute(&result)==SP_ERROR_NONE && result>Pl_Continue)
+        info.damage=damage;
+    // Only damage is writable. Do not run Forward()'s player-only crit/flag
+    // normalization: building observers must see the original classification.
+}
 }
 }
 using weapons_services::DamageInfo;
+DETOUR_DECL_MEMBER1(Weapons_BuildingDamage,int,const DamageInfo &,input) {
+    auto *entity=reinterpret_cast<CBaseEntity *>(this);
+    return weapons_services::WithBuildingDamage(gamehelpers->GetEntityClassname(entity),input,
+        [entity](DamageInfo &info) { weapons_services::ForwardBuilding(weapons_services::Index(entity),info); },
+        [this](const DamageInfo &info) { return DETOUR_MEMBER_CALL(Weapons_BuildingDamage)(info); });
+}
 DETOUR_DECL_MEMBER1(Weapons_PlayerDamage,int,const DamageInfo &,input) {
     // The old provider edited the passed CTakeDamageInfo in place. Preserve it
     // so all downstream SDKHooks and rules callbacks see the same information.
@@ -104,19 +113,22 @@ public:
         damageForward=forwards->CreateForward("Weapons_OnTakeDamage",ET_Event,10,nullptr,Param_Cell,Param_CellByRef,Param_CellByRef,Param_FloatByRef,Param_CellByRef,Param_CellByRef,Param_Array,Param_Array,Param_Cell,Param_CellByRef);
         postForward=forwards->CreateForward("Weapons_OnTakeDamagePost",ET_Ignore,10,nullptr,Param_Cell,Param_Cell,Param_Cell,Param_Float,Param_Cell,Param_Cell,Param_Array,Param_Array,Param_Cell,Param_Cell);
         rulesForward=forwards->CreateForward("Weapons_OnTakeDamageModifyRules",ET_Event,10,nullptr,Param_Cell,Param_CellByRef,Param_CellByRef,Param_FloatByRef,Param_CellByRef,Param_CellByRef,Param_Array,Param_Array,Param_Cell,Param_CellByRef);
+        buildingForward=forwards->CreateForward("Weapons_OnBuildingTakeDamage",ET_Event,8,nullptr,Param_Cell,Param_Cell,Param_Cell,Param_FloatByRef,Param_Cell,Param_Cell,Param_Cell,Param_Cell);
         CDetourManager::Init(g_pSM->GetScriptingEngine(),config);
         damageDetour=DETOUR_CREATE_MEMBER(Weapons_PlayerDamage,"CTFPlayer::OnTakeDamage()");
         aliveDetour=DETOUR_CREATE_MEMBER(Weapons_PlayerDamageAlive,"CTFPlayer::OnTakeDamage_Alive()");
         rulesDetour=DETOUR_CREATE_MEMBER(Weapons_ModifyDamageRules,"CTFGameRules::ApplyOnDamageModifyRules()");
-        if(!damageDetour || !aliveDetour || !rulesDetour) { std::snprintf(error,length,"Weapons damage detour creation failed"); return false; }
+        buildingDetour=DETOUR_CREATE_MEMBER(Weapons_BuildingDamage,"CBaseObject::OnTakeDamage()");
+        if(!damageDetour || !aliveDetour || !rulesDetour || !buildingDetour) { std::snprintf(error,length,"Weapons damage detour creation failed"); return false; }
         damageDetour->EnableDetour(); aliveDetour->EnableDetour(); rulesDetour->EnableDetour();
+        buildingDetour->EnableDetour();
         SH_ADD_HOOK(IGameEventManager2,FireEvent,events,SH_MEMBER(this,&Damage::FireEvent),false); eventHook=true;
         return true;
     }
     void SDK_OnUnload() override {
         if(eventHook) { SH_REMOVE_HOOK(IGameEventManager2,FireEvent,events,SH_MEMBER(this,&Damage::FireEvent),false); eventHook=false; }
-        for(CDetour **hook:{&rulesDetour,&aliveDetour,&damageDetour}) if(*hook) { (*hook)->Destroy(); *hook=nullptr; }
-        for(IForward **forward:{&rulesForward,&postForward,&damageForward}) if(*forward) { forwards->ReleaseForward(*forward); *forward=nullptr; }
+        for(CDetour **hook:{&buildingDetour,&rulesDetour,&aliveDetour,&damageDetour}) if(*hook) { (*hook)->Destroy(); *hook=nullptr; }
+        for(IForward **forward:{&buildingForward,&rulesForward,&postForward,&damageForward}) if(*forward) { forwards->ReleaseForward(*forward); *forward=nullptr; }
         if(config) { gameconfs->CloseGameConfigFile(config); config=nullptr; }
         critContext=-1;
     }

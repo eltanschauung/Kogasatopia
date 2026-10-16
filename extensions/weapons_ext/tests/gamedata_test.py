@@ -64,6 +64,14 @@ class GameDataTests(unittest.TestCase):
         self.assertEqual((directory/'./weapons.games.txt').resolve(),
                          (directory/'weapons.games.txt').resolve())
 
+    def test_building_damage_binding(self):
+        root = Path(__file__).resolve().parents[3]
+        tree = parse((root/'tf/addons/sourcemod/gamedata/weapons.games.txt').read_text())
+        groups = dict(dict(dict(tree)['Games'])['tf'])
+        entry = dict(dict(groups['Signatures'])['CBaseObject::OnTakeDamage()'])
+        self.assertEqual(entry['library'], 'server')
+        self.assertEqual(entry['linux'], '@_ZN11CBaseObject12OnTakeDamageERK15CTakeDamageInfo')
+
 
 if __name__ == '__main__':
     unittest.main()

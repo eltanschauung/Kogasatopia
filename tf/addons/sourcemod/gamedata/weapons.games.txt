@@ -425,6 +425,11 @@
                 "linux" "@_ZN12CTFGameRules24ApplyOnDamageModifyRulesER15CTakeDamageInfoP11CBaseEntityb"
                 "windows" "\x55\x8B\xEC\x81\xEC\x8C\x00\x00\x00\x56\x57\x8B\x7D\x08\x89\x4D\xC0"
             }
+            "CBaseObject::OnTakeDamage()"
+            {
+                "library" "server"
+                "linux" "@_ZN11CBaseObject12OnTakeDamageERK15CTakeDamageInfo"
+            }
             "CTFPlayer::OnTakeDamage()"
             {
                 "library" "server"
