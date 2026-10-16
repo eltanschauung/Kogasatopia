@@ -1,4 +1,4 @@
-// Linux x86 schema tail offsets verified against TF2 build 11087207 (2026-10-05).
+// Linux x86 schema offsets verified against TF2 build 11138802 (2026-10-16).
 "Games"
 {
 	"tf"
@@ -276,13 +276,13 @@
 			"CEconItemSchema::m_AttributeMap"
 			{
 				// accessed in loop at CEconItemSchema::GetAttributeDefinitionByName
-				"linux"		"448"
+				"linux"		"476"
 				"windows"	"448"
 			}
 			"CEconItemSchema::m_EquipRegions"
 			{
 				// the smaller of the two offsets in CEconItemSchema::GetEquipRegionIndexByName()
-				"linux"		"1004"
+				"linux"		"1052"
 				"windows"	"968"
 			}
 			"CEconItemSchema::m_ParticleSystemTree"
@@ -290,7 +290,7 @@
 				// a CUtlRBTree instance
 				// the underlying map's ::Insert function is accessed close to the end of ::BInitAttributeControlledParticleSystems()
 				// subtract by 4 to get the offset of the CUtlRBTree itself
-				"linux"		"912"
+				"linux"		"960"
 				"windows"	"876"
 			}
 			"CEconItemSchema::m_CosmeticUnusualEffectList"
@@ -298,19 +298,19 @@
 				// a CUtlVector, referenced in CEconItemSchema::BInitAttributeControlledParticleSystems()
 				// we specify the offsets of all three lists in case any offset changes independently
 				// (e.g., Valve adds a new list in between one of the others, for some weird reason)
-				"linux"		"944"
+				"linux"		"992"
 				"windows"	"908"
 			}
 			"CEconItemSchema::m_WeaponUnusualEffectList"
 			{
 				// a CUtlVector, referenced in CEconItemSchema::BInitAttributeControlledParticleSystems()
-				"linux"		"964"
+				"linux"		"1012"
 				"windows"	"928"
 			}
 			"CEconItemSchema::m_TauntUnusualEffectList"
 			{
 				// a CUtlVector, referenced in CEconItemSchema::BInitAttributeControlledParticleSystems()
-				"linux"		"984"
+				"linux"		"1032"
 				"windows"	"948"
 			}
 
@@ -318,7 +318,7 @@
 			{
 				// used in CTFItemDefinition::BInitFromKV() in the same block that "head" and "misc" are referenced
 				// on Windows, "misc" is a unique subroutine x-ref
-				"linux"		"1468"
+				"linux"		"1516"
 				"windows"	"1432"
 			}
 
