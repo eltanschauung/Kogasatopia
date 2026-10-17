@@ -11,8 +11,10 @@ providers are retired, not wrapped:
   SourcePawn PreThinkPost hook on every player.
 - `tf_ontakedamage`: native `Weapons_OnTakeDamage*` forwards and scoped,
   reentrancy-safe mini-crit event correction. The dedicated
-  `Weapons_OnBuildingTakeDamage` forward exposes real crit classification for
-  the building-only 1.35x/3x policy; see [BUILDING_DAMAGE.md](BUILDING_DAMAGE.md).
+  `Weapons_OnBuildingTakeDamage` forward derives effective crit classification
+  through the engine's damage rules on a scratch record, retaining only crit
+  and suppressing the scratch record's player-rules forward. It supplies the
+  building-only 1.35x/3x policy; see [BUILDING_DAMAGE.md](BUILDING_DAMAGE.md).
 - `fov` and `centerprojectiles`: one native view-policy owner. Weapons keeps
   commands and the existing `fov_override` / `tf2centerprojectiles` cookies.
   Hunting Revolver calls `WeaponsView_SetZoom` directly; it does not rely on

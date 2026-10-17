@@ -1,0 +1,19 @@
+"Games"
+{
+    "tf"
+    {
+        "Signatures"
+        {
+            "CTFWeaponBase::CanAttack()"
+            {
+                "library" "server"
+                "linux" "@_ZN13CTFWeaponBase9CanAttackEv"
+            }
+            "CTFWeaponBaseGun::PrimaryAttack()"
+            {
+                "library" "server"
+                "linux" "@_ZN16CTFWeaponBaseGun13PrimaryAttackEv"
+            }
+        }
+    }
+}

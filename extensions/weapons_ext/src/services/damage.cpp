@@ -5,6 +5,10 @@
 #include <CDetour/detours.h>
 #include <igameevents.h>
 #include <cstddef>
+#include <ISDKTools.h>
+
+// Shared SDKTools dependency already owned by the merged TF2Tools module.
+extern SourceMod::ISDKTools *g_pSDKTools;
 
 namespace weapons_services { namespace {
 IGameConfig *config;
@@ -12,6 +16,9 @@ CDetour *damageDetour,*aliveDetour,*rulesDetour,*buildingDetour;
 IForward *damageForward,*postForward,*rulesForward,*buildingForward;
 IGameEventManager2 *events;
 bool eventHook;
+using ModifyRules=bool (*)(void *,DamageInfo &,CBaseEntity *,bool);
+ModifyRules modifyRules;
+thread_local DamageClassificationContext classificationProbe;
 // Scope is restored after nested/reentrant damage; an unrelated hurt event can
 // never inherit the most recent hit's mini-crit context as in the old plugin.
 thread_local int critContext=-1;
@@ -65,14 +72,26 @@ void ForwardBuilding(int building,DamageInfo &info) {
     if(buildingForward->Execute(&result)==SP_ERROR_NONE && result>Pl_Continue)
         info.damage=damage;
     // Only damage is writable. Do not run Forward()'s player-only crit/flag
-    // normalization: building observers must see the original classification.
+    // normalization: observers see effective classification plus original flags.
+}
+void ClassifyBuilding(CBaseEntity *building,DamageInfo &scratch) {
+    void *rules=g_pSDKTools ? g_pSDKTools->GetGameRules() : nullptr;
+    if(!rules || !modifyRules) return;
+    DamageClassificationScope scope(classificationProbe,scratch,building);
+    // Call the game's real entry point. Our detour below still runs the game
+    // logic, but does not publish the scratch probe as a player rules event.
+    // The boolean result is not a building damage veto; only crit is retained.
+    modifyRules(rules,scratch,building,true);
 }
 }
 }
 using weapons_services::DamageInfo;
 DETOUR_DECL_MEMBER1(Weapons_BuildingDamage,int,const DamageInfo &,input) {
     auto *entity=reinterpret_cast<CBaseEntity *>(this);
+    if(!weapons_services::buildingForward || !weapons_services::buildingForward->GetFunctionCount())
+        return DETOUR_MEMBER_CALL(Weapons_BuildingDamage)(input);
     return weapons_services::WithBuildingDamage(gamehelpers->GetEntityClassname(entity),input,
+        [entity](DamageInfo &scratch) { weapons_services::ClassifyBuilding(entity,scratch); },
         [entity](DamageInfo &info) { weapons_services::ForwardBuilding(weapons_services::Index(entity),info); },
         [this](const DamageInfo &info) { return DETOUR_MEMBER_CALL(Weapons_BuildingDamage)(info); });
 }
@@ -91,7 +110,8 @@ DETOUR_DECL_MEMBER1(Weapons_PlayerDamageAlive,int,const DamageInfo &,info) {
 }
 DETOUR_DECL_MEMBER3(Weapons_ModifyDamageRules,bool,DamageInfo &,info,CBaseEntity *,victim,bool,allowDamage) {
     bool result=DETOUR_MEMBER_CALL(Weapons_ModifyDamageRules)(info,victim,allowDamage);
-    if(result) weapons_services::Forward(weapons_services::rulesForward,weapons_services::Index(victim),info);
+    if(result && !weapons_services::classificationProbe.Matches(info,victim))
+        weapons_services::Forward(weapons_services::rulesForward,weapons_services::Index(victim),info);
     return result;
 }
 SH_DECL_HOOK2(IGameEventManager2,FireEvent,SH_NOATTRIB,0,bool,IGameEvent *,bool);
@@ -110,6 +130,8 @@ public:
     }
     bool SDK_OnLoad(char *error,size_t length,bool) override {
         if(!OpenConfig(WEAPONS_GAMECONFIG_NAME,config,error,length)) return false;
+        modifyRules=Symbol<ModifyRules>(config,"CTFGameRules::ApplyOnDamageModifyRules()");
+        if(!modifyRules) { std::snprintf(error,length,"Weapons building crit classification binding failed"); return false; }
         damageForward=forwards->CreateForward("Weapons_OnTakeDamage",ET_Event,10,nullptr,Param_Cell,Param_CellByRef,Param_CellByRef,Param_FloatByRef,Param_CellByRef,Param_CellByRef,Param_Array,Param_Array,Param_Cell,Param_CellByRef);
         postForward=forwards->CreateForward("Weapons_OnTakeDamagePost",ET_Ignore,10,nullptr,Param_Cell,Param_Cell,Param_Cell,Param_Float,Param_Cell,Param_Cell,Param_Array,Param_Array,Param_Cell,Param_Cell);
         rulesForward=forwards->CreateForward("Weapons_OnTakeDamageModifyRules",ET_Event,10,nullptr,Param_Cell,Param_CellByRef,Param_CellByRef,Param_FloatByRef,Param_CellByRef,Param_CellByRef,Param_Array,Param_Array,Param_Cell,Param_CellByRef);
@@ -131,6 +153,8 @@ public:
         for(IForward **forward:{&buildingForward,&rulesForward,&postForward,&damageForward}) if(*forward) { forwards->ReleaseForward(*forward); *forward=nullptr; }
         if(config) { gameconfs->CloseGameConfigFile(config); config=nullptr; }
         critContext=-1;
+        classificationProbe={};
+        modifyRules=nullptr;
     }
 } module;
 }}

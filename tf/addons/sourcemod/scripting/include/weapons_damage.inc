@@ -44,11 +44,16 @@ forward Action Weapons_OnTakeDamageModifyRules(int victim, int &attacker, int &i
  * Called at CBaseObject::OnTakeDamage() entry, before building-specific rules,
  * only for obj_sentrygun, obj_dispenser and obj_teleporter (both ends).
  *
- * damage is pre-multiplier input. Weapons owns the single 1.35x/3x crit policy;
+ * critType is derived by the engine's ApplyOnDamageModifyRules on a scratch
+ * record, not merely copied from the incoming projectile. Only that crit field
+ * is retained: damage is the original building input, without player range
+ * variance or player damage multipliers. The scratch probe never dispatches
+ * Weapons_OnTakeDamageModifyRules. Weapons owns the single 1.35x/3x crit policy;
  * other listeners must not apply those multipliers again. CritType is the real
  * CTakeDamageInfo field, NOT inferred from DMG_CRIT or player conditions.
- * Only damage can be edited. Crit classification, flags, attribution, vectors
- * and custom damage remain untouched. Return Plugin_Changed to commit damage.
+ * Only damage can be edited. Other metadata is read-only; flags, attribution,
+ * vectors and custom damage preserve the original input values.
+ * Return Plugin_Changed to commit damage.
  * As with the player forward, actions commit edits rather than cancel damage.
  * The caller's record is never mutated or reused for another building.
  */

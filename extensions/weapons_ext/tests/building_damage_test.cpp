@@ -8,6 +8,7 @@ using namespace weapons_services;
 int main() {
     int checks=0;
     auto check=[&](bool result) { ++checks; assert(result); };
+    auto identity=[](DamageInfo &) {};
     for (const char *name:{"obj_sentrygun","obj_dispenser","obj_teleporter"}) {
         check(IsEngineerBuilding(name));
         for (int crit:{-1,0,1,2,3}) for(int flags:{0,1<<20,(1<<20)|64}) {
@@ -32,14 +33,14 @@ int main() {
             };
             // The SAME incoming record damages multiple targets, as in splash.
             for(int target=0;target<4;target++) {
-                check(WithBuildingDamage(name,input,notify,original)==123);
+                check(WithBuildingDamage(name,input,identity,notify,original)==123);
                 check(!std::memcmp(&input,&snapshot,sizeof(input)));
             }
             check(calls==4 && notifications==4);
             // Reentrant damage must not inherit or consume another hit's state.
-            WithBuildingDamage(name,input,[&](DamageInfo &outer) {
+            WithBuildingDamage(name,input,identity,[&](DamageInfo &outer) {
                 notify(outer);
-                WithBuildingDamage(name,input,notify,original);
+                WithBuildingDamage(name,input,identity,notify,original);
                 check(std::fabs(outer.damage-expected)<0.0001f);
             },original);
             check(!std::memcmp(&input,&snapshot,sizeof(input)));
@@ -50,9 +51,40 @@ int main() {
         check(!IsEngineerBuilding(name));
         DamageInfo info{};info.damage=20.0f;info.crit=2;
         int notified=0;
-        int result=WithBuildingDamage(name,info,[&](DamageInfo &) {++notified;},
+        int result=WithBuildingDamage(name,info,[&](DamageInfo &) {check(false);},[&](DamageInfo &) {++notified;},
             [&](const DamageInfo &passed) {check(&passed==&info);return 456;});
         check(result==456 && notified==0 && info.damage==20.0f);
+    }
+    for(int effective:{0,1,2}) {
+        DamageInfo incoming{};incoming.damage=90.0f;incoming.crit=0;incoming.type=1<<6;
+        incoming.attacker=37;incoming.inflictor=42;incoming.weapon=48;
+        const auto saved=incoming;
+        DamageClassificationContext probe;
+        int buildingToken=0,playerToken=0;
+        int notifications=0;
+        WithBuildingDamage("obj_dispenser",incoming,[&](DamageInfo &scratch) {
+            check(&scratch!=&incoming && !std::memcmp(&scratch,&saved,sizeof(scratch)));
+            DamageClassificationScope guard(probe,scratch,&buildingToken);
+            check(probe.Matches(scratch,&buildingToken) && !probe.Matches(incoming,&buildingToken));
+            check(!probe.Matches(scratch,&playerToken)); // Same record, real player: do not suppress.
+            DamageInfo nested{};
+            { DamageClassificationScope inner(probe,nested,&playerToken);check(probe.Matches(nested,&playerToken)); }
+            check(probe.Matches(scratch,&buildingToken));
+            // A real rules call modifies much more than classification. Poison
+            // all scratch bytes so leaking ANY field becomes a regression.
+            std::memset(&scratch,0x5a,sizeof(scratch));scratch.crit=effective;
+        },[&](DamageInfo &local) {
+            ++notifications;
+            check(probe.info==nullptr && local.crit==effective && local.damage==90.0f);
+            auto comparison=local;comparison.crit=saved.crit;
+            check(!std::memcmp(&comparison,&saved,sizeof(local)));
+            local.damage*=effective==1?1.35f:effective==2?3.0f:1.0f;
+        },[&](const DamageInfo &local) {
+            check(std::fabs(local.damage-(effective==1?121.5f:effective==2?270.0f:90.0f))<0.0001f);
+            auto comparison=local;comparison.crit=saved.crit;comparison.damage=saved.damage;
+            check(!std::memcmp(&comparison,&saved,sizeof(local)));return 1;
+        });
+        check(notifications==1 && probe.info==nullptr && !std::memcmp(&incoming,&saved,sizeof(incoming)));
     }
     std::cout<<"Building damage isolation: "<<checks<<" checks passed\n";
 }

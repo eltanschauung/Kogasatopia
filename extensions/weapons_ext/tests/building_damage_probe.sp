@@ -94,7 +94,7 @@ MemoryBlock HitInfo(float damage,int crit,int flags=0,int custom=0) {
     return info;
 }
 void Damage(int entity,MemoryBlock info,int crit,int flags) {
-    g_ExpectType=flags;g_ExpectCrit=crit;
+    g_ExpectType=flags;g_ExpectCrit=(flags & DMG_CRIT) ? 2 : crit;
     // Virtual entry also runs sentry-specific modifiers before the base detour.
     SDKCall(g_VirtualDamage,entity,info.Address);
 }
@@ -123,7 +123,7 @@ public Action Run(Handle timer) {
         Check(entity>MaxClients,"spawn building");if(entity<=MaxClients)continue;
         g_ApplyPolicy=false;TestHit(entity,2,DMG_CRIT,20);g_ApplyPolicy=true;
         TestHit(entity,0,0,20);TestHit(entity,1,0,27);TestHit(entity,2,DMG_CRIT,60);
-        TestHit(entity,1,DMG_CRIT,27);TestHit(entity,0,DMG_CRIT,20);TestHit(entity,2,0,60);
+        TestHit(entity,1,DMG_CRIT,60);TestHit(entity,0,DMG_CRIT,60);TestHit(entity,2,0,60);
         TestHit(entity,0,0,0,0,0.0);TestHit(entity,3,0,20);
         // Engine mult_dmg_vs_buildings runs AFTER the custom multiplier.
         bool attribute=WeaponsAttrib_SetByName(g_Weapon,"dmg bonus vs buildings",2.0);
@@ -174,6 +174,7 @@ public Action Run(Handle timer) {
 }
 public Action Weapons_OnBuildingTakeDamage(int entity,int attacker,int inflictor,float &damage,
     int flags,int weapon,int custom,CritType crit) {
+    if(!g_Testing)return Plugin_Continue;
     g_BuildingCalls++;
     g_LastForwardDamage=damage;
     Check(flags==g_ExpectType && view_as<int>(crit)==g_ExpectCrit,"real crit and flags preserved");
