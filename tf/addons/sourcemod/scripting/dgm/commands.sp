@@ -206,21 +206,16 @@ public Action Command_RespawnToggle(int client, int args)
         strcopy(message, sizeof(message), DGM_AreRespawnTimesForcedOn()
             ? "Respawn times are now back to normal."
             : "Respawn times are now halved; respawning all clients!");
-        if (client > 0 && IsClientInGame(client))
-            PrintToChat(client, "%s", message);
-        else
+        PrintToChatAll("%s", message);
+        if (client <= 0)
             PrintToServer("%s", message);
         return Plugin_Handled;
     }
+    PrintToChatAll("Respawn times %s (%ss)", g_InternalOverride ? "forced on" : "forced off", respawnTimeText);
     if (client <= 0)
     {
         PrintToServer("Respawn times %s (%ss)", g_InternalOverride ? "forced on" : "forced off", respawnTimeText);
         return Plugin_Handled;
-    }
-
-    if (IsClientInGame(client))
-    {
-        PrintToChat(client, "Respawn times %s (%ss)", g_InternalOverride ? "forced on" : "forced off", respawnTimeText);
     }
     return Plugin_Handled;
 }
