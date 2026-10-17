@@ -15,7 +15,7 @@ public Plugin myinfo = {
     name = "TF2 Bot Toggle Command",
     author = "Hombre",
     description = "Toggle TF2 bots on or off conveniently",
-    version = "1.3",
+    version = "1.4",
     url = "https://kogasa.tf"
 };
 
@@ -54,6 +54,28 @@ public void OnPluginStart()
     HookEvent("player_changename", Event_PlayerChangeName, EventHookMode_Pre);
 }
 
+public void OnMapStart()
+{
+    if (g_cvGameBotQuota.IntValue > 0)
+    {
+        CreateTimer(5.0, Timer_CheckMapStartBotPopulation, _, TIMER_FLAG_NO_MAPCHANGE);
+    }
+}
+
+public Action Timer_CheckMapStartBotPopulation(Handle timer)
+{
+    if (g_cvGameBotQuota.IntValue > 0 && GetClientCount(false) > 12)
+    {
+        DisableBots();
+    }
+    return Plugin_Stop;
+}
+
+void DisableBots()
+{
+    ServerCommand("exec nobots.cfg");
+}
+
 public void OnBotQuotaChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     int quota = g_cvManualBotQuota.IntValue;
@@ -70,7 +92,7 @@ public Action Command_BotToggle(int client, int args)
 
     if (quota > 0)
     {
-        ServerCommand("exec nobots.cfg");
+        DisableBots();
         PrintToChat(client, "[Bots] Bots disabled");
     }
     else
