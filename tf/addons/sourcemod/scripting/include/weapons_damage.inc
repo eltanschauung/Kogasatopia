@@ -45,12 +45,14 @@ forward Action Weapons_OnTakeDamageModifyRules(int victim, int &attacker, int &i
  * only for obj_sentrygun, obj_dispenser and obj_teleporter (both ends).
  *
  * critType is derived by the engine's ApplyOnDamageModifyRules on a scratch
- * record, not merely copied from the incoming projectile. Only that crit field
+ * record, not merely copied from the incoming projectile. The exact scratch
+ * record's engine Full-to-Mini setter request is honored even when Valve's
+ * monotonic setter retains Full. Only effective classification
  * is retained: damage is the original building input, without player range
  * variance or player damage multipliers. The scratch probe never dispatches
  * Weapons_OnTakeDamageModifyRules. Weapons owns the single 1.35x/3x crit policy;
- * other listeners must not apply those multipliers again. CritType is the real
- * CTakeDamageInfo field, NOT inferred from DMG_CRIT or player conditions.
+ * other listeners must not apply those multipliers again. CritType follows the
+ * engine field/requests, NOT a DMG_CRIT-only or player-condition heuristic.
  * Only damage can be edited. Other metadata is read-only; flags, attribution,
  * vectors and custom damage preserve the original input values.
  * Return Plugin_Changed to commit damage.

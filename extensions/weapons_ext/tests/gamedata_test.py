@@ -72,6 +72,14 @@ class GameDataTests(unittest.TestCase):
         self.assertEqual(entry['library'], 'server')
         self.assertEqual(entry['linux'], '@_ZN11CBaseObject12OnTakeDamageERK15CTakeDamageInfo')
 
+    def test_scoped_crit_request_binding(self):
+        root = Path(__file__).resolve().parents[3]
+        tree = parse((root/'tf/addons/sourcemod/gamedata/weapons.games.txt').read_text())
+        groups = dict(dict(dict(tree)['Games'])['tf'])
+        entry = dict(dict(groups['Signatures'])['CTakeDamageInfo::SetCritType()'])
+        self.assertEqual(entry['library'], 'server')
+        self.assertEqual(entry['linux'], '@_ZN15CTakeDamageInfo11SetCritTypeENS_9ECritTypeE')
+
 
 if __name__ == '__main__':
     unittest.main()

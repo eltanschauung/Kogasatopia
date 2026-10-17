@@ -86,5 +86,38 @@ int main() {
         });
         check(notifications==1 && probe.info==nullptr && !std::memcmp(&incoming,&saved,sizeof(incoming)));
     }
+    // Model Valve's monotonic setter, while observing its actual requests.
+    for(int initial:{0,1,2}) for(int first:{0,1,2}) for(int later:{-1,0,1,2}) {
+        DamageInfo scratch{};scratch.damage=90.0f;scratch.crit=initial;
+        DamageInfo unrelated=scratch;
+        DamageClassificationContext probe;
+        int building=0,nestedVictim=0;
+        auto request=[&](DamageInfo &record,int value) {
+            probe.ObserveCritRequest(record,value);
+            if(value==0 || value>record.crit) record.crit=value;
+        };
+        {
+            DamageClassificationScope guard(probe,scratch,&building);
+            request(scratch,first);
+            const bool firstDemotion=initial==2 && first==1;
+            check(probe.EffectiveCrit(scratch)==(firstDemotion ? 1 : scratch.crit));
+            request(unrelated,1);
+            check(probe.EffectiveCrit(scratch)==(firstDemotion ? 1 : scratch.crit));
+            { // Nested damage must neither inherit nor erase the outer intent.
+                DamageClassificationScope nested(probe,unrelated,&nestedVictim);
+                request(unrelated,2);request(unrelated,1);
+                check(probe.EffectiveCrit(unrelated)==1);
+                check(probe.EffectiveCrit(scratch)==scratch.crit);
+            }
+            check(probe.EffectiveCrit(scratch)==(firstDemotion ? 1 : scratch.crit));
+            if(later!=-1) request(scratch,later);
+            const bool demotion=later==-1 ? firstDemotion : later==1 && scratch.crit==2;
+            check(probe.EffectiveCrit(scratch)==(demotion ? 1 : scratch.crit));
+            check(scratch.damage==90.0f); // Observing never changes damage/field.
+            if(demotion) check(scratch.crit==2);
+        }
+        check(probe.info==nullptr && !probe.demoteFull);
+        check(probe.EffectiveCrit(scratch)==scratch.crit);
+    }
     std::cout<<"Building damage isolation: "<<checks<<" checks passed\n";
 }

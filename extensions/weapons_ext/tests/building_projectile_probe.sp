@@ -17,20 +17,19 @@ Handle g_Attack,g_CanAttack;
 DynamicHook g_DamageHook;
 int g_Red,g_Blue,g_Weapon,g_Target=-1,g_Rocket=INVALID_ENT_REFERENCE;
 int g_Case,g_Checks,g_Failures,g_Leaks,g_PlayerRules,g_Shots,g_ForwardCalls;
-int g_InventoryGeneration,g_CaseGeneration,g_Retries;
+int g_InventoryGeneration,g_CaseGeneration,g_Retries,g_PlayerFinalCrit;
 bool g_Running,g_Pre,g_Post,g_Forward,g_RocketSeen;
 int g_RawCrit,g_RawType,g_Effective;
 float g_RawDamage,g_ForwardBase,g_PolicyDamage,g_Deadline;
 char g_Context[100];
-#define MODES 9
+#define MODES 10
 #define CASES (4 * MODES * 2)
 int Mode() {return (g_Case / 2) % MODES;}
 int Kind() {return g_Case / (2 * MODES);}
 int ExpectedCrit() {
     int mode=Mode();
-    // Current Valve SetCritType refuses Full->Mini even in its demotion path.
-    // This checks the real final field, not a guessed damage-derived crit.
-    return mode==2 || mode==5 || mode==6 ? 2 : mode==0 ? 0 : 1;
+    // The engine's real demotion request wins over its monotonic final field.
+    return mode==2 || mode==5 ? 2 : mode==0 ? 0 : 1;
 }
 void Check(bool okay,const char[] label) {
     g_Checks++;
@@ -99,11 +98,11 @@ public Action NextCase(Handle timer) {
     WeaponsAttrib_RemoveByName(g_Weapon,"minicrits become crits");
     WeaponsAttrib_RemoveByName(g_Weapon,"crits_become_minicrits");
     WeaponsAttrib_RemoveByName(g_Weapon,"dmg bonus vs buildings");
-    if(mode==1 || mode==5 || mode==7 || mode==8)TF2_AddCondition(g_Blue,TFCond_Buffed,10.0,g_Blue);
+    if(mode==1 || mode==5 || mode==7 || mode==8 || mode==9)TF2_AddCondition(g_Blue,TFCond_Buffed,10.0,g_Blue);
     if(mode==2 || mode==6)TF2_AddCondition(g_Blue,TFCond_Kritzkrieged,10.0,g_Blue);
     if(mode==3)TF2_AddCondition(g_Blue,TFCond_CritCola,10.0,g_Blue);
-    if(mode==5)Check(WeaponsAttrib_SetByName(g_Weapon,"minicrits become crits",1.0),"promotion attribute");
-    if(mode==6)Check(WeaponsAttrib_SetByName(g_Weapon,"crits_become_minicrits",1.0),"demotion attribute");
+    if(mode==5 || mode==9)Check(WeaponsAttrib_SetByName(g_Weapon,"minicrits become crits",1.0),"promotion attribute");
+    if(mode==6 || mode==9)Check(WeaponsAttrib_SetByName(g_Weapon,"crits_become_minicrits",1.0),"demotion attribute");
     if(mode==7)Check(WeaponsAttrib_SetByName(g_Weapon,"dmg bonus vs buildings",2.0),"building modifier attribute");
     g_Target=CreateEntityByName(names[kind]);
     Check(g_Target>MaxClients,"real building entity");
@@ -187,7 +186,7 @@ public Action Weapons_OnTakeDamageModifyRules(int victim,int &attacker,int &infl
     if(g_Running && victim==g_Target) {
         g_Leaks++;damage=17.0;crit=CritType_None;return Plugin_Changed;
     }
-    if(g_Running && victim==g_Red)g_PlayerRules++;
+    if(g_Running && victim==g_Red) {g_PlayerRules++;g_PlayerFinalCrit=view_as<int>(crit);}
     return Plugin_Continue;
 }
 public Action PollCase(Handle timer) {
@@ -238,6 +237,13 @@ void Finish() {
         TF2_RemoveCondition(g_Blue,TFCond_Buffed);TF2_RemoveCondition(g_Blue,TFCond_Kritzkrieged);TF2_RemoveCondition(g_Blue,TFCond_CritCola);
         SDKHooks_TakeDamage(g_Red,g_Blue,g_Blue,5.0,DMG_GENERIC,g_Weapon);
         Check(g_PlayerRules>0,"normal player rules forward still dispatched");
+        // Outside a building probe, the observer must not change Valve's
+        // monotonic setter or the public player's final CritType field.
+        WeaponsAttrib_RemoveByName(g_Weapon,"minicrits become crits");
+        Check(WeaponsAttrib_SetByName(g_Weapon,"crits_become_minicrits",1.0),"player demotion control attribute");
+        SetEntityHealth(g_Red,1000);
+        SDKHooks_TakeDamage(g_Red,g_Blue,g_Blue,90.0,DMG_BLAST|DMG_CRIT|DMG_USEDISTANCEMOD,g_Weapon);
+        Check(g_PlayerFinalCrit==2,"player crit setter remains Full despite demotion request");
     }
     PrintToServer("[BuildingProjectileProbe] cases=%d checks=%d failures=%d rules_leaks=%d",g_Case,g_Checks,g_Failures,g_Leaks);
     g_Running=false;

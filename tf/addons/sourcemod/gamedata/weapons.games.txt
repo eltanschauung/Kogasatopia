@@ -430,6 +430,11 @@
                 "library" "server"
                 "linux" "@_ZN11CBaseObject12OnTakeDamageERK15CTakeDamageInfo"
             }
+            "CTakeDamageInfo::SetCritType()"
+            {
+                "library" "server"
+                "linux" "@_ZN15CTakeDamageInfo11SetCritTypeENS_9ECritTypeE"
+            }
             "CTFPlayer::OnTakeDamage()"
             {
                 "library" "server"

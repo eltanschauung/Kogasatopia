@@ -1,6 +1,6 @@
 # Building crit damage
 
-Weapons 7.4.0 / weapons_ext 2.2.1 uses one native detour on
+Weapons 7.4.0 / weapons_ext 2.2.2 uses one native detour on
 `CBaseObject::OnTakeDamage(const CTakeDamageInfo&)`. It publishes the dedicated
 `Weapons_OnBuildingTakeDamage` forward only for these exact classnames:
 
@@ -13,10 +13,19 @@ The SourcePawn policy in `weapons/building_crit_damage.sp` uses the existing
 unknown classifications remain unchanged. Before that forward, the native
 service invokes the game's `CTFGameRules::ApplyOnDamageModifyRules()` with the
 actual building victim and a disposable copy of the incoming damage record.
-It retains **only the resulting crit field**, not the damage, force basis,
-base/max damage, flags, bonus, attribution or any other scratch output. Thus
+It retains **only the effective crit classification**, not the damage, force
+basis, base/max damage, flags, bonus, attribution or any other scratch output. Thus
 Banner, Crit-a-Cola, reflected projectiles, critical damage flags and weapon
 crit attributes are classified by TF2, not a SourcePawn condition heuristic.
+
+One shared native `CTakeDamageInfo::SetCritType()` observer also records a
+Full-to-Mini request for the exact scratch record. Valve's monotonic setter
+leaves Full in that case even though its demotion branch computes mini-crit
+damage. After the rules call, that observed engine request resolves the
+scratch classification to Mini. A subsequent clear or promotion supersedes
+the request. The observer never changes the setter, its record, or its return
+path, and never dispatches SourcePawn. Outside a scratch scope it immediately
+passes through. There is no per-hit detour installation or removal.
 
 This is necessary because genuine rocket damage arrives with `CRIT_NONE` even
 when the shot is boosted. The earlier 2.2.0 implementation only multiplied
@@ -55,9 +64,11 @@ sentry modifiers run before the base-method hook and remain intact too.
 Run `bash extensions/weapons_ext/tests/run.sh` for native regression tests.
 The production `WithBuildingDamage` helper is tested for exact class scope,
 caller immutability, unchanged non-damage fields, flags independent of crit,
-multiple targets sharing one record, and reentrant calls (1,092 checks). New
+multiple targets sharing one record, and reentrant calls (1,421 checks). New
 cases poison every scratch byte to prove that only crit survives; they also
-check nested suppression-scope restoration and 90/121.5/270 outcomes.
+check nested suppression-scope restoration and 90/121.5/270 outcomes. Monotonic
+setter sequences cover promotion/clear after demotion, unrelated records,
+and reentrant probes without leaking or erasing outer request state.
 
 `tests/building_damage_probe.sp` is restricted to an empty, LAN `itemtest`
 fixture with no production configuration/database/cookies. It includes the
@@ -93,17 +104,16 @@ never assigns a crit type to an input record. Per-entity DHooks pre/post
 observers verify that the actual engine record starts with `CRIT_NONE` and is
 not mutated by the native copy/classification/multiplier pipeline.
 
-The 72 cases cover sentry/dispenser/teleporter entrance/exit at 96 and 1024
+The 80 cases cover sentry/dispenser/teleporter entrance/exit at 96 and 1024
 units, with normal, Banner, Kritz, Crit-a-Cola, reflected-projectile state,
-promotion/demotion attributes, a stock building modifier, and policy-disabled
-baseline. Required outcomes before building-specific modifiers are exactly
+promotion/demotion attributes (including both on one weapon), a stock building
+modifier, and policy-disabled baseline. Required outcomes before building-specific modifiers are exactly
 90, 121.5 and 270. Near and far ordinary rockets both remain exactly 90. The
-current engine's crit-demotion setter behavior is checked as observed, not
-inferred from the modified damage. Specifically, Valve's nonzero `SetCritType`
-uses the maximum of the old/new values: Kritz plus `crits_become_minicrits`
-can calculate mini-crit scratch damage while leaving the final field Full.
-This implementation copies that final field as specified; it does not change
-the engine's setter globally or infer classification from scratch damage.
+engine's explicit demotion request is honored, never inferred from scratch
+damage. Kritz plus `crits_become_minicrits` therefore gives 121.5, as does
+Banner plus both promotion/demotion attributes. A separate player-damage
+control confirms that Valve's player setter still retains Full: only the
+building scratch classification changes.
 Inventory changes during the fixture's
 initial round regeneration invalidate and retry a shot, rather than treating
 a vanished launcher/boost as a crit-classification failure.

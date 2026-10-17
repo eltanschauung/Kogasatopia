@@ -12,7 +12,7 @@ extern SourceMod::ISDKTools *g_pSDKTools;
 
 namespace weapons_services { namespace {
 IGameConfig *config;
-CDetour *damageDetour,*aliveDetour,*rulesDetour,*buildingDetour;
+CDetour *damageDetour,*aliveDetour,*rulesDetour,*buildingDetour,*critSetterDetour;
 IForward *damageForward,*postForward,*rulesForward,*buildingForward;
 IGameEventManager2 *events;
 bool eventHook;
@@ -82,10 +82,18 @@ void ClassifyBuilding(CBaseEntity *building,DamageInfo &scratch) {
     // logic, but does not publish the scratch probe as a player rules event.
     // The boolean result is not a building damage veto; only crit is retained.
     modifyRules(rules,scratch,building,true);
+    scratch.crit=classificationProbe.EffectiveCrit(scratch);
 }
 }
 }
 using weapons_services::DamageInfo;
+DETOUR_DECL_MEMBER1(Weapons_SetCritType,void,int,requested) {
+    // One shared native observer, no per-hit patching or SourcePawn dispatch.
+    // Outside the exact building scratch scope this is a pointer check only.
+    auto &info=*reinterpret_cast<DamageInfo *>(this);
+    weapons_services::classificationProbe.ObserveCritRequest(info,requested);
+    DETOUR_MEMBER_CALL(Weapons_SetCritType)(requested);
+}
 DETOUR_DECL_MEMBER1(Weapons_BuildingDamage,int,const DamageInfo &,input) {
     auto *entity=reinterpret_cast<CBaseEntity *>(this);
     if(!weapons_services::buildingForward || !weapons_services::buildingForward->GetFunctionCount())
@@ -141,7 +149,9 @@ public:
         aliveDetour=DETOUR_CREATE_MEMBER(Weapons_PlayerDamageAlive,"CTFPlayer::OnTakeDamage_Alive()");
         rulesDetour=DETOUR_CREATE_MEMBER(Weapons_ModifyDamageRules,"CTFGameRules::ApplyOnDamageModifyRules()");
         buildingDetour=DETOUR_CREATE_MEMBER(Weapons_BuildingDamage,"CBaseObject::OnTakeDamage()");
-        if(!damageDetour || !aliveDetour || !rulesDetour || !buildingDetour) { std::snprintf(error,length,"Weapons damage detour creation failed"); return false; }
+        critSetterDetour=DETOUR_CREATE_MEMBER(Weapons_SetCritType,"CTakeDamageInfo::SetCritType()");
+        if(!damageDetour || !aliveDetour || !rulesDetour || !buildingDetour || !critSetterDetour) { std::snprintf(error,length,"Weapons damage detour creation failed"); return false; }
+        critSetterDetour->EnableDetour();
         damageDetour->EnableDetour(); aliveDetour->EnableDetour(); rulesDetour->EnableDetour();
         buildingDetour->EnableDetour();
         SH_ADD_HOOK(IGameEventManager2,FireEvent,events,SH_MEMBER(this,&Damage::FireEvent),false); eventHook=true;
@@ -149,7 +159,7 @@ public:
     }
     void SDK_OnUnload() override {
         if(eventHook) { SH_REMOVE_HOOK(IGameEventManager2,FireEvent,events,SH_MEMBER(this,&Damage::FireEvent),false); eventHook=false; }
-        for(CDetour **hook:{&buildingDetour,&rulesDetour,&aliveDetour,&damageDetour}) if(*hook) { (*hook)->Destroy(); *hook=nullptr; }
+        for(CDetour **hook:{&buildingDetour,&rulesDetour,&aliveDetour,&damageDetour,&critSetterDetour}) if(*hook) { (*hook)->Destroy(); *hook=nullptr; }
         for(IForward **forward:{&buildingForward,&rulesForward,&postForward,&damageForward}) if(*forward) { forwards->ReleaseForward(*forward); *forward=nullptr; }
         if(config) { gameconfs->CloseGameConfigFile(config); config=nullptr; }
         critContext=-1;

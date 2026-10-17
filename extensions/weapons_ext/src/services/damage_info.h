@@ -31,8 +31,19 @@ inline bool IsEngineerBuilding(const char *name) {
 struct DamageClassificationContext {
     const DamageInfo *info=nullptr;
     const void *victim=nullptr;
+    bool demoteFull=false;
     bool Matches(const DamageInfo &record,const void *target) const {
         return info==&record && victim==target;
+    }
+    void ObserveCritRequest(const DamageInfo &record,int requested) {
+        if(info!=&record) return;
+        // Observe intent without changing the engine's setter or scratch flow.
+        // A later clear/promotion supersedes an earlier demotion request.
+        if(requested==1 && record.crit==2) demoteFull=true;
+        else if(requested==0 || requested==2) demoteFull=false;
+    }
+    int EffectiveCrit(const DamageInfo &record) const {
+        return info==&record && demoteFull && record.crit==2 ? 1 : record.crit;
     }
 };
 class DamageClassificationScope {
