@@ -11,7 +11,7 @@
 
 #include "include/client_validation.inc"
 
-#define PL_VERSION "3.0.0"
+#define PL_VERSION "3.0.1"
 
 public Plugin myinfo =
 {
@@ -99,7 +99,8 @@ public Action Timer_DisplayAd(Handle timer)
 		return Plugin_Stop;
 	}
 
-	if (!g_CvarEnabled.BoolValue || !g_Ads.Length) {
+	// Skip the entire advertisement, including server-console output.
+	if (GetClientCount(true) > 1 || !g_CvarEnabled.BoolValue || !g_Ads.Length) {
 		return Plugin_Continue;
 	}
 
