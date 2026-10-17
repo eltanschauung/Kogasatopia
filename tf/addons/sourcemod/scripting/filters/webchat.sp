@@ -215,8 +215,17 @@ static void Filters_DeliverOutboxRow(int id, const char[] hash, const char[] sou
     {
         if (display[0])
         {
-            Filters_GetWebNameColor(display, colorTag, sizeof(colorTag));
-            FormatEx(label, sizeof(label), "%s[%s]{default}", colorTag, display);
+            // The frontend owns this label: keep [Web] separate from its
+            // already-rendered name (including native RGB/pattern codes).
+            if (StrContains(display, "{gold}[Web]{default}") == 0)
+            {
+                strcopy(label, sizeof(label), display);
+            }
+            else
+            {
+                Filters_GetWebNameColor(display, colorTag, sizeof(colorTag));
+                FormatEx(label, sizeof(label), "%s[%s]{default}", colorTag, display);
+            }
         }
         else if (StrEqual(hash, "system")) strcopy(label, sizeof(label), "{gold}[Server]{default}");
         else
