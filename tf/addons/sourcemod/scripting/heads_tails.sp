@@ -9,6 +9,9 @@
 #include <filters_api>
 #define REQUIRE_PLUGIN
 
+#define EIGHT_BALL_COOLDOWN 5.0
+float g_NextEightBallUse[MAXPLAYERS + 1];
+
 static const char g_EightBallAnswers[][] =
 {
     "{green}It is certain.",
@@ -38,7 +41,7 @@ public Plugin myinfo =
     name = "Heads or Tails",
     author = "Hombre",
     description = "Flips a coin and answers Magic 8 Ball questions in chat.",
-    version = "1.1.0",
+    version = "1.1.1",
     url = "https://kogasa.tf"
 };
 
@@ -58,10 +61,25 @@ public void OnPluginStart()
     RegConsoleCmd("sm_magiceightball", Command_EightBall, "Ask the Magic 8 Ball a question.");
 }
 
+public void OnClientPutInServer(int client)
+{
+    g_NextEightBallUse[client] = 0.0;
+}
+
 public Action Command_EightBall(int client, int args)
 {
     if (client > 0 && IsClientInGame(client))
     {
+        // Engine time stays monotonic across map changes; all aliases share this gate.
+        float now = GetEngineTime();
+        float remaining = g_NextEightBallUse[client] - now;
+        if (remaining > 0.0)
+        {
+            CPrintToChat(client, "{magenta}[Magic 8 Ball]{default} Wait %d seconds before asking again.", RoundToCeil(remaining));
+            return Plugin_Handled;
+        }
+        g_NextEightBallUse[client] = now + EIGHT_BALL_COOLDOWN;
+
         int answer = GetRandomInt(0, sizeof(g_EightBallAnswers) - 1);
         CPrintToChatAll("{magenta}[Magic 8 Ball] %s{default}", g_EightBallAnswers[answer]);
     }
