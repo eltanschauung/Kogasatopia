@@ -9,12 +9,36 @@
 #include <filters_api>
 #define REQUIRE_PLUGIN
 
+static const char g_EightBallAnswers[][] =
+{
+    "{green}It is certain.",
+    "{green}It is decidedly so.",
+    "{green}Without a doubt.",
+    "{green}Yes, definitely.",
+    "{green}You may rely on it.",
+    "{green}As I see it, yes.",
+    "{green}Most likely.",
+    "{green}Outlook good.",
+    "{green}Yes.",
+    "{green}Signs point to yes.",
+    "{gold}Reply hazy, try again.",
+    "{gold}Ask again later.",
+    "{gold}Better not tell you now.",
+    "{gold}Cannot predict now.",
+    "{gold}Concentrate and ask again.",
+    "{red}Don't count on it.",
+    "{red}My reply is no.",
+    "{red}My sources say no.",
+    "{red}Outlook not so good.",
+    "{red}Very doubtful."
+};
+
 public Plugin myinfo =
 {
     name = "Heads or Tails",
     author = "Hombre",
-    description = "Flips a coin in chat.",
-    version = "1.0.0",
+    description = "Flips a coin and answers Magic 8 Ball questions in chat.",
+    version = "1.1.0",
     url = "https://kogasa.tf"
 };
 
@@ -29,6 +53,19 @@ public void OnPluginStart()
     RegConsoleCmd("sm_toss", Command_Toss, "Flip a coin.");
     RegConsoleCmd("sm_coinflip", Command_Toss, "Flip a coin.");
     RegConsoleCmd("sm_flip", Command_Toss, "Flip a coin.");
+    RegConsoleCmd("sm_8ball", Command_EightBall, "Ask the Magic 8 Ball a question.");
+    RegConsoleCmd("sm_eightball", Command_EightBall, "Ask the Magic 8 Ball a question.");
+    RegConsoleCmd("sm_magiceightball", Command_EightBall, "Ask the Magic 8 Ball a question.");
+}
+
+public Action Command_EightBall(int client, int args)
+{
+    if (client > 0 && IsClientInGame(client))
+    {
+        int answer = GetRandomInt(0, sizeof(g_EightBallAnswers) - 1);
+        CPrintToChatAll("{magenta}[Magic 8 Ball] %s{default}", g_EightBallAnswers[answer]);
+    }
+    return Plugin_Handled;
 }
 
 public Action Command_Toss(int client, int args)
