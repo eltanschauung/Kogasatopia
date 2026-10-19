@@ -85,7 +85,7 @@ public Plugin myinfo =
     name = "Vote Menu",
     author = "Codex",
     description = "Config-driven yes/no vote executor",
-    version = "1.0.0"
+    version = "1.0.1"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
@@ -104,6 +104,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 public void OnPluginStart()
 {
     RegConsoleCmd("sm_votemenu", Command_VoteMenu, "Open the vote menu");
+    RegConsoleCmd("sm_vm", Command_VoteMenu, "Open the vote menu");
     RegConsoleCmd("sm_novote", Command_NoVotes, "Toggle Votemenu vote visibility");
     RegConsoleCmd("sm_novotes", Command_NoVotes, "Toggle Votemenu vote visibility");
     AddCommandListener(CommandListener_VoteMenuAlias, "votemenu");
@@ -326,7 +327,7 @@ public Action CommandListener_VoteOption(int client, const char[] command, int a
     GetCmdArgString(text, sizeof(text));
     StripQuotes(text);
     TrimString(text);
-    if (StrEqual(text, "votemenu", false))
+    if (StrEqual(text, "votemenu", false) || StrEqual(text, "vm", false))
     {
         return Command_VoteMenu(client, 0);
     }
