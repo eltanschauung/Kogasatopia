@@ -344,7 +344,13 @@ void FinishUserMailSend(int senderUserId, bool success)
     g_MailUserSendPending[client] = false;
     if (success)
     {
-        g_MailNextSendAllowedAt[client] = GetEngineTime() + MAIL_SEND_COOLDOWN;
+        float cooldown = MAIL_SEND_COOLDOWN;
+        if (GetFeatureStatus(FeatureType_Native, "PointsStore_HasPurchase") == FeatureStatus_Available
+            && PointsStore_HasPurchase(client, "mail_cooldown_reduction"))
+        {
+            cooldown *= 0.2;
+        }
+        g_MailNextSendAllowedAt[client] = GetEngineTime() + cooldown;
     }
 }
 

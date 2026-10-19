@@ -88,7 +88,7 @@ public Plugin myinfo =
     name = "server_mail",
     author = "Hombre",
     description = "Persistent player mail with optional currency attachments.",
-    version = "1.1.2",
+    version = "1.1.3",
     url = "https://kogasa.tf"
 };
 
@@ -111,6 +111,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     MarkNativeAsOptional("Hugs_AnnounceMailedInteraction");
     MarkNativeAsOptional("PointsStore_ApplyBonusPointsSteamIdOnce");
     MarkNativeAsOptional("PointsStore_RefundBonusPointsSteamId");
+    MarkNativeAsOptional("PointsStore_HasPurchase");
     MarkNativeAsOptional("SaySounds_PlayCommand");
     MarkNativeAsOptional("RTD_ApplyGiftedRoll");
     g_MailSendResultForward = new GlobalForward("ServerMail_OnMailSendResult",
