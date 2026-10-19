@@ -56,10 +56,10 @@ void AttemptLotteryTicketPurchase(int client, int amount)
         return;
     }
 
-    if (g_CurrentLotteryEqual && amount != GetLotteryEqualTicketValue())
+    if (g_CurrentLotteryEqual && amount < GetLotteryEqualTicketValue())
     {
         CPrintToChat(client,
-            "%s[Lottery]{default} Equal Lottery tickets must have a value of {gold}%d{default}.",
+            "%s[Lottery]{default} Equal Lottery tickets must have a value of at least {gold}%d{default}.",
             colorTag,
             GetLotteryEqualTicketValue());
         return;

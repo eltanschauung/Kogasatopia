@@ -349,7 +349,7 @@ void ContinueEqualLotteryRefunds(int lotteryId)
     char query[384];
     FormatEx(query, sizeof(query),
         "SELECT steamid64, ticket_value FROM %s "
-        ... "WHERE lottery_id = %d AND ticket_value != %d",
+        ... "WHERE lottery_id = %d AND ticket_value < %d",
         LOTTO_TICKET_TABLE,
         lotteryId,
         requiredValue);
@@ -422,7 +422,7 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
     {
         FormatEx(query, sizeof(query),
             "INSERT INTO %s (steamid64, balance) "
-            ... "SELECT steamid64, ticket_value FROM %s WHERE lottery_id = %d AND ticket_value != %d "
+            ... "SELECT steamid64, ticket_value FROM %s WHERE lottery_id = %d AND ticket_value < %d "
             ... "ON DUPLICATE KEY UPDATE balance = GREATEST(0, balance + VALUES(balance))",
             BP_BALANCE_TABLE,
             LOTTO_TICKET_TABLE,
@@ -433,7 +433,7 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
     {
         FormatEx(query, sizeof(query),
             "INSERT INTO %s (steamid64, balance) "
-            ... "SELECT steamid64, ticket_value FROM %s WHERE lottery_id = %d AND ticket_value != %d "
+            ... "SELECT steamid64, ticket_value FROM %s WHERE lottery_id = %d AND ticket_value < %d "
             ... "ON CONFLICT(steamid64) DO UPDATE SET balance = MAX(0, balance + excluded.balance), updated_at = CURRENT_TIMESTAMP",
             BP_BALANCE_TABLE,
             LOTTO_TICKET_TABLE,
@@ -443,7 +443,7 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
     txn.AddQuery(query);
 
     FormatEx(query, sizeof(query),
-        "DELETE FROM %s WHERE lottery_id = %d AND ticket_value != %d",
+        "DELETE FROM %s WHERE lottery_id = %d AND ticket_value < %d",
         LOTTO_TICKET_TABLE,
         lotteryId,
         requiredValue);

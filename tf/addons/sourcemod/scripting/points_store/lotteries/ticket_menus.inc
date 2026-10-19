@@ -38,7 +38,7 @@ int GetLotteryChanceCount(int amount)
 {
     if (g_CurrentLotteryEqual)
     {
-        return amount == GetLotteryEqualTicketValue() ? 1 : 0;
+        return amount >= GetLotteryEqualTicketValue() ? 1 : 0;
     }
 
     int roundedAmount = RoundLotteryTicketValue(amount);
