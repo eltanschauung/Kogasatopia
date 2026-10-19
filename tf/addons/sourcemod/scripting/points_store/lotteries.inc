@@ -42,6 +42,7 @@ char g_CurrentLotteryHash[LOTTO_HASH_MAX];
 char g_CurrentLotteryHashColor[BP_CURRENCY_COLOR_MAX + 2];
 bool g_CurrentLotterySuper = false;
 bool g_CurrentLotteryEqual = false;
+int g_CurrentLotteryEqualTicketValue = 0;
 bool g_LotteryEqualRefundInProgress = false;
 
 bool g_LotteryWaitingCustom[MAXPLAYERS + 1];

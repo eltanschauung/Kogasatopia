@@ -250,6 +250,21 @@ public void SQL_OnLotteryEqualColumnReady(Database db, DBResultSet results, cons
         LogError("[points_store] Lottery equal_lottery migration failed: %s", error);
     }
 
+    char query[256];
+    FormatEx(query, sizeof(query),
+        "ALTER TABLE %s ADD COLUMN %sequal_ticket_value INTEGER NOT NULL DEFAULT 0",
+        LOTTO_TABLE, g_IsMySql ? "IF NOT EXISTS " : "");
+    g_Database.Query(SQL_OnLotteryEqualValueColumnReady, query);
+}
+
+public void SQL_OnLotteryEqualValueColumnReady(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (error[0] && StrContains(error, "duplicate column", false) == -1
+        && StrContains(error, "already exists", false) == -1)
+    {
+        LogError("[points_store] Lottery equal_ticket_value migration failed: %s", error);
+        return;
+    }
     EnsureLotteryTicketsSchema();
 }
 

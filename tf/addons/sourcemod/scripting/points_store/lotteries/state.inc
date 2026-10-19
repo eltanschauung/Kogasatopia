@@ -15,6 +15,10 @@ int GetLotteryMaxTicketValue()
 
 int GetLotteryEqualTicketValue()
 {
+    if (g_CurrentLotteryEqualTicketValue > 0)
+    {
+        return g_CurrentLotteryEqualTicketValue;
+    }
     if (g_CvarLotteryEqualTicketValue == null)
     {
         return 100;
@@ -62,6 +66,7 @@ void ClearLocalLotteryState()
     g_CurrentLotteryHashColor[0] = '\0';
     g_CurrentLotterySuper = false;
     g_CurrentLotteryEqual = false;
+    g_CurrentLotteryEqualTicketValue = 0;
     g_LotteryEqualRefundInProgress = false;
     ClearAllClientLotteryCaches();
     ResetLotteryDrawState();
@@ -87,7 +92,7 @@ void EnsureActiveLottery()
 
     char query[256];
     Format(query, sizeof(query),
-        "SELECT id, hash, hash_color, super_lottery, equal_lottery FROM %s WHERE finished = 0 ORDER BY id DESC LIMIT 1",
+        "SELECT id, hash, hash_color, super_lottery, equal_lottery, equal_ticket_value FROM %s WHERE finished = 0 ORDER BY id DESC LIMIT 1",
         LOTTO_TABLE);
     g_Database.Query(SQL_OnActiveLotterySelected, query);
 }
@@ -114,7 +119,7 @@ public void SQL_OnActiveLotterySelected(Database db, DBResultSet results, const 
         results.FetchString(2, hashColor, sizeof(hashColor));
         bool superLottery = results.FetchInt(3) != 0;
         bool equalLottery = results.FetchInt(4) != 0;
-        SetActiveLottery(lotteryId, hash, hashColor, superLottery, equalLottery);
+        SetActiveLottery(lotteryId, hash, hashColor, superLottery, equalLottery, results.FetchInt(5));
         return;
     }
 
@@ -232,13 +237,15 @@ void SetActiveLottery(
     const char[] hash,
     const char[] hashColor,
     bool superLottery,
-    bool equalLottery)
+    bool equalLottery,
+    int equalTicketValue = 0)
 {
     g_CurrentLotteryId = lotteryId;
     strcopy(g_CurrentLotteryHash, sizeof(g_CurrentLotteryHash), hash);
     strcopy(g_CurrentLotteryHashColor, sizeof(g_CurrentLotteryHashColor), hashColor);
     g_CurrentLotterySuper = superLottery;
     g_CurrentLotteryEqual = equalLottery && !superLottery;
+    g_CurrentLotteryEqualTicketValue = g_CurrentLotteryEqual ? equalTicketValue : 0;
     g_LotteryReady = true;
 
     if (g_CurrentLotteryEqual)
@@ -279,6 +286,13 @@ void SetCurrentLotterySuper(bool superLottery)
 
 void SetCurrentLotteryEqual(bool equalLottery)
 {
+    // Choose only on the transition into Equal mode, not when a pending draw
+    // is restored or called again. Store the amount with the lottery itself.
+    if (equalLottery && !g_CurrentLotteryEqual)
+    {
+        int standardValue = g_CvarLotteryEqualTicketValue == null ? 100 : g_CvarLotteryEqualTicketValue.IntValue;
+        g_CurrentLotteryEqualTicketValue = GetRandomInt(0, 1) == 0 ? standardValue : GetRandomInt(20, 140) * 5;
+    }
     g_CurrentLotteryEqual = equalLottery;
     if (equalLottery)
     {
@@ -292,8 +306,9 @@ void SetCurrentLotteryEqual(bool equalLottery)
 
     char query[192];
     Format(query, sizeof(query),
-        "UPDATE %s SET super_lottery = 0, equal_lottery = 1 WHERE id = %d AND finished = 0",
+        "UPDATE %s SET super_lottery = 0, equal_lottery = 1, equal_ticket_value = %d WHERE id = %d AND finished = 0",
         LOTTO_TABLE,
+        GetLotteryEqualTicketValue(),
         g_CurrentLotteryId);
     g_Database.Query(SQL_OnIgnoredResult, query);
     BeginEqualLotteryRefunds();
