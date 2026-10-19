@@ -3,6 +3,9 @@
 		LoadTranslations("common.phrases");
 
 		RegConsoleCmd("sm_hug", Command_Hug, "Hug another player by name");
+		RegConsoleCmd("sm_myhugs", Command_MyInteractionStats, "Show your hug totals and top counterparts");
+		RegConsoleCmd("sm_myrapes", Command_MyInteractionStats, "Show your rape totals and top counterparts");
+		RegConsoleCmd("sm_myfeeds", Command_MyInteractionStats, "Show your feed totals and top counterparts");
 		RegConsoleCmd("sm_feed", Command_Feed, "Feed another player by name");
 		RegConsoleCmd("sm_rape", Command_Rape, "Rape another player by name");
 		RegConsoleCmd("sm_checkhugs", Command_CheckHugs, "Check your total hugs received and given");

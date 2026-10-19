@@ -141,6 +141,7 @@
 			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastHuggers(receiver, senderName);
 		}
 		SaveClientStats(receiver);
+		Hugs_RecordRelationshipSteam(senderSteamId64, receiverSteamId64, rape ? 2 : (feed ? 1 : 0), amount, amount, senderName);
 		AnnounceMailedInteraction(sender, receiver, senderSteamId64, senderName, rape, feed);
 		return true;
 	}

@@ -6,6 +6,7 @@
 		}
 
 		int amount = GetEffectiveMultiplier();
+		Hugs_RecordRelationship(sender, recipient, 0, amount, amount);
 		if (incrementSender)
 		{
 			g_iHugsGiven[sender] += amount;
@@ -23,6 +24,7 @@
 		}
 
 		int amount = GetEffectiveMultiplier();
+		Hugs_RecordRelationship(sender, recipient, 1, amount, amount);
 		if (incrementSender)
 		{
 			g_iFeedsGiven[sender] += amount;
@@ -40,6 +42,7 @@
 		}
 
 		int amount = GetEffectiveMultiplier();
+		Hugs_RecordRelationship(sender, recipient, 2, amount, amount);
 		if (incrementSender)
 		{
 			g_iRapesGiven[sender] += amount;
@@ -57,6 +60,7 @@ void UpdateRapeStatsDuel(int sender, int recipient, int score1, int score2)
 		}
 
 		int amount = GetEffectiveMultiplier();
+		Hugs_RecordRelationship(sender, recipient, 2, score1 * amount, score2 * amount);
 		g_iRapesGiven[sender] += score1 * amount;
 		PrintToChat(sender, "[SM] %i rapes have been credited to your account!", score1 * amount);
 

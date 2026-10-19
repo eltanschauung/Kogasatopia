@@ -51,8 +51,17 @@
 		}
 
 		g_iSchemaOpsPending = 0;
+		g_HugsRelationshipsReady = false;
 
 		char query[2048];
+		FormatEx(query, sizeof(query),
+			"CREATE TABLE IF NOT EXISTS %s (sender VARCHAR(32) NOT NULL, recipient VARCHAR(32) NOT NULL, "
+			... "kind TINYINT NOT NULL, given BIGINT NOT NULL DEFAULT 0, received BIGINT NOT NULL DEFAULT 0, "
+			... "sender_name VARCHAR(128) NOT NULL DEFAULT '', recipient_name VARCHAR(128) NOT NULL DEFAULT '', "
+			... "PRIMARY KEY(sender,recipient,kind), KEY idx_hugs_recipient(recipient,kind)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+			HUGS_RELATIONSHIP_TABLE);
+		g_iSchemaOpsPending++;
+		g_hDatabase.Query(Hugs_OnRelationshipSchemaReady, query);
 		Format(query, sizeof(query), "CREATE TABLE IF NOT EXISTS %s (steamid VARCHAR(64) PRIMARY KEY, name VARCHAR(%d) NOT NULL DEFAULT '', hugs_given INTEGER NOT NULL DEFAULT 0, hugs_received INTEGER NOT NULL DEFAULT 0, feeds_given INTEGER NOT NULL DEFAULT 0, feeds_received INTEGER NOT NULL DEFAULT 0, rapes_given INTEGER NOT NULL DEFAULT 0, rapes_received INTEGER NOT NULL DEFAULT 0, last_hugger1 VARCHAR(%d) NOT NULL DEFAULT '', last_hugger2 VARCHAR(%d) NOT NULL DEFAULT '', last_hugger3 VARCHAR(%d) NOT NULL DEFAULT '', last_hugger4 VARCHAR(%d) NOT NULL DEFAULT '', last_hugger5 VARCHAR(%d) NOT NULL DEFAULT '', last_feeder1 VARCHAR(%d) NOT NULL DEFAULT '', last_feeder2 VARCHAR(%d) NOT NULL DEFAULT '', last_feeder3 VARCHAR(%d) NOT NULL DEFAULT '', last_feeder4 VARCHAR(%d) NOT NULL DEFAULT '', last_feeder5 VARCHAR(%d) NOT NULL DEFAULT '', last_rapists VARCHAR(%d) NOT NULL DEFAULT '')",
 			HUGS_DB_TABLE, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, MAX_NAME_LENGTH, HISTORY_STRING_LEN);
 		g_iSchemaOpsPending++;

@@ -37,7 +37,7 @@ public Plugin myinfo =
     name = "hugs",
     author = "Your Name",
     description = "Allows players to hug/rape each other, track hugs/rapes, check stats, and view last huggers/rapists",
-    version = "1.5.1",
+    version = "1.6.0",
     url = "https://example.com"
 };
 
@@ -76,6 +76,7 @@ enum HugsLeaderboardKind
 };
 
 #include "hugs/mail_api.sp"
+#include "hugs/personal_statistics.sp"
 #include "hugs/lifecycle.sp"
 #include "hugs/multiplier.sp"
 #include "hugs/leaderboards.sp"
