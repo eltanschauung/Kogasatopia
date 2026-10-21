@@ -1,0 +1,296 @@
+{
+  "accepted_weapon_selections": 77,
+  "date": "2026-10-21",
+  "in_engine_regressions": {
+    "checks": 76,
+    "failures": 0
+  },
+  "limitations": [
+    "Bots do not model real clients or Steam/network responses.",
+    "Whole-engine CPU measurements include workload and setup; small differences are not causal attribution.",
+    "Observer self timings exclude primitive frame collection and producer profiler costs.",
+    "Cold/exploratory passes are excluded from performance conclusions; strict-provider passes are the reference.",
+    "The cold strict mode-1 trial had one transient hat-count sample of 3, returning to 31; warm references retained 31.",
+    "Dense forced recreation intentionally creates long frames even at healthy average tickrate.",
+    "No legacy native loadout aggregates were collected. Historical zero placeholder fields must not be interpreted as zero native cost."
+  ],
+  "matches_sourced": 10,
+  "offline_policy_tests": 9,
+  "paired_source_identity": true,
+  "players": 16,
+  "production_commit": "66ad1df",
+  "saved_hat_selections": 31,
+  "saved_weapon_selections": 78,
+  "timezone": "America/New_York",
+  "unsupported_skipped": 1,
+  "validation": [
+    {
+      "alerts": [
+        {
+          "calls": 0,
+          "detail": null,
+          "emission_ms": 0.35,
+          "frame_peak_ms": null,
+          "frames": 0,
+          "hosts": 0,
+          "mode": 1,
+          "rate": 58.542,
+          "records": 3,
+          "scopes": 0,
+          "tick": 9865
+        }
+      ],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "label": "alert1",
+      "mode": 1,
+      "observed_rate": 66.415,
+      "observer_subset_ms_per_second": 0.099,
+      "operations": 199,
+      "peak_frame_ms": 227.143,
+      "use": "alert-pipeline validation only; inventory-provider isolation not asserted in initial pass"
+    },
+    {
+      "alerts": [
+        {
+          "calls": 0,
+          "detail": "0",
+          "emission_ms": 0.709,
+          "frame_peak_ms": "218.75",
+          "frames": 0,
+          "hosts": 0,
+          "mode": 2,
+          "rate": 53.647,
+          "records": 3,
+          "scopes": 0,
+          "tick": 45472
+        }
+      ],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "label": "alert2",
+      "mode": 2,
+      "observed_rate": 66.447,
+      "observer_subset_ms_per_second": 0.123,
+      "operations": 199,
+      "peak_frame_ms": 218.117,
+      "use": "alert-pipeline validation only; inventory-provider isolation not asserted in initial pass"
+    },
+    {
+      "alerts": [
+        {
+          "calls": 2,
+          "detail": "1",
+          "emission_ms": 1.065,
+          "frame_peak_ms": "218.75",
+          "frames": 1,
+          "hosts": 1,
+          "mode": 3,
+          "rate": 59.0,
+          "records": 9,
+          "scopes": 2,
+          "tick": 47165
+        }
+      ],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "label": "alert3",
+      "mode": 3,
+      "observed_rate": 66.433,
+      "observer_subset_ms_per_second": 0.249,
+      "operations": 198,
+      "peak_frame_ms": 221.561,
+      "use": "alert-pipeline validation only; inventory-provider isolation not asserted in initial pass"
+    },
+    {
+      "alerts": [],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "label": "alert0",
+      "mode": 0,
+      "observed_rate": 66.481,
+      "observer_subset_ms_per_second": 0.0,
+      "operations": 198,
+      "peak_frame_ms": 211.955,
+      "use": "alert-pipeline validation only; inventory-provider isolation not asserted in initial pass"
+    },
+    {
+      "alerts": [],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "engine_cpu_ms_per_second": 153.2894457853309,
+      "label": "single1warm",
+      "mode": 1,
+      "new_plugin_errors": [],
+      "observed_rate": 66.755,
+      "observer_subset_ms_per_second": 0.082,
+      "operations": 299,
+      "peak_frame_ms": 41.915,
+      "use": "single running lab provider asserted by harness"
+    },
+    {
+      "alerts": [],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "cpu_provenance": "captured controller stdout",
+      "engine_cpu_ms_per_second": 152.68872169732285,
+      "label": "single2",
+      "mode": 2,
+      "observed_rate": 66.752,
+      "observer_subset_ms_per_second": 0.081,
+      "operations": 299,
+      "peak_frame_ms": 45.076,
+      "use": "single running lab provider asserted by harness"
+    },
+    {
+      "alerts": [],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "cpu_provenance": "captured controller stdout",
+      "engine_cpu_ms_per_second": 152.65703555688057,
+      "label": "single3",
+      "mode": 3,
+      "observed_rate": 66.76,
+      "observer_subset_ms_per_second": 0.178,
+      "operations": 299,
+      "peak_frame_ms": 44.433,
+      "use": "single running lab provider asserted by harness"
+    },
+    {
+      "alerts": [
+        {
+          "calls": 2,
+          "detail": "1",
+          "emission_ms": 1.293,
+          "frame_peak_ms": "218.75",
+          "frames": 1,
+          "hosts": 1,
+          "mode": 3,
+          "rate": 53.894,
+          "records": 9,
+          "scopes": 2,
+          "tick": 25185
+        }
+      ],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 3
+        }
+      },
+      "engine_cpu_ms_per_second": 156.9824655583204,
+      "label": "single3fault",
+      "mode": 3,
+      "new_plugin_errors": [],
+      "observed_rate": 66.487,
+      "observer_subset_ms_per_second": 0.278,
+      "operations": 198,
+      "peak_frame_ms": 212.322,
+      "use": "single running lab provider asserted by harness"
+    },
+    {
+      "alerts": [],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 25
+        },
+        "equipped_custom_weapons": {
+          "max": 20,
+          "min": 19
+        }
+      },
+      "engine_cpu_ms_per_second": 119.15654251297198,
+      "label": "ordinary",
+      "mode": 2,
+      "new_plugin_errors": [],
+      "observed_rate": 66.829,
+      "observer_subset_ms_per_second": 0.048,
+      "operations": 149,
+      "peak_frame_ms": 37.611,
+      "use": "single running lab provider asserted by harness"
+    },
+    {
+      "alerts": [],
+      "coverage": {
+        "equipped_custom_hats": {
+          "max": 31,
+          "min": 31
+        },
+        "equipped_custom_weapons": {
+          "max": 14,
+          "min": 3
+        }
+      },
+      "engine_cpu_ms_per_second": 578.0696381833167,
+      "label": "single3dense",
+      "mode": 3,
+      "new_plugin_errors": [],
+      "observed_rate": 66.823,
+      "observer_subset_ms_per_second": 0.097,
+      "operations": 2384,
+      "peak_frame_ms": 116.549,
+      "use": "single running lab provider asserted by harness"
+    }
+  ]
+}

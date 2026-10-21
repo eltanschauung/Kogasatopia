@@ -1,0 +1,2 @@
+# Unified patch context contains intentional whitespace prefix characters.
+current_weapons_test_api.patch -whitespace

@@ -1,5 +1,9 @@
 # CheckLag observer-cost diagnostics
 
+Historical pre-1.6 description. See [checklag_modes.md](checklag_modes.md) for
+current modes: the primitive frame path is intentionally unprofiled, producer
+timing is sampled only in mode 3, and automatic category output is consolidated.
+
 `sm_checklag_mode` defaults to 1: one tickrate monitor per second, with reused
 Profiler handles measuring that monitor. Mode 0 bypasses collection. Mode 2
 also measures frame collection and incoming scope recording. `sm_lagself`

@@ -1,0 +1,74 @@
+--- a/weapons.sp
++++ b/weapons.sp
+@@ -55,7 +55,7 @@
+     name = "Weapons",
+     author = "nosoop, Hombre, tsuza, Mir, Huutti, Utsuho, Sappykun, Nanochip, Leonardo, FlaminSarge, AndrewBetson, rtldg, pufftwitt, MikeJS, Jaro 'Monkeys' Vanderheijden, Codex",
+     description = "Unified custom weapons, weapon behavior, models, sounds, and loadouts.",
+-    version = "7.4.1" ... VERSION_SUFFIX,
++    version = "7.4.1-mge-lab" ... VERSION_SUFFIX,
+     url = "https://kogasa.tf"
+ };
+ 
+@@ -125,6 +125,7 @@
+ #include "weapons/web_loadout.sp"
+ #include "weapons/statistics_persistence.sp"
+ 
++#include "weapons/debug_loadout.sp"
+ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int maxlen)
+ {
+     WeaponsCustomAttributes_RegisterNatives();
+@@ -136,6 +137,10 @@
+     RegPluginLibrary("weapons");
+     WeaponsGameplay_RegisterNatives();
+     CreateNative("Weapons_SetPlayerLoadoutItem", Native_SetPlayerLoadoutItem);
++    CreateNative("WeaponsDebug_ApplyHats", Native_WeaponsDebugHats);
++    CreateNative("WeaponsDebug_Reapply", Native_WeaponsDebugReapply);
++    CreateNative("WeaponsDebug_HatCount", Native_WeaponsDebugHatCount);
++    CreateNative("WeaponsDebug_ReapplyHats", Native_WeaponsDebugReapplyHats);
+     CreateNative("Weapons_RemovePlayerLoadoutItem", Native_RemovePlayerLoadoutItem);
+     CreateNative("Weapons_GetPlayerLoadoutItem", Native_GetPlayerLoadoutItem);
+     CreateNative("Weapons_EquipPlayerItem", Native_EquipPlayerItem);
+--- a/weapons/loadout_controller.sp
++++ b/weapons/loadout_controller.sp
+@@ -798,6 +798,7 @@
+ 
+ bool CanPlayerAccessItem(int client, const CustomItemDefinition item)
+ {
++    if (WeaponsDebug_ItemGrant(client, item)) return true;
+     return CanPlayerViewItem(client, item) && !ItemRequiresPointsStorePurchase(client, item);
+ }
+ 
+--- a/weapons/hats/definitions.sp
++++ b/weapons/hats/definitions.sp
+@@ -80,6 +80,7 @@
+ 
+ bool CanClientAccessHat(int client, int hatIndex)
+ {
++	if (WeaponsDebug_HatGrant(client, hatIndex)) return true;
+ 	if (!IsHatIndexValid(hatIndex))
+ 	{
+ 		return false;
+--- a/weapons/hats/persistence.sp
++++ b/weapons/hats/persistence.sp
+@@ -1,4 +1,4 @@
+-static void LoadStableHatStateChunk(int client, const char[] stateValue)
++void LoadStableHatStateChunk(int client, const char[] stateValue)
+ {
+ 	char entries[32][96];
+ 	int entryCount = ExplodeString(stateValue, ",", entries, sizeof(entries), sizeof(entries[]));
+@@ -41,6 +41,7 @@
+ 
+ void LoadHatStateCookie(int client)
+ {
++	if (WeaponsDebug_HasProfile(client)) return;
+ 	ResetClientHatSelections(client);
+ 	g_szHatIdChoice[client][0] = '\0';
+ 	g_iHatCookieChunksUsed[client] = 0;
+@@ -223,6 +224,7 @@
+ 
+ void SaveHatStateCookie(int client, bool allowClear = false)
+ {
++	if (WeaponsDebug_HasProfile(client)) return;
+ 	if (g_hHatStateCookies[0] == INVALID_HANDLE || client <= 0 || client > MaxClients)
+ 	{
+ 		return;

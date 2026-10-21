@@ -1,13 +1,16 @@
 #define CHECKLAG_SCOPE_LIMIT 256
 #define CHECKLAG_SCOPE_WINDOW 5.0
 #define CHECKLAG_CONTEXT_LENGTH 160
-#define CHECKLAG_SNAPSHOT_SCOPE_LIMIT 32
-#define CHECKLAG_SLOW_CALL_LIMIT 4096 // Debug stress: retain dense bursts, not just their tail.
-#define CHECKLAG_SNAPSHOT_CALL_LIMIT 24
+#define CHECKLAG_SNAPSHOT_SCOPE_LIMIT 2
+#define CHECKLAG_SLOW_CALL_LIMIT 64
+#define CHECKLAG_SNAPSHOT_CALL_LIMIT 2
 #define CHECKLAG_SLOW_CALL_MS 1.0
-#define CHECKLAG_FRAME_LIMIT 512
-#define CHECKLAG_SNAPSHOT_FRAME_LIMIT 8
+#define CHECKLAG_FRAME_LIMIT 64
+#define CHECKLAG_SNAPSHOT_FRAME_LIMIT 2
 #define CHECKLAG_SLOW_FRAME_MS 30.0
+#define CHECKLAG_PROFILE_STRIDE 16
+#define CHECKLAG_SCOPE_TICK_BUDGET 32
+#define CHECKLAG_DETAIL_INTERVAL 15.0
 
 #include <profiler>
 #include "checklag_math.inc"
@@ -32,13 +35,16 @@ int g_LagSlowCount, g_LagSlowCursor;
 int g_LagSlowStartTick[CHECKLAG_SLOW_CALL_LIMIT], g_LagSlowSpan[CHECKLAG_SLOW_CALL_LIMIT];
 int g_LagSlowParent[CHECKLAG_SLOW_CALL_LIMIT], g_LagSlowOverwritten;
 int g_LagSlowBoundary[CHECKLAG_SLOW_CALL_LIMIT];
+int g_LagFrameBoundary[CHECKLAG_FRAME_LIMIT], g_LagBoundary;
+int g_LagScopeBudgetTick = -1, g_LagScopeBudgetUsed;
+float g_LagNextDetailedAt;
 float g_LagSlowChildren[CHECKLAG_SLOW_CALL_LIMIT];
 float g_LagFrameGap[CHECKLAG_FRAME_LIMIT], g_LagFrameAt[CHECKLAG_FRAME_LIMIT];
 int g_LagFrameTick[CHECKLAG_FRAME_LIMIT], g_LagFrameCount, g_LagFrameCursor;
 int g_LagFrameStartTick[CHECKLAG_FRAME_LIMIT], g_LagFrameHost[CHECKLAG_FRAME_LIMIT];
-int g_LagFrameBoundary[CHECKLAG_FRAME_LIMIT], g_LagBoundary;
 int g_LastFrameTick;
 Profiler g_LagFrameClock;
+float g_LagLastFrameAt;
 char g_LastLagScopeLines[CHECKLAG_SNAPSHOT_SCOPE_LIMIT][384];
 int g_LastLagScopeLineCount, g_LastLagAlertTick;
 bool g_LastLagSnapshotReady;
@@ -50,16 +56,11 @@ void CheckLag_ResetFrames()
     g_LagFrameCount = 0;
     g_LagFrameCursor = 0;
     g_LastFrameTick = GetGameTickCount();
-    if (g_CheckLagMode < 2)
-    {
-        delete g_LagFrameClock;
-        delete g_LagHostClock;
-        delete g_LagHostIntervalClock;
-        g_LagHostReady = false;
-        return;
-    }
-    if (g_LagFrameClock == null) g_LagFrameClock = new Profiler();
-    g_LagFrameClock.Start();
+    g_LagLastFrameAt = 0.0;
+    delete g_LagFrameClock;
+    delete g_LagHostClock;
+    delete g_LagHostIntervalClock;
+    g_LagHostReady = false;
     CheckLag_HostReset();
 }
 
@@ -72,16 +73,13 @@ void CheckLag_SanitizeField(char[] value, int maxlen)
 
 public any Native_CheckLagRecordScope(Handle plugin, int params)
 {
-    if (g_CheckLagMode != 2) return 0;
+    if (g_CheckLagMode != 3 || g_LagScopeIndexes == null) return 0;
+    int tick = GetGameTickCount();
+    if (tick != g_LagScopeBudgetTick) { g_LagScopeBudgetTick = tick; g_LagScopeBudgetUsed = 0; }
+    if (++g_LagScopeBudgetUsed > CHECKLAG_SCOPE_TICK_BUDGET) { g_LagScopeDropped++; return 0; }
+    float duration = GetNativeCell(2);
+    if (!(duration >= 0.25 && duration < 60000.0)) return 0;
     int self = CheckLag_SelfBegin(Self_RecordScope);
-    any result = CheckLag_RecordScopeImpl(plugin, params);
-    CheckLag_SelfEnd(self);
-    return result;
-}
-
-any CheckLag_RecordScopeImpl(Handle plugin, int params)
-{
-    if (g_CheckLagMode < 2 || g_LagScopeIndexes == null) return 0;
     char filename[80], scope[72], context[CHECKLAG_CONTEXT_LENGTH];
     GetPluginFilename(plugin, filename, sizeof(filename));
     GetNativeString(1, scope, sizeof(scope));
@@ -91,15 +89,15 @@ any CheckLag_RecordScopeImpl(Handle plugin, int params)
     int span = params >= 5 ? GetNativeCell(5) : 0;
     int parent = params >= 6 ? GetNativeCell(6) : 0;
     float children = params >= 7 ? view_as<float>(GetNativeCell(7)) : -1.0;
-    float duration = GetNativeCell(2);
     CheckLag_RecordScopeFields(filename, scope, duration, context, startTick, span, parent, children);
+    CheckLag_SelfEnd(self);
     return 0;
 }
 
 void CheckLag_RecordScopeFields(const char[] filename, char scope[72], float duration,
     char context[CHECKLAG_CONTEXT_LENGTH], int startTick = -1, int span = 0, int parent = 0, float children = -1.0)
 {
-    if (g_CheckLagMode < 2) return;
+    if (g_CheckLagMode != 3) return;
     char key[160];
     CheckLag_SanitizeField(scope, sizeof(scope));
     CheckLag_SanitizeField(context, sizeof(context));
@@ -163,34 +161,24 @@ void CheckLag_RecordScopeFields(const char[] filename, char scope[72], float dur
 
 public void OnGameFrame()
 {
-    if (g_CheckLagMode != 2) return;
-    int self = CheckLag_SelfBegin(Self_Frame);
-    CheckLag_GameFrameImpl();
-    // SourceMod timers can run BEFORE OnGameFrame at the SAME tick number.
-    // Callback completion belongs to the interval closed by this boundary.
-    g_LagBoundary++;
-    CheckLag_SelfEnd(self);
-}
-
-void CheckLag_GameFrameImpl()
-{
     if (g_CheckLagMode < 2) return;
-    float now = GetEngineTime(), gap;
-    if (g_LagFrameClock == null) { CheckLag_ResetFrames(); return; }
-    g_LagFrameClock.Stop();
-    gap = g_LagFrameClock.Time;
-    g_LagFrameClock.Start();
+    // Deliberately no Profiler, strings, file reads, native producer dispatch,
+    // self-profiler or telemetry on this hot path. Engine-time precision is
+    // coarse; these are useful stall estimates, not microsecond measurements.
+    float now = GetEngineTime();
+    float gap = g_LagLastFrameAt > 0.0 ? now - g_LagLastFrameAt : 0.0;
+    g_LagLastFrameAt = now;
     int previousTick = g_LastFrameTick;
     g_LastFrameTick = GetGameTickCount();
-    if (now < g_RoundQuietUntil || gap < 0.0 || gap > 60.0) return;
-    int host = CheckLag_HostPoll(now, gap * 1000.0 >= CHECKLAG_SLOW_FRAME_MS);
+    int boundary = g_LagBoundary++;
+    if (now < g_RoundQuietUntil || gap * 1000.0 < CHECKLAG_SLOW_FRAME_MS || gap > 60.0) return;
     int row = g_LagFrameCursor;
     g_LagFrameGap[row] = gap;
     g_LagFrameAt[row] = now;
     g_LagFrameTick[row] = GetGameTickCount();
     g_LagFrameStartTick[row] = previousTick;
-    g_LagFrameBoundary[row] = g_LagBoundary;
-    g_LagFrameHost[row] = host;
+    g_LagFrameHost[row] = 0;
+    g_LagFrameBoundary[row] = boundary;
     g_LagFrameCursor = (row + 1) % CHECKLAG_FRAME_LIMIT;
     if (g_LagFrameCount < CHECKLAG_FRAME_LIMIT) g_LagFrameCount++;
 }
@@ -208,16 +196,18 @@ int CheckLag_RecentFrameRow()
 int CheckLag_FrameMeasuredCall(int frame)
 {
     if (frame < 0) return -1;
+    float now = GetEngineTime();
     int best = -1;
     for (int row = 0; row < g_LagSlowCount; row++)
-        if (g_LagSlowBoundary[row] == g_LagFrameBoundary[frame]
+        if (now - g_LagSlowAt[row] < CHECKLAG_SCOPE_WINDOW
+            && g_LagSlowBoundary[row] == g_LagFrameBoundary[frame]
             && (best < 0 || g_LagSlowDuration[row] > g_LagSlowDuration[best])) best = row;
     return best;
 }
 
 void CheckLag_LogFrames(int alertTick)
 {
-    if (g_CheckLagMode < 2) return;
+    if (g_CheckLagMode != 3) return;
     bool shown[CHECKLAG_FRAME_LIMIT];
     float now = GetEngineTime();
     g_LastLagFrameDetail[0] = '\0';
@@ -241,13 +231,12 @@ void CheckLag_LogFrames(int alertTick)
         }
         float outside = duration > measured ? duration - measured : 0.0;
         FormatEx(message, sizeof(message),
-            "v=3|alert_tick=%d|rank=%d|frame_tick=%d|previous_tick=%d|frame_ms=%.3f|budget_ms=%.3f|age_ms=%.1f|same_tick_scope=%s|scope_ms=%.3f|call_seq=%d|outside_largest_ms=%.3f|host_seq=%d",
+            "v=4|mode=3|gap_clock=engine_time|alert_tick=%d|rank=%d|frame_tick=%d|previous_tick=%d|frame_ms=%.3f|budget_ms=%.3f|age_ms=%.1f|same_tick_scope=%s|scope_ms=%.3f|call_seq=%d|outside_largest_ms=%.3f|host_seq=%d",
             alertTick, rank + 1, g_LagFrameTick[best], g_LagFrameStartTick[best],
             duration, GetTickInterval() * 1000.0, (now - g_LagFrameAt[best]) * 1000.0,
             scope, measured, sequence, outside, g_LagFrameHost[best]);
         PluginStats_Record("lag_frame", message);
         LogMessage("[CheckLag][Frame] %s", message);
-        CheckLag_HostLog(g_LagFrameHost[best], alertTick, g_LagFrameTick[best]);
         if (rank == 0)
             FormatEx(g_LastLagFrameDetail, sizeof(g_LastLagFrameDetail),
                 "Worst frame: %.3f ms at tick %d (work tick %d); matching interval: %s %.3f ms; outside that largest interval %.3f ms. This is not exclusive CPU attribution.",
@@ -275,9 +264,37 @@ int CheckLag_RecentMeasuredScope()
     return best;
 }
 
+void CheckLag_LogBasicSnapshot(int tick, float current, float maximum, bool manual)
+{
+    int frameTick;
+    float peak = CheckLag_RecentFramePeak(frameTick);
+    char message[384];
+    FormatEx(message, sizeof(message),
+        "v=4|mode=%d|alert_tick=%d|rate=%.3f|expected=%.3f|frame_peak_ms=%.2f|frame_tick=%d|window_s=5|detailed=0|scope_sampling=%s|gap_clock=engine_time|snapshot_kind=%s",
+        g_CheckLagMode, tick, current, maximum, peak, frameTick, g_CheckLagMode == 3 ? "sampled" : "off", manual ? "manual" : "automatic");
+    PluginStats_Record(manual ? "lag_manual_snapshot" : "tickrate_drop", message);
+    LogMessage("[CheckLag] %s", message);
+    g_LastLagAlertTick = tick;
+    g_LastLagAlertAt = GetEngineTime();
+    g_LastLagAlertRate = current;
+    g_LastLagAlertFrame = peak;
+    g_LastLagScopeLineCount = 0;
+    g_LastLagSnapshotReady = true;
+    FormatEx(g_LastLagFrameDetail, sizeof(g_LastLagFrameDetail),
+        "Coarse frame-gap estimate %.2f ms at tick %d. No callback attribution in this snapshot; mode 3 samples detail.", peak, frameTick);
+}
+
 void CheckLag_LogSnapshot(int alertTick, float current, float maximum, int measured, bool manual = false)
 {
     if (g_CheckLagMode < 2) return;
+    // Basic mode is one record. Detailed mode adds at most seven records per
+    // 15s, rather than flooding the asynchronous statistics/database service.
+    if (g_CheckLagMode == 2 || GetEngineTime() < g_LagNextDetailedAt)
+    {
+        CheckLag_LogBasicSnapshot(alertTick, current, maximum, manual);
+        return;
+    }
+    g_LagNextDetailedAt = GetEngineTime() + CHECKLAG_DETAIL_INTERVAL;
     float now = GetEngineTime(), loss, choke;
     int frameTick, humans;
     float framePeak = CheckLag_RecentFramePeak(frameTick);
@@ -290,7 +307,9 @@ void CheckLag_LogSnapshot(int alertTick, float current, float maximum, int measu
         if (l > loss) loss = l;
         if (h > choke) choke = h;
     }
-    char message[512], scope[160] = "none";
+    // Keep the compact headline under the statistics provider's 512-byte cap.
+    // Full scope names/context remain in the separately bounded detail rows.
+    char message[512], scope[96] = "none";
     float peak;
     int calls;
     if (measured >= 0)
@@ -300,12 +319,10 @@ void CheckLag_LogSnapshot(int alertTick, float current, float maximum, int measu
         calls = g_LagScopeCalls[measured];
     }
     FormatEx(message, sizeof(message),
-        "v=3|alert_tick=%d|rate=%.3f|expected=%.3f|window_s=%.1f|frame_peak_ms=%.2f|frame_tick=%d|humans=%d|entities=%d|free_edicts=%d|loss_pct=%.2f|choke_pct=%.2f|measured=%s|peak_ms=%.3f|calls=%d|dropped_scopes=%d|overwritten_calls=%d|measured_role=window_context",
-        alertTick, current, maximum, CHECKLAG_SCOPE_WINDOW, framePeak, frameTick,
-        humans, entities, GetMaxEntities() - entities, loss * 100.0, choke * 100.0,
+        "v=4|mode=3|alert_tick=%d|rate=%.3f|expected=%.3f|snapshot_kind=%s|sample_stride=16|detailed=1|frame_peak_ms=%.2f|frame_tick=%d|humans=%d|entities=%d|loss_pct=%.2f|choke_pct=%.2f|measured=%s|peak_ms=%.3f|calls=%d|dropped_scopes=%d|overwritten_calls=%d|measured_role=sampled_context",
+        alertTick, current, maximum, manual ? "manual" : "automatic", framePeak, frameTick,
+        humans, entities, loss * 100.0, choke * 100.0,
         scope, peak, calls, g_LagScopeDropped, g_LagSlowOverwritten);
-    StrCat(message, sizeof(message), manual ? "|snapshot_kind=manual" : "|snapshot_kind=automatic");
-    StrCat(message, sizeof(message), "|mode=2");
     PluginStats_Record(manual ? "lag_manual_snapshot" : "tickrate_drop", message);
     LogMessage("[CheckLag] %s", message);
     g_LastLagAlertTick = alertTick;
@@ -315,6 +332,11 @@ void CheckLag_LogSnapshot(int alertTick, float current, float maximum, int measu
     g_LastLagScopeLineCount = 0;
     g_LastLagSnapshotReady = true;
     CheckLag_LogFrames(alertTick);
+    if (g_LagHostReady)
+    {
+        int host = (g_LagHostCursor + CHECKLAG_HOST_LIMIT - 1) % CHECKLAG_HOST_LIMIT;
+        CheckLag_HostLog(g_LagHostSamples[host].sequence, alertTick, 0);
+    }
 
     // Bounded, queued telemetry only on alerts. Nested inclusive timings must
     // not be summed as exclusive CPU time. Bucket/peak ages show freshness.
@@ -371,15 +393,12 @@ public Action Command_LagSnapshot(int client, int args)
 {
     if (g_CheckLagMode < 2)
     {
-        ReplyToCommand(client, "[CheckLag] Profiling is disabled; use sm_checklag_mode 2 for snapshots.");
+        ReplyToCommand(client, "[CheckLag] Use sm_checklag_mode 2 for basic snapshots or 3 for sampled detail.");
         return Plugin_Handled;
     }
     int tick = GetGameTickCount();
-    int emission = CheckLag_SelfBegin(Self_Snapshot);
     CheckLag_LogSnapshot(tick, PluginStats_GetObservedTickrate(), PluginStats_GetExpectedTickrate(),
         CheckLag_RecentMeasuredScope(), true);
-    CheckLag_SelfReport(tick, tick - 1);
-    CheckLag_SelfEmission(emission);
     ReplyToCommand(client, "[CheckLag] Manual snapshot saved for Tick #%d (not a tickrate-drop event).", tick);
     return Plugin_Handled;
 }
@@ -388,7 +407,7 @@ public Action Command_LagDetails(int client, int args)
 {
     if (g_CheckLagMode < 2)
     {
-        ReplyToCommand(client, "[CheckLag] Profiling is disabled; use sm_checklag_mode 2 for details.");
+        ReplyToCommand(client, "[CheckLag] Use sm_checklag_mode 2 for cheap frame evidence or 3 for sampled callback detail.");
         return Plugin_Handled;
     }
     if (g_LastLagSnapshotReady)
@@ -396,7 +415,8 @@ public Action Command_LagDetails(int client, int args)
         ReplyToCommand(client, "[CheckLag] Saved alert Tick #%d (%.1f seconds ago): %.1f tick/s; recent frame peak %.1f ms. Inclusive times:",
             g_LastLagAlertTick, GetEngineTime() - g_LastLagAlertAt, g_LastLagAlertRate, g_LastLagAlertFrame);
         if (g_LastLagFrameDetail[0]) ReplyToCommand(client, "[CheckLag] %s", g_LastLagFrameDetail);
-        ReplyToCommand(client, "[CheckLag] The following are five-second window context, not necessarily the stalled tick. CPU/wait/IO windows are stored separately.");
+        if (g_CheckLagMode == 2) return Plugin_Handled;
+        ReplyToCommand(client, "[CheckLag] Sampled five-second context, not exclusive CPU attribution. Host samples cover one second, not one frame.");
         int count = g_LastLagScopeLineCount < 12 ? g_LastLagScopeLineCount : 12;
         for (int i = 0; i < count; i++) ReplyToCommand(client, "  %s", g_LastLagScopeLines[i]);
         ReplyToCommand(client, "[CheckLag] Full snapshot is stored in plugin_statistics_events and SourceMod logs; join on session + alert_tick.");

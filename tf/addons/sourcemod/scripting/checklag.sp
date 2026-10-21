@@ -28,7 +28,7 @@ public Plugin myinfo =
     name = "CheckLag",
     author = "Hombre",
     description = "Reports the server's current and expected tickrate.",
-    version = "1.5.0-debug",
+    version = "1.6.0",
     url = "https://kogasa.tf"
 };
 
@@ -38,34 +38,20 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     RegPluginLibrary("checklag");
     CreateNative("CheckLag_RecordScope",Native_CheckLagRecordScope);
     CreateNative("CheckLag_IsProfilingEnabled", Native_CheckLagIsProfilingEnabled);
-    CreateNative("CheckLagDebug_ObserverCosts", Native_CheckLagDebugObserverCosts);
+    CreateNative("CheckLagDebug_ObserverCosts", Native_CheckLagObserverCosts);
     return APLRes_Success;
-}
-
-// Lab-only non-destructive read of the previous second's root observer costs.
-// No logging/telemetry and no mutation of the production observer accounting.
-public any Native_CheckLagDebugObserverCosts(Handle plugin, int params)
-{
-    float costs[3], now = GetEngineTime();
-    for (int row = 0; row < g_SelfCount; row++)
-    {
-        if (now - g_SelfAt[row] > 1.0) continue;
-        costs[0] += g_SelfTotal[row];
-        if (g_SelfTotal[row] > costs[1]) costs[1] = g_SelfTotal[row];
-        costs[2] += g_SelfMs[row][Self_RecordScope];
-    }
-    SetNativeArray(1, costs, sizeof(costs));
-    return 0;
 }
 
 public void OnPluginStart()
 {
     g_LagScopeIndexes=new StringMap();
     g_CheckLagModeConVar = CreateConVar("sm_checklag_mode", "1",
-        "CheckLag: 0=off, 1=tickrate alerts only, 2=full in-plugin profiling.", _, true, 0.0, true, 2.0);
+        "CheckLag: 0=off, 1=alerts, 2=cheap frame evidence, 3=sampled bounded profiling.", _, true, 0.0, true, 3.0);
+    // Reloads retain an existing ConVar object and its old upper bound.
+    g_CheckLagModeConVar.SetBounds(ConVarBound_Upper, true, 3.0);
+    RegAdminCmd("sm_lagself", Command_LagSelf, ADMFLAG_ROOT, "Completed observer costs (frame hot path is deliberately unprofiled).");
     g_CheckLagMode = g_CheckLagModeConVar.IntValue;
     g_CheckLagModeConVar.AddChangeHook(CheckLag_ModeChanged);
-    RegAdminCmd("sm_lagself", Command_LagSelf, ADMFLAG_ROOT, "Completed CheckLag observer costs.");
     RegAdminCmd("sm_lagdetails",Command_LagDetails,ADMFLAG_ROOT,"Recent measured callback times and network context.");
     RegAdminCmd("sm_lagsnapshot", Command_LagSnapshot, ADMFLAG_ROOT, "Persist current timings without classifying them as a tickrate drop.");
     RegConsoleCmd("sm_lag", Command_CheckLag, "Broadcast the server tickrate.");
@@ -189,9 +175,9 @@ public Action Timer_MonitorTickrate(Handle timer)
 {
     if (g_CheckLagMode == 0) return Plugin_Stop;
     int self = CheckLag_SelfBegin(Self_Monitor);
-    Action result = CheckLag_MonitorTickrate();
+    Action action = CheckLag_MonitorTickrate();
     CheckLag_SelfEnd(self);
-    return result;
+    return action;
 }
 
 Action CheckLag_MonitorTickrate()
@@ -203,6 +189,8 @@ Action CheckLag_MonitorTickrate()
         return Plugin_Continue;
     }
 
+    // Kernel reads are never on the frame/scope hot paths, even after a stall.
+    if (g_CheckLagMode == 3) CheckLag_HostPoll(GetEngineTime(), false);
     float current = PluginStats_GetObservedTickrate();
     if (current >= CHECKLAG_HEALTHY_TICKRATE)
     {
@@ -219,12 +207,11 @@ Action CheckLag_MonitorTickrate()
     int serverTick = GetGameTickCount();
     g_NextAdminAlertAt = now + CHECKLAG_ADMIN_ALERT_INTERVAL;
     int emission = CheckLag_SelfBegin(Self_Snapshot);
-    if (g_CheckLagMode == 2)
+    if (g_CheckLagMode >= 2)
         CheckLag_LogSnapshot(serverTick, current, maximum, CheckLag_RecentMeasuredScope());
     else
         CheckLag_LogTickrateAlert(serverTick, current, maximum);
-    int frame = g_CheckLagMode == 2 ? CheckLag_RecentFrameRow() : -1;
-    CheckLag_SelfReport(serverTick, frame >= 0 ? g_LagFrameStartTick[frame] : serverTick - 1);
+    CheckLag_SelfReport(serverTick, serverTick - 1);
 
     for (int client = 1; client <= MaxClients; client++)
     {
@@ -239,14 +226,14 @@ Action CheckLag_MonitorTickrate()
             serverTick,
             current,
             maximum);
-        if (g_CheckLagMode == 2)
+        if (g_CheckLagMode == 3)
         {
             int call = CheckLag_FrameMeasuredCall(CheckLag_RecentFrameRow());
             if (call >= 0)
-                CPrintToChat(client,"{gold}[CheckLag]{default} On stalled tick: %s ({salmon}%.2f ms{default}, inclusive). {gold}!lagdetails{default} for context.",
+                CPrintToChat(client,"{gold}[CheckLag]{default} Sampled interval on stalled frame: %s ({salmon}%.2f ms{default}, inclusive). {gold}!lagdetails{default} for context.",
                     g_LagScopeNames[g_LagSlowScope[call]], g_LagSlowDuration[call]);
             else
-                CPrintToChat(client,"{gold}[CheckLag]{default} No matching measured interval on the stalled tick. {gold}!lagdetails{default} for frame/host diagnostics.");
+                CPrintToChat(client,"{gold}[CheckLag]{default} No matching sampled interval on the stalled frame. Sampling can miss the cause. {gold}!lagdetails{default} for context.");
         }
     }
     CheckLag_SelfEmission(emission);
