@@ -19,6 +19,7 @@ int g_CheckLagMode = 1;
 Handle g_AdminMonitorTimer = null;
 float g_NextAdminAlertAt = 0.0;
 float g_RoundQuietUntil = 0.0;
+#include "checklag_self.inc"
 #include "checklag_diagnostics.inc"
 #include "checklag_mode.inc"
 
@@ -27,7 +28,7 @@ public Plugin myinfo =
     name = "CheckLag",
     author = "Hombre",
     description = "Reports the server's current and expected tickrate.",
-    version = "1.4.0",
+    version = "1.6.0",
     url = "https://kogasa.tf"
 };
 
@@ -37,6 +38,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int errMax)
     RegPluginLibrary("checklag");
     CreateNative("CheckLag_RecordScope",Native_CheckLagRecordScope);
     CreateNative("CheckLag_IsProfilingEnabled", Native_CheckLagIsProfilingEnabled);
+    CreateNative("CheckLagDebug_ObserverCosts", Native_CheckLagObserverCosts);
     return APLRes_Success;
 }
 
@@ -44,7 +46,10 @@ public void OnPluginStart()
 {
     g_LagScopeIndexes=new StringMap();
     g_CheckLagModeConVar = CreateConVar("sm_checklag_mode", "1",
-        "CheckLag: 0=off, 1=tickrate alerts only, 2=full in-plugin profiling.", _, true, 0.0, true, 2.0);
+        "CheckLag: 0=off, 1=alerts, 2=cheap frame evidence, 3=sampled bounded profiling.", _, true, 0.0, true, 3.0);
+    // Reloads retain an existing ConVar object and its old upper bound.
+    g_CheckLagModeConVar.SetBounds(ConVarBound_Upper, true, 3.0);
+    RegAdminCmd("sm_lagself", Command_LagSelf, ADMFLAG_ROOT, "Completed observer costs (frame hot path is deliberately unprofiled).");
     g_CheckLagMode = g_CheckLagModeConVar.IntValue;
     g_CheckLagModeConVar.AddChangeHook(CheckLag_ModeChanged);
     RegAdminCmd("sm_lagdetails",Command_LagDetails,ADMFLAG_ROOT,"Recent measured callback times and network context.");
@@ -70,6 +75,7 @@ public void Event_RoundQuietPeriod(Event event, const char[] name, bool dontBroa
 
 public void OnMapStart()
 {
+    CheckLag_SelfReset();
     CheckLag_ResetProfilingState();
     g_RoundQuietUntil = GetEngineTime() + 5.0;
     g_NextAdminAlertAt = g_RoundQuietUntil;
@@ -92,6 +98,7 @@ public void OnPluginEnd()
     delete g_LagFrameClock;
     delete g_LagHostClock;
     delete g_LagHostIntervalClock;
+    CheckLag_SelfShutdown();
 }
 
 bool IsWordCharacter(char value)
@@ -166,6 +173,15 @@ void PrintTickrateToClient(int client)
 
 public Action Timer_MonitorTickrate(Handle timer)
 {
+    if (g_CheckLagMode == 0) return Plugin_Stop;
+    int self = CheckLag_SelfBegin(Self_Monitor);
+    Action action = CheckLag_MonitorTickrate();
+    CheckLag_SelfEnd(self);
+    return action;
+}
+
+Action CheckLag_MonitorTickrate()
+{
     if (g_CheckLagMode == 0)
         return Plugin_Stop;
     if (GetEngineTime() < g_RoundQuietUntil || !CheckLag_IsRoundRunning())
@@ -173,6 +189,8 @@ public Action Timer_MonitorTickrate(Handle timer)
         return Plugin_Continue;
     }
 
+    // Kernel reads are never on the frame/scope hot paths, even after a stall.
+    if (g_CheckLagMode == 3) CheckLag_HostPoll(GetEngineTime(), false);
     float current = PluginStats_GetObservedTickrate();
     if (current >= CHECKLAG_HEALTHY_TICKRATE)
     {
@@ -188,10 +206,12 @@ public Action Timer_MonitorTickrate(Handle timer)
     float maximum = PluginStats_GetExpectedTickrate();
     int serverTick = GetGameTickCount();
     g_NextAdminAlertAt = now + CHECKLAG_ADMIN_ALERT_INTERVAL;
-    if (g_CheckLagMode == 2)
+    int emission = CheckLag_SelfBegin(Self_Snapshot);
+    if (g_CheckLagMode >= 2)
         CheckLag_LogSnapshot(serverTick, current, maximum, CheckLag_RecentMeasuredScope());
     else
         CheckLag_LogTickrateAlert(serverTick, current, maximum);
+    CheckLag_SelfReport(serverTick, serverTick - 1);
 
     for (int client = 1; client <= MaxClients; client++)
     {
@@ -206,16 +226,17 @@ public Action Timer_MonitorTickrate(Handle timer)
             serverTick,
             current,
             maximum);
-        if (g_CheckLagMode == 2)
+        if (g_CheckLagMode == 3)
         {
             int call = CheckLag_FrameMeasuredCall(CheckLag_RecentFrameRow());
             if (call >= 0)
-                CPrintToChat(client,"{gold}[CheckLag]{default} On stalled tick: %s ({salmon}%.2f ms{default}, inclusive). {gold}!lagdetails{default} for context.",
+                CPrintToChat(client,"{gold}[CheckLag]{default} Sampled interval on stalled frame: %s ({salmon}%.2f ms{default}, inclusive). {gold}!lagdetails{default} for context.",
                     g_LagScopeNames[g_LagSlowScope[call]], g_LagSlowDuration[call]);
             else
-                CPrintToChat(client,"{gold}[CheckLag]{default} No matching measured interval on the stalled tick. {gold}!lagdetails{default} for frame/host diagnostics.");
+                CPrintToChat(client,"{gold}[CheckLag]{default} No matching sampled interval on the stalled frame. Sampling can miss the cause. {gold}!lagdetails{default} for context.");
         }
     }
+    CheckLag_SelfEmission(emission);
     return Plugin_Continue;
 }
 

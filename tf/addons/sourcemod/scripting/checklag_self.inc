@@ -58,7 +58,7 @@ void CheckLag_SelfReset()
     g_SelfCount = 0; g_SelfCursor = 0; g_SelfOverflow = 0; g_SelfDepth = 0;
 }
 
-void CheckLag_SelfShutdown()
+stock void CheckLag_SelfShutdown()
 {
     for (int slot = 0; slot < CHECKLAG_SELF_DEPTH; slot++) delete g_SelfClocks[slot];
 }
@@ -83,7 +83,18 @@ void CheckLag_SelfReport(int alertTick, int workTick, int client = -1)
         "v=1|mode=%d|alert_tick=%d|work_tick=%d|window_ms=%.3f|tick_peak_ms=%.3f|peak_tick=%d|work_tick_self_ms=%.3f|sampled_ticks=%d|overflow=%d|attribution=wall_inclusive|snapshot_in_progress=1",
         g_CheckLagMode, alertTick, workTick, total, peak, peakTick, work, roots, g_SelfOverflow);
     if (client >= 0) ReplyToCommand(client, "[CheckLag][Self] %s", message);
-    else { PluginStats_Record("lag_self_window", message); LogMessage("[CheckLag][Self] %s", message); }
+    // One automatic summary rather than six records per alert. The primitive
+    // frame path intentionally has no per-frame self-profiler; this is stated
+    // explicitly so missing accounting is never presented as zero overhead.
+    FormatEx(message, sizeof(message),
+        "v=2|mode=%d|alert_tick=%d|work_tick=%d|window_ms=%.3f|tick_peak_ms=%.3f|monitor_ms=%.3f|record_scope_ms=%.3f|calls=%d|overflow=%d|frame_path=unprofiled|attribution=wall_inclusive",
+        g_CheckLagMode, alertTick, workTick, total, peak, categories[Self_Monitor], categories[Self_RecordScope], calls[Self_Monitor], g_SelfOverflow);
+    if (client < 0)
+    {
+        PluginStats_Record("lag_self_window", message);
+        LogMessage("[CheckLag][Self] %s", message);
+        return;
+    }
     for (int category = 0; category < view_as<int>(Self_CategoryCount); category++)
     {
         FormatEx(message, sizeof(message), "v=1|alert_tick=%d|category=%s|inclusive_ms=%.3f|calls=%d",
@@ -93,6 +104,21 @@ void CheckLag_SelfReport(int alertTick, int workTick, int client = -1)
     }
 }
 
+// Bounded, non-mutating aggregate read for the independent MGE lab observer.
+public any Native_CheckLagObserverCosts(Handle plugin, int params)
+{
+    float costs[3], now = GetEngineTime();
+    for (int row = 0; row < g_SelfCount; row++)
+    {
+        if (now - g_SelfAt[row] > 1.0) continue;
+        costs[0] += g_SelfTotal[row];
+        if (g_SelfTotal[row] > costs[1]) costs[1] = g_SelfTotal[row];
+        costs[2] += g_SelfMs[row][Self_RecordScope];
+    }
+    SetNativeArray(1, costs, sizeof(costs));
+    return 0;
+}
+
 public Action Command_LagSelf(int client, int args)
 {
     CheckLag_SelfReport(GetGameTickCount(), GetGameTickCount(), client);
@@ -100,7 +126,7 @@ public Action Command_LagSelf(int client, int args)
     return Plugin_Handled;
 }
 
-void CheckLag_SelfEmission(int started)
+stock void CheckLag_SelfEmission(int started)
 {
     if (started < 0 || started >= g_SelfDepth) return;
     // Stop exactly once; SourceMod rejects a second Stop on the same sample.

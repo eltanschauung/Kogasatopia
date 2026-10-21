@@ -27,14 +27,27 @@ static int g_KogasaPerfDepth;
 static int g_KogasaPerfStartTick[16], g_KogasaPerfSpan[16], g_KogasaPerfParent[16];
 static int g_KogasaPerfSequence;
 static float g_KogasaPerfChildren[16];
+static int g_KogasaPerfCachedTick = -1, g_KogasaPerfStarts;
+static bool g_KogasaPerfEnabled;
 stock int KogasaPerfBegin()
 {
-    if (g_KogasaPerfDepth >= sizeof(g_KogasaPerfProfiles)
-        || GetFeatureStatus(FeatureType_Native, "CheckLag_RecordScope") != FeatureStatus_Available
-        || (GetFeatureStatus(FeatureType_Native, "CheckLag_IsProfilingEnabled") == FeatureStatus_Available
-            && !CheckLag_IsProfilingEnabled())) return -1;
+    if (g_KogasaPerfDepth >= sizeof(g_KogasaPerfProfiles)) return -1;
+    int tick = GetGameTickCount();
+    if (tick != g_KogasaPerfCachedTick)
+    {
+        g_KogasaPerfCachedTick = tick;
+        g_KogasaPerfStarts = 0;
+        g_KogasaPerfEnabled = GetFeatureStatus(FeatureType_Native, "CheckLag_RecordScope") == FeatureStatus_Available
+            && GetFeatureStatus(FeatureType_Native, "CheckLag_IsProfilingEnabled") == FeatureStatus_Available
+            && CheckLag_IsProfilingEnabled();
+    }
+    // Mode 1/2 have the same disabled producer path. Mode 3 admits at most 32
+    // starts per plugin on each sampled tick, including nested scopes. Omitted
+    // children remain unmeasured inclusive remainder, not exclusive CPU time.
+    if (!g_KogasaPerfEnabled || g_KogasaPerfStarts >= 32) return -1;
+    g_KogasaPerfStarts++;
     int slot = g_KogasaPerfDepth++;
-    g_KogasaPerfStartTick[slot] = GetGameTickCount();
+    g_KogasaPerfStartTick[slot] = tick;
     g_KogasaPerfSpan[slot] = ++g_KogasaPerfSequence;
     g_KogasaPerfParent[slot] = slot > 0 ? g_KogasaPerfSpan[slot - 1] : 0;
     g_KogasaPerfChildren[slot] = 0.0;
@@ -49,7 +62,7 @@ stock void KogasaPerfEnd(int slot, const char[] scope, const char[] context = ""
     g_KogasaPerfDepth = slot;
     float milliseconds = g_KogasaPerfProfiles[slot].Time * 1000.0;
     if (slot > 0) g_KogasaPerfChildren[slot - 1] += milliseconds;
-    if (milliseconds >= 0.0 && milliseconds < 60000.0
+    if (milliseconds >= 0.25 && milliseconds < 60000.0
         && GetFeatureStatus(FeatureType_Native, "CheckLag_RecordScope") == FeatureStatus_Available)
         CheckLag_RecordScope(scope, milliseconds, context, g_KogasaPerfStartTick[slot],
             g_KogasaPerfSpan[slot], g_KogasaPerfParent[slot], g_KogasaPerfChildren[slot]);

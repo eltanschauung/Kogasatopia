@@ -1,5 +1,9 @@
 # CheckLag v3 diagnostics
 
+Historical pre-1.6 architecture and incident notes. Current modes 2 and 3,
+sampling limits and clock precision are documented in [checklag_modes.md](checklag_modes.md).
+The old full mode 2 described below is no longer available.
+
 ## Collection modes
 
 `sm_checklag_mode` defaults to `1` and is bounded to 0..2:

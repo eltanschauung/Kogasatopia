@@ -1,7 +1,7 @@
 // Read-only, bounded Linux main-thread diagnostics. No PID, command line,
 // environment, client identity, address or secret is recorded.
 #define CHECKLAG_HOST_LIMIT 64
-#define CHECKLAG_HOST_INTERVAL 0.25
+#define CHECKLAG_HOST_INTERVAL 1.0
 #define CHECKLAG_HOST_CPU 1
 #define CHECKLAG_HOST_WAIT 2
 #define CHECKLAG_HOST_FAULTS 4
@@ -56,7 +56,7 @@ void CheckLag_HostReset()
 {
     g_LagHostCursor = 0; g_LagHostSequence = 0;
     g_LagHostReady = false; g_LagHostNextAt = 0.0;
-    if (g_CheckLagMode < 2) return;
+    if (g_CheckLagMode != 3) return;
     if (g_LagHostIntervalClock == null) g_LagHostIntervalClock = new Profiler();
     g_LagHostIntervalClock.Start();
     g_LagHostWaitEnabled = false;
@@ -129,8 +129,9 @@ static void CheckLag_HostRead(CheckLagHostSample sample)
 
 int CheckLag_HostPoll(float now, bool stalled)
 {
-    if (g_CheckLagMode < 2) return 0;
-    if (now < g_LagHostNextAt && !stalled) return 0;
+    #pragma unused stalled
+    if (g_CheckLagMode != 3) return 0;
+    if (now < g_LagHostNextAt) return 0;
     if (g_LagHostClock == null) g_LagHostClock = new Profiler();
     g_LagHostClock.Start();
     CheckLagHostSample sample;

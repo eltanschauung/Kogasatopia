@@ -11,6 +11,11 @@ void CheckLag_ResetProfilingState()
     g_LastLagScopeLineCount = 0;
     g_LastLagSnapshotReady = false;
     g_LastLagFrameDetail[0] = '\0';
+    g_LagNextDetailedAt = 0.0;
+    g_LagScopeBudgetUsed = 0;
+    g_LagScopeBudgetTick = -1;
+    g_LagBoundary = 0;
+    CheckLag_SelfReset();
     CheckLag_ResetFrames();
 }
 
@@ -33,7 +38,11 @@ public void CheckLag_ModeChanged(ConVar convar, const char[] oldValue, const cha
 
 public any Native_CheckLagIsProfilingEnabled(Handle plugin, int params)
 {
-    return g_CheckLagMode == 2;
+    // Old compiled producers also receive sampling/backpressure, not merely
+    // a renamed full-profiling mode. New producers cache this once per tick.
+    int tick = GetGameTickCount();
+    return g_CheckLagMode == 3 && tick % CHECKLAG_PROFILE_STRIDE == 0
+        && (tick != g_LagScopeBudgetTick || g_LagScopeBudgetUsed < CHECKLAG_SCOPE_TICK_BUDGET);
 }
 
 void CheckLag_LogTickrateAlert(int tick, float current, float maximum)
@@ -41,7 +50,7 @@ void CheckLag_LogTickrateAlert(int tick, float current, float maximum)
     if (g_CheckLagMode != 1) return;
     char message[160];
     FormatEx(message, sizeof(message),
-        "v=3|mode=1|alert_tick=%d|rate=%.3f|expected=%.3f|snapshot_kind=automatic",
+        "v=4|mode=1|alert_tick=%d|rate=%.3f|expected=%.3f|snapshot_kind=automatic",
         tick, current, maximum);
     PluginStats_Record("tickrate_drop", message);
     LogMessage("[CheckLag] %s", message);

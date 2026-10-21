@@ -268,6 +268,13 @@ bool TryParseNonNegativeInt(const char[] text, int &value)
 
 void UpdateHatForClient(int client)
 {
+	int profile = KogasaPerfBegin();
+	CustomHats_UpdateProfiled(client);
+	WeaponsPerf_EndClient(profile, "CustomHats/refresh", client);
+}
+
+void CustomHats_UpdateProfiled(int client)
+{
 	if (!HasEnabledHats() || !HasClientEnabledHats(client))
 	{
 		RemoveHat(client, -1);
