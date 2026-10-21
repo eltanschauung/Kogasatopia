@@ -64,42 +64,13 @@ void Lotteries_OnPluginEnd()
 
 void Lotteries_OnMapEnd()
 {
-    int interruptedLotteryId = 0;
-    if (g_LotteryCallTimer != null)
-    {
-        interruptedLotteryId = g_LotteryCallLotteryId;
-    }
-
+    // Keep the absolute deadline; map changes must not extend special mode.
     CancelPendingLotteryCall();
-
-    if (interruptedLotteryId > 0)
-    {
-        g_LotteryMapChangeLotteryId = interruptedLotteryId;
-    }
 }
 
 void Lotteries_OnMapStart()
 {
-    if (g_LotteryMapChangeLotteryId <= 0 || g_LotteryCallTimer != null
-        || g_LotteryDrawInProgress)
-    {
-        return;
-    }
-
-    g_LotteryCallRequesterUserId = 0;
-    g_LotteryCallLotteryId = g_LotteryMapChangeLotteryId;
-    g_LotteryMapChangeLotteryId = 0;
-    g_LotteryCallTimer = CreateTimer(
-        LOTTO_MAP_CHANGE_DELAY,
-        Timer_LotteryCall,
-        _,
-        TIMER_FLAG_NO_MAPCHANGE);
-
-    if (g_LotteryCallTimer == null)
-    {
-        LogError("[points_store] Could not reschedule lottery %d after a map change.", g_LotteryCallLotteryId);
-        g_LotteryCallLotteryId = 0;
-    }
+    ResumePendingLotteryCall();
 }
 
 void Lotteries_OnClientAuthorized(int client)
@@ -124,6 +95,8 @@ void Lotteries_OnDatabaseDisconnected()
     g_CurrentLotteryHashColor[0] = '\0';
     g_CurrentLotterySuper = false;
     g_CurrentLotteryEqual = false;
+    g_CurrentLotteryEqualTicketValue = 0;
+    g_LotteryCallDeadline = 0;
     g_LotteryEqualRefundInProgress = false;
     CancelPendingLotteryCall();
 }
@@ -263,6 +236,21 @@ public void SQL_OnLotteryEqualValueColumnReady(Database db, DBResultSet results,
         && StrContains(error, "already exists", false) == -1)
     {
         LogError("[points_store] Lottery equal_ticket_value migration failed: %s", error);
+        return;
+    }
+    char query[256];
+    FormatEx(query, sizeof(query),
+        "ALTER TABLE %s ADD COLUMN %scall_deadline INTEGER NOT NULL DEFAULT 0",
+        LOTTO_TABLE, g_IsMySql ? "IF NOT EXISTS " : "");
+    g_Database.Query(SQL_OnLotteryDeadlineColumnReady, query);
+}
+
+public void SQL_OnLotteryDeadlineColumnReady(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (error[0] && StrContains(error, "duplicate column", false) == -1
+        && StrContains(error, "already exists", false) == -1)
+    {
+        LogError("[points_store] Lottery call_deadline migration failed: %s", error);
         return;
     }
     EnsureLotteryTicketsSchema();

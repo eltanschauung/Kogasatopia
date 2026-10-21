@@ -132,7 +132,7 @@ public Plugin myinfo =
     name = "points_store",
     author = "Kogasa, Hombre",
     description = "Currency purchase receipts, shop UI, and ownership API.",
-    version = "1.1.2",
+    version = "1.1.3",
     url = "https://kogasa.tf"
 };
 

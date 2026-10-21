@@ -20,7 +20,7 @@
 #define LOTTO_WELFARE_POOL_PERCENT 5
 #define LOTTO_TICKET_WRITE_TIMEOUT 15.0
 #define LOTTO_TICKET_MUTATION_COOLDOWN 2.0
-#define LOTTO_MAP_CHANGE_DELAY 120.0
+#define LOTTO_CALL_WARNING_SECONDS 60
 
 ConVar g_CvarLotteryDisabled = null;
 ConVar g_CvarLotteryMaxTicketValue = null;
@@ -57,7 +57,7 @@ Handle g_LotteryDrawTimer = null;
 Handle g_LotteryCallTimer = null;
 int g_LotteryCallRequesterUserId = 0;
 int g_LotteryCallLotteryId = 0;
-int g_LotteryMapChangeLotteryId = 0;
+int g_LotteryCallDeadline = 0;
 int g_LotteryDrawIndex = 0;
 int g_LotteryDrawLotteryId = 0;
 int g_LotteryDrawPrizePool = 0;

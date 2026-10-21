@@ -104,7 +104,9 @@ public Action Command_LotteryTime(int client, int args)
 
 void PrintLotteryTime(int client, bool includePrefix)
 {
-    int secondsUntilLottery = SecondsUntilNextLotteryDraw(GetTime());
+    int secondsUntilLottery = g_LotteryCallDeadline > 0
+        ? g_LotteryCallDeadline - GetTime() : SecondsUntilNextLotteryDraw(GetTime());
+    if (secondsUntilLottery < 0) secondsUntilLottery = 0;
     int minutesUntilLottery = (secondsUntilLottery + 59) / 60;
     char minuteLabel[16];
     strcopy(minuteLabel, sizeof(minuteLabel), minutesUntilLottery == 1 ? "minute" : "minutes");

@@ -25,12 +25,17 @@ public Action Command_DoLottery(int client, int args)
         return Plugin_Handled;
     }
 
+    if (g_LotteryCallDeadline < GetTime()
+        && (g_CurrentLotteryEqual || g_CurrentLotterySuper || g_LotteryCallDeadline > 0))
+    {
+        ResetLotteryCallState();
+    }
     g_LotteryCallRequesterUserId = client > 0 ? GetClientUserId(client) : 0;
     g_LotteryCallLotteryId = g_CurrentLotteryId;
 
     char colorTag[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(colorTag, sizeof(colorTag));
-    int callDelay = GetRandomInt(20, 80);
+    int callDelay = LOTTO_CALL_WARNING_SECONDS;
 
     g_LotteryCallTimer = CreateTimer(float(callDelay), Timer_LotteryCall, _, TIMER_FLAG_NO_MAPCHANGE);
     if (g_LotteryCallTimer == null)
@@ -42,6 +47,7 @@ public Action Command_DoLottery(int client, int args)
     }
 
     int specialLotteryRoll = GetRandomInt(1, 100);
+    g_LotteryCallDeadline = GetTime() + callDelay;
     if (g_CurrentLotterySuper || (!g_CurrentLotteryEqual && specialLotteryRoll <= 35))
     {
         SetCurrentLotterySuper(true);
@@ -57,6 +63,7 @@ public Action Command_DoLottery(int client, int args)
     }
     else
     {
+        PersistLotteryCallState();
         CPrintToChatAll("%s[Lotto]{default} A lottery is being called soon, {gold}!bet{default} now!", colorTag);
     }
     return Plugin_Handled;
@@ -196,6 +203,7 @@ public void SQL_OnLotteryDrawStatsLoaded(Database db, DBResultSet results, const
     if (ticketCount <= 0 || prizePool <= 0)
     {
         g_LotteryDrawInProgress = false;
+        ResetLotteryCallState();
         ReplyToLotteryRequester(requesterUserId, "[Lotto] There are no tickets in the current lottery.");
         return;
     }
@@ -576,6 +584,8 @@ public void SQL_OnLotteryFinished(Database db, DBResultSet results, const char[]
         g_CurrentLotteryHashColor[0] = '\0';
         g_CurrentLotterySuper = false;
         g_CurrentLotteryEqual = false;
+        g_CurrentLotteryEqualTicketValue = 0;
+        g_LotteryCallDeadline = 0;
         g_LotteryEqualRefundInProgress = false;
         ClearAllClientLotteryCaches();
         ResetLotteryDrawState();
@@ -615,6 +625,8 @@ public void SQL_OnLotteryFinished(Database db, DBResultSet results, const char[]
     g_CurrentLotteryHashColor[0] = '\0';
     g_CurrentLotterySuper = false;
     g_CurrentLotteryEqual = false;
+    g_CurrentLotteryEqualTicketValue = 0;
+    g_LotteryCallDeadline = 0;
     g_LotteryEqualRefundInProgress = false;
     ClearAllClientLotteryCaches();
     ResetLotteryDrawState();

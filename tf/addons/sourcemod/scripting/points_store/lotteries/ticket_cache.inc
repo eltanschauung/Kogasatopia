@@ -180,6 +180,13 @@ bool IsLotteryReadyForClient(int client, bool needTicketLoaded = true)
         return false;
     }
 
+    if (!g_LotteryDrawInProgress && g_LotteryCallTimer == null
+        && (g_CurrentLotteryEqual || g_CurrentLotterySuper)
+        && g_LotteryCallDeadline < GetTime())
+    {
+        ResetLotteryCallState();
+    }
+
     if (needTicketLoaded && g_LotteryEqualRefundInProgress)
     {
         CPrintToChat(client, "%s[Lotto]{default} Equal Lottery tickets are being updated. Try again in a moment.", colorTag);
