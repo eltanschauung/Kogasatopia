@@ -251,10 +251,10 @@ void SetActiveLottery(
     g_LotteryCallDeadline = callDeadline;
     g_LotteryReady = true;
 
-    // Legacy/stale special modes have no valid final-minute call to enforce.
-    // Discard them before refunding or restricting anybody's ticket.
+    // Special modes require a final-minute call; ordinary calls can also be
+    // five-minute empty retries. Discard stale special modes before refunds.
     if ((g_CurrentLotteryEqual || g_CurrentLotterySuper || callDeadline > 0)
-        && !IsLotteryCallWindowCurrent(callDeadline, GetTime()))
+        && !IsLotteryCallScheduleCurrent(callDeadline, GetTime(), g_CurrentLotteryEqual || g_CurrentLotterySuper))
     {
         ResetLotteryCallState();
     }
@@ -280,6 +280,18 @@ bool IsLotteryCallWindowCurrent(int deadline, int now)
     return deadline > 0 && deadline >= now && deadline - now <= LOTTO_CALL_WARNING_SECONDS;
 }
 
+bool IsLotteryCallScheduleCurrent(int deadline, int now, bool specialLottery)
+{
+    if (specialLottery)
+    {
+        return IsLotteryCallWindowCurrent(deadline, now);
+    }
+
+    // Resume overdue ordinary retries after a map change/reload, rather than
+    // silently losing the draw while the server was unavailable.
+    return deadline > 0 && deadline - now <= LOTTO_EMPTY_RETRY_SECONDS;
+}
+
 void PersistLotteryCallState()
 {
     if (!g_DatabaseReady || g_Database == null || g_CurrentLotteryId <= 0) return;
@@ -291,13 +303,13 @@ void PersistLotteryCallState()
     g_Database.Query(SQL_OnIgnoredResult, query);
 }
 
-void ResetLotteryCallState()
+void ResetLotteryCallState(int nextDeadline = 0)
 {
     CancelPendingLotteryCall();
     g_CurrentLotteryEqual = false;
     g_CurrentLotterySuper = false;
     g_CurrentLotteryEqualTicketValue = 0;
-    g_LotteryCallDeadline = 0;
+    g_LotteryCallDeadline = nextDeadline;
     PersistLotteryCallState();
 }
 
@@ -306,7 +318,7 @@ void ResumePendingLotteryCall()
     if (!IsLotteryEnabled() || !g_LotteryReady || g_CurrentLotteryId <= 0 || g_LotteryCallTimer != null
         || g_LotteryDrawInProgress || g_LotteryCallDeadline <= 0) return;
     int remaining = g_LotteryCallDeadline - GetTime();
-    if (!IsLotteryCallWindowCurrent(g_LotteryCallDeadline, GetTime()))
+    if (!IsLotteryCallScheduleCurrent(g_LotteryCallDeadline, GetTime(), g_CurrentLotteryEqual || g_CurrentLotterySuper))
     {
         ResetLotteryCallState();
         return;

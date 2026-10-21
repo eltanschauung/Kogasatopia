@@ -15,13 +15,20 @@ public Action Command_DoLottery(int client, int args)
 
     if (g_LotteryCallTimer != null)
     {
-        ReplyToCommand(client, "[Lotto] A lottery draw is already scheduled.");
+        // The cron caller must not announce or replace a silent empty retry.
+        if (client > 0)
+        {
+            ReplyToCommand(client, "[Lotto] A lottery draw is already scheduled.");
+        }
         return Plugin_Handled;
     }
 
     if (g_LotteryDrawInProgress)
     {
-        ReplyToCommand(client, "[Lotto] A lottery draw is already in progress.");
+        if (client > 0)
+        {
+            ReplyToCommand(client, "[Lotto] A lottery draw is already in progress.");
+        }
         return Plugin_Handled;
     }
 
@@ -203,8 +210,10 @@ public void SQL_OnLotteryDrawStatsLoaded(Database db, DBResultSet results, const
     if (ticketCount <= 0 || prizePool <= 0)
     {
         g_LotteryDrawInProgress = false;
-        ResetLotteryCallState();
-        ReplyToLotteryRequester(requesterUserId, "[Lotto] There are no tickets in the current lottery.");
+        // Keep this lottery open without another call, announcement or reroll.
+        // Special restrictions belong only to the original final-minute call.
+        ResetLotteryCallState(GetTime() + LOTTO_EMPTY_RETRY_SECONDS);
+        ResumePendingLotteryCall();
         return;
     }
 

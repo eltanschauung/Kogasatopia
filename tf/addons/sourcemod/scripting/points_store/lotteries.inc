@@ -21,6 +21,7 @@
 #define LOTTO_TICKET_WRITE_TIMEOUT 15.0
 #define LOTTO_TICKET_MUTATION_COOLDOWN 2.0
 #define LOTTO_CALL_WARNING_SECONDS 60
+#define LOTTO_EMPTY_RETRY_SECONDS 300
 
 ConVar g_CvarLotteryDisabled = null;
 ConVar g_CvarLotteryMaxTicketValue = null;
