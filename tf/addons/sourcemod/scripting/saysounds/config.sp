@@ -507,17 +507,17 @@ static void PrecacheReplacementSounds(
         groups.GetString(i, groupName, sizeof(groupName));
         FormatEx(downloadPath, sizeof(downloadPath), "sound/%s", soundPath);
 
-        if (!FileExists(downloadPath, true))
-        {
-            LogError("[SaySounds] %s replacement not found: %s", replacementType, downloadPath);
-            continue;
-        }
-
+        // Clients may download the sample exclusively from FastDL. The server
+        // only needs its precache/download-table entries, not a local audio copy.
         AddFileToDownloadsTable(downloadPath);
         if (PrecacheSound(soundPath, true))
         {
             readyReplacements.PushString(soundPath);
             readyGroups.PushString(groupName);
+        }
+        else
+        {
+            LogError("[SaySounds] %s replacement failed to precache: %s", replacementType, soundPath);
         }
     }
 }
