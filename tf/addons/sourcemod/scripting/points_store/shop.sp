@@ -2,6 +2,12 @@
 StringMap g_StorePendingPurchaseReceipts[MAXPLAYERS + 1];
 bool g_StorePurchaseAttempt[MAXPLAYERS + 1];
 
+bool Store_HasPendingPurchaseReceipt(int client, const char[] itemKey)
+{
+    return client > 0 && client <= MaxClients && g_StorePendingPurchaseReceipts[client] != null
+        && g_StorePendingPurchaseReceipts[client].ContainsKey(itemKey);
+}
+
 void Store_ClearPendingPurchaseReceipts(int client)
 {
     delete g_StorePendingPurchaseReceipts[client];
@@ -348,6 +354,8 @@ public void SQL_OnPurchaseInserted(Database db, DBResultSet results, const char[
             Oblivion_ChatAllEx(client, "%s[!shop]{default} %s bought {gold}%s{default} for %d %s%s{default}",
                 colorTag, displayName, itemName, price, colorTag, currencyShort);
             PlayPurchaseSound(price);
+            client = GetClientFromSerial(serial);
+            if (Client_IsHumanInGame(client)) WelfareRobot_OnPurchased(client, itemKey);
         }
     }
 }

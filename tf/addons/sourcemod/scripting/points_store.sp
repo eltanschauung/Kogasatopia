@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <clientprefs>
 #include <sdkhooks>
 #include <tf2>
 #include <tf2_stocks>
@@ -132,7 +133,7 @@ public Plugin myinfo =
     name = "points_store",
     author = "Kogasa, Hombre",
     description = "Currency purchase receipts, shop UI, and ownership API.",
-    version = "1.1.4",
+    version = "1.1.5",
     url = "https://kogasa.tf"
 };
 
@@ -190,6 +191,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 #include "points_store/lottery_leaderboard.sp"
 #include "points_store/balance_commands.sp"
 #include "points_store/transfers_and_welfare.sp"
+#include "points_store/welfare_robot.sp"
 #include "points_store/stimulus.sp"
 #include "points_store/shop.sp"
 #include "points_store/native_api.sp"

@@ -1,7 +1,22 @@
 bool g_WelfareVolunteerResetUsed = false;
+DataPack g_WelfareCollectionRequest[MAXPLAYERS + 1];
+
+enum WelfareAvailability
+{
+    Welfare_Ready,
+    Welfare_Disabled,
+    Welfare_MinPlayers,
+    Welfare_BalanceLoading,
+    Welfare_AlreadyCollected,
+    Welfare_PoolLoading,
+    Welfare_PoolEmpty,
+    Welfare_StateLoading,
+    Welfare_RequestPending
+}
 
 void Welfare_OnPluginStart()
 {
+    WelfareRobot_OnPluginStart();
     HookEvent("teamplay_round_win", Event_WelfareRoundWin, EventHookMode_PostNoCopy);
 }
 
@@ -211,70 +226,76 @@ public Action Command_Welfare(int client, int args)
         return Plugin_Handled;
     }
 
-    char prefix[96];
-    char currencyLong[BP_CURRENCY_LONG_MAX];
+    WelfareAvailability availability = Welfare_GetAvailability(client);
+    if (availability == Welfare_Ready) Welfare_BeginCollection(client, false);
+    else if (!WelfareRobot_TryToggle(client)) Welfare_PrintUnavailable(client, availability);
+    return Plugin_Handled;
+}
+
+WelfareAvailability Welfare_GetAvailability(int client)
+{
+    if (!IsWelfareEnabled()) return Welfare_Disabled;
+    int minPlayers = GetWelfareMinPlayers();
+    if (minPlayers > 0 && GetWelfareHumanPlayerCount() < minPlayers) return Welfare_MinPlayers;
+    if (!g_DatabaseReady || g_Database == null || !g_PerMapAwardsReady) return Welfare_StateLoading;
+    if (!AreBonusPointsReady(client)) return Welfare_BalanceLoading;
+    if (g_WelfareCollectionRequest[client] != null) return Welfare_RequestPending;
+    if (GetPerMapAwardCount(client, "welfare") >= 1) return Welfare_AlreadyCollected;
+    if (!g_EconomyStateLoaded) return Welfare_PoolLoading;
+    if (g_WelfarePoolBalance <= 0) return Welfare_PoolEmpty;
+    return Welfare_Ready;
+}
+
+void Welfare_PrintUnavailable(int client, WelfareAvailability availability)
+{
+    char prefix[96], currencyLong[BP_CURRENCY_LONG_MAX];
     GetCurrencyPrefix(prefix, sizeof(prefix));
     GetCurrencyLongLabel(currencyLong, sizeof(currencyLong));
-
-    if (!IsWelfareEnabled())
+    switch (availability)
     {
-        CPrintToChat(client, "%s Welfare is currently disabled", prefix);
-        return Plugin_Handled;
+        case Welfare_Disabled: CPrintToChat(client, "%s Welfare is currently disabled", prefix);
+        case Welfare_MinPlayers: CPrintToChat(client, "%s Minimum playercount for welfare collection is {gold}%d", prefix, GetWelfareMinPlayers());
+        case Welfare_BalanceLoading:
+        {
+            LoadClientBonusPoints(client);
+            CPrintToChat(client, "%s Your %s are loading. Try again in a moment.", prefix, currencyLong);
+        }
+        case Welfare_AlreadyCollected: CPrintToChat(client, "%s You already collected {gold}!welfare{default} this map.", prefix);
+        case Welfare_PoolLoading:
+        {
+            LoadEconomyState();
+            CPrintToChat(client, "%s Welfare pool is loading. Try again in a moment.", prefix);
+        }
+        case Welfare_PoolEmpty: CPrintToChat(client, "%s Welfare pool is empty right now.", prefix);
+        case Welfare_StateLoading: CPrintToChat(client, "%s Welfare is loading. Try again in a moment.", prefix);
+        case Welfare_RequestPending: CPrintToChat(client, "%s Your welfare collection is already processing.", prefix);
     }
+}
 
-    int minPlayers = GetWelfareMinPlayers();
-    if (minPlayers > 0 && GetWelfareHumanPlayerCount() < minPlayers)
-    {
-        CPrintToChat(client, "%s Minimum playercount for welfare collection is {gold}%d", prefix, minPlayers);
-        return Plugin_Handled;
-    }
-
-    if (!AreBonusPointsReady(client))
-    {
-        LoadClientBonusPoints(client);
-        CPrintToChat(client, "%s Your %s are loading. Try again in a moment.", prefix, currencyLong);
-        return Plugin_Handled;
-    }
-
-    if (GetPerMapAwardCount(client, "welfare") >= 1)
-    {
-        CPrintToChat(client, "%s You already collected {gold}!welfare{default} this map.", prefix);
-        return Plugin_Handled;
-    }
-
-    if (!g_EconomyStateLoaded)
-    {
-        LoadEconomyState();
-        CPrintToChat(client, "%s Welfare pool is loading. Try again in a moment.", prefix);
-        return Plugin_Handled;
-    }
-
-    if (g_WelfarePoolBalance <= 0)
-    {
-        CPrintToChat(client, "%s Welfare pool is empty right now.", prefix);
-        return Plugin_Handled;
-    }
-
+void Welfare_BeginCollection(int client, bool automatic)
+{
     int amount = GetRandomInt(BP_WELFARE_MIN, BP_WELFARE_MAX);
     if (amount > g_WelfarePoolBalance)
     {
         amount = g_WelfarePoolBalance;
     }
 
-    DebitWelfarePoolForClient(client, amount);
-    return Plugin_Handled;
+    DebitWelfarePoolForClient(client, amount, automatic);
 }
 
-void DebitWelfarePoolForClient(int client, int amount)
+void DebitWelfarePoolForClient(int client, int amount, bool automatic = false)
 {
-    if (amount <= 0 || !g_DatabaseReady || g_Database == null)
+    if (amount <= 0 || !g_DatabaseReady || g_Database == null || g_WelfareCollectionRequest[client] != null)
     {
         return;
     }
 
     DataPack pack = new DataPack();
-    pack.WriteCell(GetClientUserId(client));
+    pack.WriteCell(GetClientSerial(client));
     pack.WriteCell(amount);
+    pack.WriteCell(automatic);
+    pack.WriteCell(g_PerMapStateGeneration);
+    g_WelfareCollectionRequest[client] = pack;
 
     char query[384];
     Format(query, sizeof(query),
@@ -291,11 +312,14 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
 {
     DataPack pack = view_as<DataPack>(data);
     pack.Reset();
-    int userId = pack.ReadCell();
+    int client = GetClientFromSerial(pack.ReadCell());
     int amount = pack.ReadCell();
+    bool automatic = view_as<bool>(pack.ReadCell());
+    int generation = pack.ReadCell();
+    bool ownsRequest = client > 0 && g_WelfareCollectionRequest[client] == pack;
+    if (ownsRequest) g_WelfareCollectionRequest[client] = null;
     delete pack;
 
-    int client = GetClientOfUserId(userId);
     char prefix[96];
     char currencyLong[BP_CURRENCY_LONG_MAX];
     char colorTag[BP_CURRENCY_COLOR_MAX + 2];
@@ -306,7 +330,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
     if (error[0] != '\0')
     {
         LogError("[points_store] Welfare pool debit failed: %s", error);
-        if (Client_IsHumanInGame(client))
+        if (!automatic && ownsRequest && Client_IsHumanInGame(client))
         {
             CPrintToChat(client, "%s Could not collect welfare right now.", prefix);
         }
@@ -316,7 +340,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
     if (results == null || results.AffectedRows <= 0)
     {
         LoadEconomyState();
-        if (Client_IsHumanInGame(client))
+        if (!automatic && ownsRequest && Client_IsHumanInGame(client))
         {
             CPrintToChat(client, "%s Welfare pool is empty right now.", prefix);
         }
@@ -329,20 +353,29 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
         g_WelfarePoolBalance = 0;
     }
 
-    if (!Client_IsHumanInGame(client) || !ApplyBonusPoints(client, amount, false, false, 1.0, "welfare", 0, 0.0, 1))
+    if (!ownsRequest || generation != g_PerMapStateGeneration || !Client_IsHumanInGame(client)
+        || (automatic && !WelfareRobot_CanCollect(client))
+        || !ApplyBonusPoints(client, amount, false, false, 1.0, "welfare", 0, 0.0, 1))
     {
         QueueEconomyDelta(BP_ECONOMY_WELFARE_POOL_KEY, amount);
         g_WelfarePoolBalance += amount;
         LogEconomyEvent("welfare_pool_refund", client, amount, "welfare", 0, g_WelfarePoolBalance, g_CumulativeSpentBalance);
-        if (Client_IsHumanInGame(client))
+        if (!automatic && ownsRequest && Client_IsHumanInGame(client))
         {
             CPrintToChat(client, "%s Could not collect welfare right now.", prefix);
         }
         return;
     }
 
-    PlayWelfareSound(amount);
     LogEconomyEvent("welfare_pool_debit", client, amount, "welfare", 0, g_WelfarePoolBalance, g_CumulativeSpentBalance);
+
+    if (automatic)
+    {
+        WelfareRobot_AnnounceCollection(client, amount);
+        return;
+    }
+
+    PlayWelfareSound(amount);
 
     char displayName[256];
     BuildPurchaseDisplayName(client, displayName, sizeof(displayName));

@@ -155,6 +155,7 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+    WelfareRobot_OnMapEnd();
     CurrencyLeaderboard_OnMapEnd();
     Lotteries_OnMapEnd();
 }
@@ -164,9 +165,20 @@ public void OnClientAuthorized(int client, const char[] auth)
     Bounties_OnClientAuthorized(client);
     g_NextSendAllowedAt[client] = 0.0;
     ClearClientStoreCache(client);
+    if (AreClientCookiesCached(client)) WelfareRobot_LoadPreference(client);
     LoadClientPurchases(client);
     LoadClientBonusPoints(client);
     Lotteries_OnClientAuthorized(client);
+}
+
+public void OnClientConnected(int client)
+{
+    WelfareRobot_ResetClient(client);
+}
+
+public void OnClientCookiesCached(int client)
+{
+    WelfareRobot_LoadPreference(client);
 }
 
 public void OnClientPutInServer(int client)
@@ -176,6 +188,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    WelfareRobot_ResetClient(client);
     GameplayRewards_OnClientDisconnect(client);
     Bounties_OnClientDisconnect(client);
     g_NextSendAllowedAt[client] = 0.0;
