@@ -134,6 +134,9 @@ void SpecQueue_Init() {
     RegConsoleCmd("sm_remove", SpecQueue_Cmd_Spectate, "Move yourself to spectator.");
     RegConsoleCmd("sm_afk", SpecQueue_Cmd_Spectate, "Move yourself to spectator.");
     RegConsoleCmd("sm_spec", SpecQueue_Cmd_Spectate, "Move yourself to spectator.");
+    RegAdminCmd("sm_stopqueue", SpecQueue_Cmd_StopQueue, ADMFLAG_GENERIC, "Suspend the spectator queue until population reaches the resume limit.");
+    RegAdminCmd("sm_noqueue", SpecQueue_Cmd_StopQueue, ADMFLAG_GENERIC, "Suspend the spectator queue until population reaches the resume limit.");
+    RegAdminCmd("sm_noq", SpecQueue_Cmd_StopQueue, ADMFLAG_GENERIC, "Suspend the spectator queue until population reaches the resume limit.");
 
     AddCommandListener(SpecQueue_OnClientJoinTeam, "jointeam");
 
@@ -846,12 +849,30 @@ void SpecQueue_UpdateQueueSuspension() {
         return;
     }
 
-    g_bSpecQueueSuspended = shouldSuspend;
+    SpecQueue_SetQueueSuspended(shouldSuspend, "population_high");
+}
+
+public Action SpecQueue_Cmd_StopQueue(int client, int args) {
+    if (!g_bSpecQueueConfigsExecuted || !SpecQueue_IsPluginEnabled() || SpecQueue_GetPlayingLimit() <= 0) {
+        CReplyToCommand(client, "{gold}[SpecQueue]{cyan} The spectator queue is not enabled.");
+        return Plugin_Handled;
+    }
+
+    SpecQueue_SetQueueSuspended(true, "admin_command");
+    CReplyToCommand(client, "{gold}[SpecQueue]{cyan} Spectator queue suspended until the population reaches the resume limit.");
+    return Plugin_Handled;
+}
+
+void SpecQueue_SetQueueSuspended(bool suspended, const char[] reason) {
+    if (g_bSpecQueueSuspended == suspended) {
+        return;
+    }
+    g_bSpecQueueSuspended = suspended;
     if (g_bSpecQueueSuspended) {
         SpecQueue_CancelPlayerChangeChecks();
         g_SpecQueue.Clear();
         SpecQueue_ClearAllPendingJoins();
-        SpecQueue_LogPopulationSnapshot("queue_suspended", 0, -1, -1, 0, "population_high");
+        SpecQueue_LogPopulationSnapshot("queue_suspended", 0, -1, -1, 0, reason);
     } else {
         SpecQueue_ResetAutoQueueActivityBaselines();
         SpecQueue_LogPopulationSnapshot("queue_resumed", 0, -1, -1, 0, "population_at_limit");
