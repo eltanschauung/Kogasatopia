@@ -271,6 +271,12 @@ public Action Command_Gift(int client, int args)
         return Plugin_Handled;
     }
 
+    if (amount < 10)
+    {
+        CPrintToChat(client, "%s The minimum gift is {cyan}10 Gems{default}.", MAIL_PREFIX);
+        return Plugin_Handled;
+    }
+
     if (!PointsStore_AreBonusPointsLoaded(client))
     {
         CPrintToChat(client, "%s Your currency balance is still loading.", MAIL_PREFIX);
