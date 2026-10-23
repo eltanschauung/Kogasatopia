@@ -22,8 +22,12 @@ polling or offline collection. Normal population, pool,
 balance-readiness and once-per-map requirements remain in force, including the
 existing volunteer reset. Unavailable automatic attempts are silent.
 
-For owners, `!welfare` (and its existing aliases) collects normally when possible.
-If collection is unavailable, it toggles the robot instead. Automatic success
+`!welfare` (and its existing aliases) only collects welfare or prints the normal
+unavailable reason. It never toggles the robot. Owners explicitly toggle their
+robot using `!welfarebot`, `!welfarerobot`, or `!bot` (console commands
+`sm_welfarebot`, `sm_welfarerobot`, `sm_bot`), regardless of welfare availability.
+The toggle command does not buy the item or perform a manual collection.
+Ownership and cookies must finish loading before toggling. Automatic success
 has only the private robot message and client-targeted, non-forced `xp_gain`
 Saysounds playback; manual welfare announcements and sounds stay unchanged.
 

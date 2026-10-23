@@ -11,6 +11,9 @@ Handle g_WelfareRobotPurchaseTimer[MAXPLAYERS + 1];
 void WelfareRobot_OnPluginStart()
 {
     g_WelfareRobotCookie = new Cookie("points_store_welfare_robot", "Automatic welfare collection enabled", CookieAccess_Private);
+    RegConsoleCmd("sm_welfarebot", Command_WelfareRobot, "Toggle your Automatic Welfare Robot.");
+    RegConsoleCmd("sm_welfarerobot", Command_WelfareRobot, "Toggle your Automatic Welfare Robot.");
+    RegConsoleCmd("sm_bot", Command_WelfareRobot, "Toggle your Automatic Welfare Robot.");
     HookEvent("teamplay_round_start", Event_WelfareRobotRoundStart, EventHookMode_PostNoCopy);
     HookEvent("teamplay_round_win", Event_WelfareRobotRoundEnd, EventHookMode_PostNoCopy);
     HookEvent("player_team", Event_WelfareRobotTeamChanged, EventHookMode_Post);
@@ -66,7 +69,7 @@ void WelfareRobot_OnClientPutInServer(int client)
     WelfareRobot_ResumePendingCollections();
 }
 
-void WelfareRobot_LoadPreference(int client)
+void WelfareRobot_LoadPreference(int client, bool resumeCollection = true)
 {
     if (!IsClientAuthorizedHuman(client) || !AreClientCookiesCached(client)) return;
     if (g_WelfareRobotPreferenceDirty[client])
@@ -82,7 +85,7 @@ void WelfareRobot_LoadPreference(int client)
         g_WelfareRobotEnabled[client] = !StrEqual(value, "0");
     }
     g_WelfareRobotPreferenceLoaded[client] = true;
-    WelfareRobot_ResumeCollection(client);
+    if (resumeCollection) WelfareRobot_ResumeCollection(client);
 }
 
 bool WelfareRobot_IsOwned(int client)
@@ -120,20 +123,35 @@ void WelfareRobot_SetEnabled(int client, bool enabled)
     if (enabled)
         CPrintToChat(client, "%s[Gems]{default} You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start.", color);
     else
-        CPrintToChat(client, "%s[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfare{default} to toggle your robot.", color);
+        CPrintToChat(client, "%s[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfarebot{default} to toggle your robot.", color);
 }
 
-bool WelfareRobot_TryToggle(int client)
+public Action Command_WelfareRobot(int client, int args)
 {
-    if (!WelfareRobot_IsOwned(client)) return false;
-    if (!g_WelfareRobotPreferenceLoaded[client]) WelfareRobot_LoadPreference(client);
+    if (!Client_IsHumanInGame(client)) return Plugin_Handled;
+    char prefix[96];
+    GetCurrencyPrefix(prefix, sizeof(prefix));
+    if (!g_ClientPurchasesLoaded[client]
+        || Store_HasPendingPurchaseReceipt(client, BP_WELFARE_ROBOT_ITEM))
+    {
+        LoadClientPurchases(client);
+        CPrintToChat(client, "%s Your Welfare Robot ownership is still loading. Try again shortly.", prefix);
+        return Plugin_Handled;
+    }
+    if (!WelfareRobot_IsOwned(client))
+    {
+        CPrintToChat(client, "%s You do not own a {gold}Welfare Robot{default}. Purchase one in {gold}!shop{default}.", prefix);
+        return Plugin_Handled;
+    }
+    // Reading cookies for a toggle must not trigger a pending collection first.
+    if (!g_WelfareRobotPreferenceLoaded[client]) WelfareRobot_LoadPreference(client, false);
     if (!g_WelfareRobotPreferenceLoaded[client])
     {
-        CPrintToChat(client, "{gold}[Gems]{default} Your Welfare Robot preference is still loading. Try again shortly.");
-        return true;
+        CPrintToChat(client, "%s Your Welfare Robot preference is still loading. Try again shortly.", prefix);
+        return Plugin_Handled;
     }
     WelfareRobot_SetEnabled(client, !g_WelfareRobotEnabled[client]);
-    return true;
+    return Plugin_Handled;
 }
 
 void WelfareRobot_OnPurchased(int client, const char[] itemKey)

@@ -16,6 +16,7 @@ int checks, failures, replies, publicReplies, xpSounds, welfareSounds, loads;
 int credits, refunds, awarded, collected, population = 3, minimum = 3;
 int session = 1001, chosenAmount = 7, affected = 1;
 int testTeam = 2, hookedEvents;
+int registeredCommands, registeredCommandMask;
 bool human = true, owned = true, cookiesCached = true, optedIn = true;
 bool welfareEnabled = true, balanceReady = true;
 char savedCookie[8], lastReply[512], lastQuery[512];
@@ -98,6 +99,11 @@ stock void LoadClientBonusPoints(int client)
     #pragma unused client
     loads++;
 }
+stock void LoadClientPurchases(int client)
+{
+    if (client != 1) failures++;
+    loads++;
+}
 stock void LoadEconomyState() { loads++; }
 stock int TestSerial(int client) { return client == 1 ? session : -1; }
 stock int TestFromSerial(int serial) { return human && serial == session ? 1 : 0; }
@@ -130,6 +136,16 @@ stock void TestHook(const char[] name, EventHook callback, EventHookMode mode)
     }
     else if ((!StrEqual(name, "teamplay_round_start") && !StrEqual(name, "teamplay_round_win"))
         || mode != EventHookMode_PostNoCopy) failures++;
+}
+stock void TestRegisterCommand(const char[] name, ConCmd callback, const char[] description)
+{
+    #pragma unused callback
+    #pragma unused description
+    registeredCommands++;
+    if (StrEqual(name, "sm_welfarebot")) registeredCommandMask |= 1;
+    else if (StrEqual(name, "sm_welfarerobot")) registeredCommandMask |= 2;
+    else if (StrEqual(name, "sm_bot")) registeredCommandMask |= 4;
+    else failures++;
 }
 stock bool SaySounds_TryPlayCommand(int client, const char[] command, bool force)
 {
@@ -196,6 +212,7 @@ stock void Oblivion_ChatAllEx(int client, const char[] format, any ...)
 #define GetRandomInt TestRandomInt
 #define CreateTimer TestTimer
 #define HookEvent TestHook
+#define RegConsoleCmd TestRegisterCommand
 #define LogError TestLogError
 #include "welfare_under_test.inc"
 #include "welfare_robot.sp"
@@ -246,10 +263,12 @@ public void OnPluginStart()
     WelfareRobot_OnPluginStart();
     g_ClientPurchasesLoaded[1] = true;
     Check(hookedEvents == 3, "round start, round end and team changes hooked without polling");
+    Check(registeredCommands == 3 && registeredCommandMask == 7, "all three explicit robot command aliases registered");
     Check(WelfareRobot_CanCollect(1), "owned robot defaults enabled");
     Check(!WelfareRobot_CanCollect(2), "no fake or disconnected targets");
     owned = false;
-    Check(!WelfareRobot_TryToggle(1), "non-owner cannot toggle");
+    Command_WelfareRobot(1, 0);
+    Check(StrContains(lastReply, "You do not own") != -1 && g_WelfareRobotEnabled[1], "non-owner cannot toggle");
     WelfareRobot_OnPurchased(1, "automatic_welfare_robot");
     Check(g_WelfareRobotPurchaseTimer[1] == null, "no timer without ownership");
     owned = true;
@@ -281,10 +300,15 @@ public void OnPluginStart()
     Event_WelfareRobotRoundStart(null, "", false);
     Check(queuedSql == null && replies == before, "claimed map silently skipped");
     Command_Welfare(1, 0);
-    Check(!g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "0"), "unavailable welfare toggles off");
-    Check(StrEqual(lastReply, "{cyan}[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfare{default} to toggle your robot."), "disabled message resets currency color");
+    Check(g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "1"), "unavailable welfare does not toggle robot");
+    Check(StrContains(lastReply, "already collected") != -1, "unavailable welfare prints normal reason");
+    Command_WelfareRobot(1, 0);
+    Check(!g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "0"), "robot command explicitly toggles off");
+    Check(StrEqual(lastReply, "{cyan}[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfarebot{default} to toggle your robot."), "disabled message points to new command and resets currency color");
     Command_Welfare(1, 0);
-    Check(g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "1"), "unavailable welfare toggles on");
+    Check(!g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "0"), "unavailable welfare does not enable disabled robot");
+    Command_WelfareRobot(1, 0);
+    Check(g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "1"), "robot command explicitly toggles on");
     Check(StrEqual(lastReply, "{cyan}[Gems]{default} You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start."), "enabled message resets currency color");
     Fresh();
     WelfareRobot_SetEnabled(1, false);
@@ -598,6 +622,41 @@ public void OnPluginStart()
     WelfareRobot_SetEnabled(1, false);
     Event_WelfareRobotRoundStart(null, "", false);
     Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "known disabled robot does not retain collection work");
+    Fresh();
+    Command_WelfareRobot(1, 0);
+    Check(!g_WelfareRobotEnabled[1] && queuedSql == null && collected == 0,
+        "toggle command toggles instead of collecting even when welfare is available");
+    Command_WelfareRobot(1, 0);
+    Check(g_WelfareRobotEnabled[1] && queuedSql == null && collected == 0,
+        "explicit enable does not perform an immediate manual collection");
+    Fresh();
+    g_ClientPurchasesLoaded[1] = false;
+    Command_WelfareRobot(1, 0);
+    Check(g_WelfareRobotEnabled[1] && StrContains(lastReply, "ownership is still loading") != -1,
+        "unloaded ownership cannot toggle");
+    Fresh();
+    cookiesCached = false;
+    g_WelfareRobotPreferenceLoaded[1] = false;
+    Command_WelfareRobot(1, 0);
+    Check(g_WelfareRobotEnabled[1] && StrContains(lastReply, "preference is still loading") != -1,
+        "unloaded cookies cannot toggle");
+    Fresh();
+    g_WelfareRobotCollectionPending[1] = true;
+    g_WelfareRobotPreferenceLoaded[1] = false;
+    strcopy(savedCookie, sizeof(savedCookie), "1");
+    Command_WelfareRobot(1, 0);
+    Check(!g_WelfareRobotEnabled[1] && queuedSql == null && !g_WelfareRobotCollectionPending[1],
+        "loading cookies to disable never starts pending collection first");
+    Fresh();
+    before = replies;
+    Command_WelfareRobot(0, 0);
+    Command_WelfareRobot(2, 0);
+    Check(replies == before && g_WelfareRobotEnabled[1], "console and invalid clients cannot toggle");
+    Fresh();
+    population = 2;
+    Command_Welfare(1, 0);
+    Check(g_WelfareRobotEnabled[1] && StrContains(lastReply, "Minimum playercount") != -1,
+        "low-population welfare prints restriction without toggling");
     WelfareRobot_ResetClient(1);
     PrintToServer("[WelfareRobotProbe] %d checks, %d failures", checks, failures);
 }

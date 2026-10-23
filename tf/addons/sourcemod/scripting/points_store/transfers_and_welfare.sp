@@ -228,7 +228,7 @@ public Action Command_Welfare(int client, int args)
 
     WelfareAvailability availability = Welfare_GetAvailability(client);
     if (availability == Welfare_Ready) Welfare_BeginCollection(client, false);
-    else if (!WelfareRobot_TryToggle(client)) Welfare_PrintUnavailable(client, availability);
+    else Welfare_PrintUnavailable(client, availability);
     return Plugin_Handled;
 }
 
