@@ -242,7 +242,9 @@ void ChangeTeam(int team, bool disconnect = false, int userId = -1)
 public void OnPluginStart()
 {
     Fresh();
+    g_ClientPurchasesLoaded[1] = false;
     WelfareRobot_OnPluginStart();
+    g_ClientPurchasesLoaded[1] = true;
     Check(hookedEvents == 3, "round start, round end and team changes hooked without polling");
     Check(WelfareRobot_CanCollect(1), "owned robot defaults enabled");
     Check(!WelfareRobot_CanCollect(2), "no fake or disconnected targets");
@@ -402,17 +404,17 @@ public void OnPluginStart()
     testTeam = 1;
     before = replies;
     Event_WelfareRobotRoundStart(null, "", false);
-    Check(g_WelfareRobotWaitingForTeam[1] && queuedSql == null && replies == before,
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == null && replies == before,
         "spectator defers automatic round-start collection silently");
     Event_WelfareRobotRoundStart(null, "", false);
     ChangeTeam(0);
     ChangeTeam(1);
     ChangeTeam(2, true);
     ChangeTeam(2, false, session + 1);
-    Check(g_WelfareRobotWaitingForTeam[1] && queuedSql == null,
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == null,
         "unassigned, spectator, disconnect and stale user events cannot collect");
     ChangeTeam(2);
-    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql != null,
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql != null,
         "joining RED consumes deferred attempt and starts collection");
     DataPack teamRequest = queuedSql;
     ChangeTeam(3);
@@ -425,14 +427,14 @@ public void OnPluginStart()
     testTeam = 0;
     Event_WelfareRobotRoundStart(null, "", false);
     ChangeTeam(3);
-    Check(queuedSql != null && !g_WelfareRobotWaitingForTeam[1], "joining BLU also releases deferred collection");
+    Check(queuedSql != null && !g_WelfareRobotCollectionPending[1], "joining BLU also releases deferred collection");
     CompleteSql();
 
     Fresh();
     testTeam = 1;
     Event_WelfareRobotRoundStart(null, "", false);
     Event_WelfareRobotRoundEnd(null, "", false);
-    Check(queuedSql != null && !g_WelfareRobotWaitingForTeam[1] && testTeam == 1,
+    Check(queuedSql != null && !g_WelfareRobotCollectionPending[1] && testTeam == 1,
         "round end collects for connected owner who stayed spectator");
     teamRequest = queuedSql;
     Event_WelfareRobotRoundEnd(null, "", false);
@@ -446,17 +448,17 @@ public void OnPluginStart()
     Event_WelfareRobotRoundStart(null, "", false);
     WelfareRobot_SetEnabled(1, false);
     Event_WelfareRobotRoundEnd(null, "", false);
-    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql == null, "disabling cancels deferred attempt");
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "disabling cancels deferred attempt");
     Fresh();
     testTeam = 1;
     Event_WelfareRobotRoundStart(null, "", false);
     WelfareRobot_OnMapEnd();
     Event_WelfareRobotRoundEnd(null, "", false);
-    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql == null, "map end discards deferred attempt");
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "map end discards deferred attempt");
     Event_WelfareRobotRoundStart(null, "", false);
     WelfareRobot_ResetClient(1);
     ChangeTeam(2);
-    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql == null, "disconnect reset cannot pass deferred attempt to reused slot");
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "disconnect reset cannot pass deferred attempt to reused slot");
 
     Fresh();
     testTeam = 1;
@@ -464,7 +466,7 @@ public void OnPluginStart()
     purchaseTimer = g_WelfareRobotPurchaseTimer[1];
     Timer_WelfareRobotPurchase(purchaseTimer, timerSerial);
     delete purchaseTimer;
-    Check(g_WelfareRobotWaitingForTeam[1] && queuedSql == null,
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == null,
         "purchase still waits three seconds then defers spectator collection");
     ChangeTeam(3);
     Check(queuedSql != null, "purchase deferred attempt releases on team join");
@@ -485,8 +487,117 @@ public void OnPluginStart()
     population = 2;
     before = replies;
     Event_WelfareRobotRoundEnd(null, "", false);
-    Check(queuedSql == null && replies == before && !g_WelfareRobotWaitingForTeam[1],
-        "spectator fallback still respects population requirement silently");
+    Check(queuedSql == null && replies == before && g_WelfareRobotCollectionPending[1],
+        "spectator fallback respects population requirement and retains pending attempt");
+    Fresh();
+    testTeam = 1;
+    g_ClientPurchasesLoaded[1] = false;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Check(g_WelfareRobotCollectionPending[1], "map-change ownership load must not discard deferred collection");
+    g_ClientPurchasesLoaded[1] = true;
+    ChangeTeam(2);
+    Check(queuedSql != null, "team join after ownership load must still collect");
+    if (queuedSql != null) CompleteSql();
+    Fresh();
+    g_PerMapAwardsReady = false;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Check(g_WelfareRobotCollectionPending[1], "map-change per-map load must not discard collection");
+    g_PerMapAwardsReady = true;
+    WelfareRobot_ResumePendingCollections();
+    Check(queuedSql != null, "per-map ready callback resumes collection without another round start");
+    CompleteSql();
+
+    Fresh();
+    WelfareRobot_OnMapEnd();
+    human = false;
+    WelfareRobot_OnMapStart();
+    Event_WelfareRobotRoundStart(null, "", false);
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "map can start before client finishes loading");
+    human = true;
+    testTeam = 1;
+    g_ClientPurchasesLoaded[1] = false;
+    g_WelfareRobotPreferenceLoaded[1] = false;
+    WelfareRobot_OnClientPutInServer(1);
+    Check(g_WelfareRobotCollectionPending[1], "late loading client arms collection after initial round start");
+    ChangeTeam(2);
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == null, "early team join retains pending ownership load");
+    g_ClientPurchasesLoaded[1] = true;
+    WelfareRobot_ResumeCollection(1);
+    Check(queuedSql != null, "ownership completion resumes late client on RED");
+    CompleteSql();
+
+    // Cookie, receipt, balance, per-map state and pool SQL complete in any order.
+    for (int order = 0; order < 5; order++)
+    {
+        Fresh();
+        g_ClientPurchasesLoaded[1] = g_WelfareRobotPreferenceLoaded[1] = false;
+        balanceReady = g_PerMapAwardsReady = g_EconomyStateLoaded = false;
+        Event_WelfareRobotRoundStart(null, "", false);
+        for (int step = 0; step < 5; step++)
+        {
+            switch ((order + step) % 5)
+            {
+                case 0: g_ClientPurchasesLoaded[1] = true;
+                case 1: WelfareRobot_LoadPreference(1);
+                case 2: balanceReady = true;
+                case 3: g_PerMapAwardsReady = true;
+                case 4: g_EconomyStateLoaded = true;
+            }
+            WelfareRobot_ResumePendingCollections();
+            Check(step == 4 ? queuedSql != null : queuedSql == null,
+                "readiness order only starts SQL after all dependencies are ready");
+        }
+        DataPack readyRequest = queuedSql;
+        WelfareRobot_ResumePendingCollections();
+        Check(queuedSql == readyRequest && !g_WelfareRobotCollectionPending[1], "repeated readiness signals cannot start a second collection");
+        CompleteSql();
+    }
+
+    Fresh();
+    testTeam = 1;
+    g_ClientPurchasesLoaded[1] = false;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(g_WelfareRobotCollectionPending[1] && g_WelfareRobotAllowSpectator[1] && queuedSql == null,
+        "round-end fallback remains authorized while ownership loads");
+    g_ClientPurchasesLoaded[1] = true;
+    WelfareRobot_ResumeCollection(1);
+    Check(queuedSql != null && !g_WelfareRobotAllowSpectator[1], "late ownership callback collects spectator fallback exactly once");
+    CompleteSql();
+
+    Fresh();
+    testTeam = 1;
+    g_ClientPurchasesLoaded[1] = false;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Event_WelfareRobotRoundStart(null, "", false);
+    g_ClientPurchasesLoaded[1] = true;
+    WelfareRobot_ResumeCollection(1);
+    Check(g_WelfareRobotCollectionPending[1] && !g_WelfareRobotAllowSpectator[1] && queuedSql == null,
+        "new round removes previous round-end spectator permission");
+    ChangeTeam(3);
+    Check(queuedSql != null, "new round still collects once client joins BLU");
+    CompleteSql();
+
+    Fresh();
+    WelfareRobot_OnMapEnd();
+    WelfareRobot_OnMapStart();
+    g_PerMapAwardsReady = false;
+    WelfareRobot_ResumePendingCollections();
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == null, "map transition defers until award reset completes");
+    g_PerMapAwardsReady = true;
+    WelfareRobot_ResumePendingCollections();
+    Check(queuedSql != null, "map-transition reset callback wakes retained in-game client");
+    CompleteSql();
+
+    Fresh();
+    owned = false;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "known non-owner does not retain collection work");
+    Fresh();
+    WelfareRobot_SetEnabled(1, false);
+    Event_WelfareRobotRoundStart(null, "", false);
+    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "known disabled robot does not retain collection work");
     WelfareRobot_ResetClient(1);
     PrintToServer("[WelfareRobotProbe] %d checks, %d failures", checks, failures);
 }

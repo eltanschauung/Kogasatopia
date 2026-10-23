@@ -144,6 +144,7 @@ public void OnMapStart()
     Bounties_OnMapStart();
     Welfare_OnMapStart();
     RefreshPerMapAwardScope();
+    WelfareRobot_OnMapStart();
     if (g_PerMapIgnoreInitialMapStart)
     {
         g_PerMapIgnoreInitialMapStart = false;
@@ -184,6 +185,7 @@ public void OnClientCookiesCached(int client)
 public void OnClientPutInServer(int client)
 {
     GameplayRewards_OnClientPutInServer(client);
+    WelfareRobot_OnClientPutInServer(client);
 }
 
 public void OnClientDisconnect(int client)

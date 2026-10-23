@@ -4,7 +4,8 @@ Cookie g_WelfareRobotCookie;
 bool g_WelfareRobotEnabled[MAXPLAYERS + 1];
 bool g_WelfareRobotPreferenceLoaded[MAXPLAYERS + 1];
 bool g_WelfareRobotPreferenceDirty[MAXPLAYERS + 1];
-bool g_WelfareRobotWaitingForTeam[MAXPLAYERS + 1];
+bool g_WelfareRobotCollectionPending[MAXPLAYERS + 1];
+bool g_WelfareRobotAllowSpectator[MAXPLAYERS + 1];
 Handle g_WelfareRobotPurchaseTimer[MAXPLAYERS + 1];
 
 void WelfareRobot_OnPluginStart()
@@ -15,7 +16,9 @@ void WelfareRobot_OnPluginStart()
     HookEvent("player_team", Event_WelfareRobotTeamChanged, EventHookMode_Post);
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (Client_IsHumanInGame(client) && AreClientCookiesCached(client)) WelfareRobot_LoadPreference(client);
+        if (!Client_IsHumanInGame(client)) continue;
+        g_WelfareRobotCollectionPending[client] = true;
+        if (AreClientCookiesCached(client)) WelfareRobot_LoadPreference(client);
     }
 }
 
@@ -25,7 +28,8 @@ void WelfareRobot_ResetClient(int client)
     g_WelfareRobotEnabled[client] = false;
     g_WelfareRobotPreferenceLoaded[client] = false;
     g_WelfareRobotPreferenceDirty[client] = false;
-    g_WelfareRobotWaitingForTeam[client] = false;
+    g_WelfareRobotCollectionPending[client] = false;
+    g_WelfareRobotAllowSpectator[client] = false;
     // The SQL callback owns the pack; invalidate, never delete it here.
     g_WelfareCollectionRequest[client] = null;
 }
@@ -35,9 +39,31 @@ void WelfareRobot_OnMapEnd()
     for (int client = 1; client <= MaxClients; client++)
     {
         delete g_WelfareRobotPurchaseTimer[client];
-        g_WelfareRobotWaitingForTeam[client] = false;
+        g_WelfareRobotCollectionPending[client] = false;
+        g_WelfareRobotAllowSpectator[client] = false;
         g_WelfareCollectionRequest[client] = null;
     }
+}
+
+void WelfareRobot_OnMapStart()
+{
+    // Arm independently of asynchronous ownership/cookie/per-map readiness.
+    // Do not collect until the per-map reset/restore callback has completed.
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        g_WelfareRobotCollectionPending[client] = Client_IsHumanInGame(client);
+        g_WelfareRobotAllowSpectator[client] = false;
+    }
+}
+
+void WelfareRobot_OnClientPutInServer(int client)
+{
+    if (!Client_IsHumanInGame(client)) return;
+    // Clients can finish loading after the map's initial round-start event.
+    g_WelfareRobotCollectionPending[client] = true;
+    g_WelfareRobotAllowSpectator[client] = false;
+    if (AreClientCookiesCached(client)) WelfareRobot_LoadPreference(client);
+    WelfareRobot_ResumePendingCollections();
 }
 
 void WelfareRobot_LoadPreference(int client)
@@ -56,6 +82,7 @@ void WelfareRobot_LoadPreference(int client)
         g_WelfareRobotEnabled[client] = !StrEqual(value, "0");
     }
     g_WelfareRobotPreferenceLoaded[client] = true;
+    WelfareRobot_ResumeCollection(client);
 }
 
 bool WelfareRobot_IsOwned(int client)
@@ -84,7 +111,8 @@ void WelfareRobot_SetEnabled(int client, bool enabled)
     if (!enabled)
     {
         delete g_WelfareRobotPurchaseTimer[client];
-        g_WelfareRobotWaitingForTeam[client] = false;
+        g_WelfareRobotCollectionPending[client] = false;
+        g_WelfareRobotAllowSpectator[client] = false;
     }
 
     char color[BP_CURRENCY_COLOR_MAX + 2];
@@ -128,7 +156,11 @@ public Action Timer_WelfareRobotPurchase(Handle timer, any serial)
 
 public void Event_WelfareRobotRoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-    for (int client = 1; client <= MaxClients; client++) WelfareRobot_AttemptCollection(client);
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        g_WelfareRobotAllowSpectator[client] = false;
+        WelfareRobot_AttemptCollection(client);
+    }
 }
 
 public void Event_WelfareRobotTeamChanged(Event event, const char[] name, bool dontBroadcast)
@@ -136,37 +168,58 @@ public void Event_WelfareRobotTeamChanged(Event event, const char[] name, bool d
     if (event.GetBool("disconnect")) return;
     int client = GetClientOfUserId(event.GetInt("userid"));
     int team = event.GetInt("team");
-    if (Client_IsHumanInGame(client) && g_WelfareRobotWaitingForTeam[client]
-        && (team == 2 || team == 3)) WelfareRobot_AttemptCollection(client);
+    if (Client_IsHumanInGame(client) && (team == 2 || team == 3))
+        WelfareRobot_ResumeCollection(client);
 }
 
 public void Event_WelfareRobotRoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (g_WelfareRobotWaitingForTeam[client]) WelfareRobot_AttemptCollection(client, true);
+        if (g_WelfareRobotCollectionPending[client]) WelfareRobot_AttemptCollection(client, true);
     }
 }
 
 void WelfareRobot_AttemptCollection(int client, bool allowSpectator = false)
 {
     if (!Client_IsHumanInGame(client)) return;
+    g_WelfareRobotCollectionPending[client] = true;
+    if (allowSpectator) g_WelfareRobotAllowSpectator[client] = true;
+    WelfareRobot_ResumeCollection(client);
+}
+
+void WelfareRobot_ResumePendingCollections()
+{
+    for (int client = 1; client <= MaxClients; client++) WelfareRobot_ResumeCollection(client);
+}
+
+void WelfareRobot_ResumeCollection(int client)
+{
+    if (client <= 0 || client > MaxClients || !g_WelfareRobotCollectionPending[client]
+        || !Client_IsHumanInGame(client)) return;
+    // "Not loaded yet" is not the same as "does not own an enabled robot".
+    if (!g_ClientPurchasesLoaded[client] || !g_WelfareRobotPreferenceLoaded[client]
+        || Store_HasPendingPurchaseReceipt(client, BP_WELFARE_ROBOT_ITEM)) return;
     if (!WelfareRobot_CanCollect(client))
     {
-        g_WelfareRobotWaitingForTeam[client] = false;
+        g_WelfareRobotCollectionPending[client] = false;
+        g_WelfareRobotAllowSpectator[client] = false;
         return;
     }
+    if (g_WelfareRobotPurchaseTimer[client] != null) return;
     int team = GetClientTeam(client);
-    if (!allowSpectator && team != 2 && team != 3)
+    if (!g_WelfareRobotAllowSpectator[client] && team != 2 && team != 3) return;
+    WelfareAvailability availability = Welfare_GetAvailability(client);
+    if (availability == Welfare_Ready || availability == Welfare_AlreadyCollected
+        || availability == Welfare_Disabled || availability == Welfare_RequestPending)
     {
-        g_WelfareRobotWaitingForTeam[client] = true;
-        return;
+        // Consume before starting SQL. Request ownership and the per-map guard
+        // protect concurrent/manual collections. Loading/transient states stay
+        // pending until a readiness callback or lifecycle event wakes them.
+        g_WelfareRobotCollectionPending[client] = false;
+        g_WelfareRobotAllowSpectator[client] = false;
+        if (availability == Welfare_Ready) Welfare_BeginCollection(client, true);
     }
-    // Consume the deferred attempt before starting SQL. The existing welfare
-    // request token and per-map award guard still prevent duplicate payouts.
-    g_WelfareRobotWaitingForTeam[client] = false;
-    if (Welfare_GetAvailability(client) == Welfare_Ready)
-        Welfare_BeginCollection(client, true);
 }
 
 void WelfareRobot_AnnounceCollection(int client, int amount)

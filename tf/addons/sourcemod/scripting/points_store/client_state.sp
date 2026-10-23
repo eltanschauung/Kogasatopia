@@ -166,6 +166,7 @@ public void SQL_OnClientPurchasesLoaded(Database db, DBResultSet results, const 
     Store_MarkPurchasesChanged(client);
     g_ClientPurchasesLoaded[client] = true;
     if (reload) LoadClientPurchases(client);
+    WelfareRobot_ResumeCollection(client);
 }
 
 public void SQL_OnClientBonusPointsLoaded(Database db, DBResultSet results, const char[] error, any data)
@@ -212,6 +213,7 @@ public void SQL_OnClientBonusPointsLoaded(Database db, DBResultSet results, cons
     g_ClientBonusPoints[client] = balance > 0 ? balance : 0;
     g_ClientBonusPointsLoaded[client] = true;
     if (reload) LoadClientBonusPoints(client);
+    WelfareRobot_ResumeCollection(client);
 }
 
 int GetCachedPurchasePrice(int client, const char[] itemKey)

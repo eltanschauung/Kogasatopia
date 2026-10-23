@@ -10,8 +10,15 @@ attempt collection if already on RED/BLU. Spectators/unassigned owners defer the
 attempt until a `player_team` post event places them on RED/BLU. If still waiting
 at round end (`teamplay_round_win`, TF2's round-end event), attempt collection in
 spectator instead. The three-second purchase attempt follows the same team gate.
-Deferred state is consumed before SQL begins, and cleared on disable, disconnect,
-or map end. There is no background polling or offline collection. Normal population, pool,
+Map start and client entry also arm collection, so the initial round-start event
+may occur before clients finish loading. Pending work survives asynchronous
+cookie, ownership, balance, per-map state and pool initialization. Successful
+readiness callbacks resume pending collections; "not loaded" is never treated
+as "not owned". Round-end spectator permission remains attached to the pending
+attempt until consumed, or is reset by the next round/map. Known disabled or
+non-owned robots do not retain work. Deferred state is consumed before SQL
+begins, and cleared on disable, disconnect, or map end. There is no background
+polling or offline collection. Normal population, pool,
 balance-readiness and once-per-map requirements remain in force, including the
 existing volunteer reset. Unavailable automatic attempts are silent.
 
@@ -45,6 +52,11 @@ disabled robots and stale timers.
 It also checks RED/BLU joins, spectator/unassigned deferral, round-end fallback,
 repeated events, invalid/disconnect user events, deferred purchase collection,
 deferred state cleanup, unchanged manual collection, and fallback eligibility.
+Map-change regressions include clients entering after the first round start,
+team selection before ownership finishes loading, delayed per-map reset,
+rotated completion orders of all five readiness prerequisites, and round-end
+fallback authorization surviving asynchronous initialization. These cases
+reproduced three failures in version 1.1.7 before the readiness-aware fix.
 
 This validates deterministic policy and callback behavior, not a real purchase
 or network/database fault injection. The production plugin must also compile

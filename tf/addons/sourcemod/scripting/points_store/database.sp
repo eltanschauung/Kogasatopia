@@ -473,6 +473,7 @@ void BeginPerMapStateAction()
     if (g_PerMapStateAction == BP_PER_MAP_ACTION_NONE)
     {
         g_PerMapAwardsReady = true;
+        WelfareRobot_ResumePendingCollections();
         return;
     }
 
@@ -518,6 +519,7 @@ public void SQL_OnPerMapAwardsReset(Database db, DBResultSet results, const char
 
     g_PerMapStateAction = BP_PER_MAP_ACTION_NONE;
     g_PerMapAwardsReady = true;
+    WelfareRobot_ResumePendingCollections();
 }
 
 public void SQL_OnPerMapAwardsRestored(Database db, DBResultSet results, const char[] error, any data)
@@ -552,6 +554,7 @@ public void SQL_OnPerMapAwardsRestored(Database db, DBResultSet results, const c
 
     g_PerMapStateAction = BP_PER_MAP_ACTION_NONE;
     g_PerMapAwardsReady = true;
+    WelfareRobot_ResumePendingCollections();
     LogMessage("[points_store] Restored %d per-map reward counter(s) for %s on port %d.", restored, g_PerMapName, g_PerMapServerPort);
 }
 
@@ -598,5 +601,6 @@ public void SQL_OnEconomyStateLoaded(Database db, DBResultSet results, const cha
     g_WelfarePoolBalance = welfarePool;
     g_CumulativeSpentBalance = cumulativeSpent;
     g_EconomyStateLoaded = true;
+    WelfareRobot_ResumePendingCollections();
 }
 
