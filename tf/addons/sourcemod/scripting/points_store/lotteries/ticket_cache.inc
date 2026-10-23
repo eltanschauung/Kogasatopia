@@ -187,7 +187,7 @@ bool IsLotteryReadyForClient(int client, bool needTicketLoaded = true)
         ResetLotteryCallState();
     }
 
-    if (needTicketLoaded && g_LotteryEqualRefundInProgress)
+    if (g_LotteryEqualRefundInProgress)
     {
         CPrintToChat(client, "%s[Lotto]{default} Equal Lottery tickets are being updated. Try again in a moment.", colorTag);
         return false;

@@ -457,19 +457,6 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
         amounts.Push(rows.FetchInt(1));
     }
 
-    if (steamIds.Length == 0)
-    {
-        delete steamIds;
-        delete amounts;
-        g_LotteryEqualRefundInProgress = false;
-        ReloadAllClientLotteryTickets();
-        if (requiredValue != GetLotteryEqualTicketValue())
-        {
-            BeginEqualLotteryRefunds();
-        }
-        return;
-    }
-
     Transaction txn = new Transaction();
     char query[1024];
     if (g_IsMySql)
@@ -499,6 +486,17 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
     FormatEx(query, sizeof(query),
         "DELETE FROM %s WHERE lottery_id = %d AND ticket_value < %d",
         LOTTO_TICKET_TABLE,
+        lotteryId,
+        requiredValue);
+    txn.AddQuery(query);
+
+    // Equal mode replaces every eligible stake with the required value. Keep
+    // the ticket characters/identity and do not refund the forfeited excess.
+    // This must also run when there were no undersized tickets to refund.
+    FormatEx(query, sizeof(query),
+        "UPDATE %s SET ticket_value = %d WHERE lottery_id = %d AND ticket_value > %d",
+        LOTTO_TICKET_TABLE,
+        requiredValue,
         lotteryId,
         requiredValue);
     txn.AddQuery(query);

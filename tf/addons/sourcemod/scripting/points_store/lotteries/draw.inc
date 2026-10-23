@@ -64,7 +64,7 @@ public Action Command_DoLottery(int client, int args)
     {
         SetCurrentLotteryEqual(true);
         CPrintToChatAll(
-            "%s[Lotto]{default} An {gold}Equal Lottery{default} is being called soon, {gold}only tickets with a value of %d or more are accepted!",
+            "%s[Lotto]{default} An {gold}Equal Lottery{default} is being called soon, {gold}all tickets will have a value of %d!",
             colorTag,
             GetLotteryEqualTicketValue());
     }
