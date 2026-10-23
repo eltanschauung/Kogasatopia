@@ -252,10 +252,10 @@ public void OnPluginStart()
     Check(queuedSql == null && replies == before, "claimed map silently skipped");
     Command_Welfare(1, 0);
     Check(!g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "0"), "unavailable welfare toggles off");
-    Check(StrContains(lastReply, "Automatic welfare collection disabled.") != -1, "disabled message");
+    Check(StrEqual(lastReply, "{cyan}[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfare{default} to toggle your robot."), "disabled message resets currency color");
     Command_Welfare(1, 0);
     Check(g_WelfareRobotEnabled[1] && StrEqual(savedCookie, "1"), "unavailable welfare toggles on");
-    Check(StrContains(lastReply, "You enabled your {gold}Welfare Robot!") != -1, "enabled message");
+    Check(StrEqual(lastReply, "{cyan}[Gems]{default} You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start."), "enabled message resets currency color");
     Fresh();
     WelfareRobot_SetEnabled(1, false);
     before = replies;

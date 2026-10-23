@@ -81,9 +81,9 @@ void WelfareRobot_SetEnabled(int client, bool enabled)
     char color[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(color, sizeof(color));
     if (enabled)
-        CPrintToChat(client, "%s[Gems] You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start.", color);
+        CPrintToChat(client, "%s[Gems]{default} You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start.", color);
     else
-        CPrintToChat(client, "%s[Gems] Automatic welfare collection disabled. Use {gold}!welfare{default} to toggle your robot.", color);
+        CPrintToChat(client, "%s[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfare{default} to toggle your robot.", color);
 }
 
 bool WelfareRobot_TryToggle(int client)
