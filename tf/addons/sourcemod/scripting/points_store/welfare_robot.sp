@@ -4,12 +4,15 @@ Cookie g_WelfareRobotCookie;
 bool g_WelfareRobotEnabled[MAXPLAYERS + 1];
 bool g_WelfareRobotPreferenceLoaded[MAXPLAYERS + 1];
 bool g_WelfareRobotPreferenceDirty[MAXPLAYERS + 1];
+bool g_WelfareRobotWaitingForTeam[MAXPLAYERS + 1];
 Handle g_WelfareRobotPurchaseTimer[MAXPLAYERS + 1];
 
 void WelfareRobot_OnPluginStart()
 {
     g_WelfareRobotCookie = new Cookie("points_store_welfare_robot", "Automatic welfare collection enabled", CookieAccess_Private);
     HookEvent("teamplay_round_start", Event_WelfareRobotRoundStart, EventHookMode_PostNoCopy);
+    HookEvent("teamplay_round_win", Event_WelfareRobotRoundEnd, EventHookMode_PostNoCopy);
+    HookEvent("player_team", Event_WelfareRobotTeamChanged, EventHookMode_Post);
     for (int client = 1; client <= MaxClients; client++)
     {
         if (Client_IsHumanInGame(client) && AreClientCookiesCached(client)) WelfareRobot_LoadPreference(client);
@@ -22,6 +25,7 @@ void WelfareRobot_ResetClient(int client)
     g_WelfareRobotEnabled[client] = false;
     g_WelfareRobotPreferenceLoaded[client] = false;
     g_WelfareRobotPreferenceDirty[client] = false;
+    g_WelfareRobotWaitingForTeam[client] = false;
     // The SQL callback owns the pack; invalidate, never delete it here.
     g_WelfareCollectionRequest[client] = null;
 }
@@ -31,6 +35,7 @@ void WelfareRobot_OnMapEnd()
     for (int client = 1; client <= MaxClients; client++)
     {
         delete g_WelfareRobotPurchaseTimer[client];
+        g_WelfareRobotWaitingForTeam[client] = false;
         g_WelfareCollectionRequest[client] = null;
     }
 }
@@ -76,7 +81,11 @@ void WelfareRobot_SetEnabled(int client, bool enabled)
         g_WelfareRobotPreferenceDirty[client] = false;
     }
     else g_WelfareRobotPreferenceDirty[client] = true;
-    if (!enabled) delete g_WelfareRobotPurchaseTimer[client];
+    if (!enabled)
+    {
+        delete g_WelfareRobotPurchaseTimer[client];
+        g_WelfareRobotWaitingForTeam[client] = false;
+    }
 
     char color[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(color, sizeof(color));
@@ -122,9 +131,41 @@ public void Event_WelfareRobotRoundStart(Event event, const char[] name, bool do
     for (int client = 1; client <= MaxClients; client++) WelfareRobot_AttemptCollection(client);
 }
 
-void WelfareRobot_AttemptCollection(int client)
+public void Event_WelfareRobotTeamChanged(Event event, const char[] name, bool dontBroadcast)
 {
-    if (WelfareRobot_CanCollect(client) && Welfare_GetAvailability(client) == Welfare_Ready)
+    if (event.GetBool("disconnect")) return;
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    int team = event.GetInt("team");
+    if (Client_IsHumanInGame(client) && g_WelfareRobotWaitingForTeam[client]
+        && (team == 2 || team == 3)) WelfareRobot_AttemptCollection(client);
+}
+
+public void Event_WelfareRobotRoundEnd(Event event, const char[] name, bool dontBroadcast)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (g_WelfareRobotWaitingForTeam[client]) WelfareRobot_AttemptCollection(client, true);
+    }
+}
+
+void WelfareRobot_AttemptCollection(int client, bool allowSpectator = false)
+{
+    if (!Client_IsHumanInGame(client)) return;
+    if (!WelfareRobot_CanCollect(client))
+    {
+        g_WelfareRobotWaitingForTeam[client] = false;
+        return;
+    }
+    int team = GetClientTeam(client);
+    if (!allowSpectator && team != 2 && team != 3)
+    {
+        g_WelfareRobotWaitingForTeam[client] = true;
+        return;
+    }
+    // Consume the deferred attempt before starting SQL. The existing welfare
+    // request token and per-map award guard still prevent duplicate payouts.
+    g_WelfareRobotWaitingForTeam[client] = false;
+    if (Welfare_GetAvailability(client) == Welfare_Ready)
         Welfare_BeginCollection(client, true);
 }
 

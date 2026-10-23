@@ -6,8 +6,12 @@ attempt three seconds later. Ownership comes from normal store receipts; the
 enabled/disabled preference is a private ClientPrefs cookie.
 
 On each `teamplay_round_start`, connected human owners with their robot enabled
-attempt collection using the same welfare availability policy as manual users.
-There is no background polling or offline collection. Normal population, pool,
+attempt collection if already on RED/BLU. Spectators/unassigned owners defer the
+attempt until a `player_team` post event places them on RED/BLU. If still waiting
+at round end (`teamplay_round_win`, TF2's round-end event), attempt collection in
+spectator instead. The three-second purchase attempt follows the same team gate.
+Deferred state is consumed before SQL begins, and cleared on disable, disconnect,
+or map end. There is no background polling or offline collection. Normal population, pool,
 balance-readiness and once-per-map requirements remain in force, including the
 existing volunteer reset. Unavailable automatic attempts are silent.
 
@@ -38,6 +42,9 @@ confirmation and delay, cookie-load ordering, persisted toggles, unavailable
 conditions, normal manual behavior, overlapping requests, opted-out sound,
 depleted/contended pools, SQL failure, disconnect/slot reuse, map changes,
 disabled robots and stale timers.
+It also checks RED/BLU joins, spectator/unassigned deferral, round-end fallback,
+repeated events, invalid/disconnect user events, deferred purchase collection,
+deferred state cleanup, unchanged manual collection, and fallback eligibility.
 
 This validates deterministic policy and callback behavior, not a real purchase
 or network/database fault injection. The production plugin must also compile

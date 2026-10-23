@@ -15,6 +15,7 @@
 int checks, failures, replies, publicReplies, xpSounds, welfareSounds, loads;
 int credits, refunds, awarded, collected, population = 3, minimum = 3;
 int session = 1001, chosenAmount = 7, affected = 1;
+int testTeam = 2, hookedEvents;
 bool human = true, owned = true, cookiesCached = true, optedIn = true;
 bool welfareEnabled = true, balanceReady = true;
 char savedCookie[8], lastReply[512], lastQuery[512];
@@ -100,6 +101,12 @@ stock void LoadClientBonusPoints(int client)
 stock void LoadEconomyState() { loads++; }
 stock int TestSerial(int client) { return client == 1 ? session : -1; }
 stock int TestFromSerial(int serial) { return human && serial == session ? 1 : 0; }
+stock int TestFromUserId(int userId) { return human && userId == session ? 1 : 0; }
+stock int TestClientTeam(int client)
+{
+    if (client != 1 || !human) failures++;
+    return testTeam;
+}
 stock int TestRandomInt(int low, int high)
 {
     if (low != 4 || high != 10) failures++;
@@ -116,7 +123,13 @@ stock Handle TestTimer(float interval, Timer callback, any serial, int flags)
 stock void TestHook(const char[] name, EventHook callback, EventHookMode mode)
 {
     #pragma unused callback
-    if (!StrEqual(name, "teamplay_round_start") || mode != EventHookMode_PostNoCopy) failures++;
+    hookedEvents++;
+    if (StrEqual(name, "player_team"))
+    {
+        if (mode != EventHookMode_Post) failures++;
+    }
+    else if ((!StrEqual(name, "teamplay_round_start") && !StrEqual(name, "teamplay_round_win"))
+        || mode != EventHookMode_PostNoCopy) failures++;
 }
 stock bool SaySounds_TryPlayCommand(int client, const char[] command, bool force)
 {
@@ -178,6 +191,8 @@ stock void Oblivion_ChatAllEx(int client, const char[] format, any ...)
 #define AreClientCookiesCached TestCookiesCached
 #define GetClientSerial TestSerial
 #define GetClientFromSerial TestFromSerial
+#define GetClientOfUserId TestFromUserId
+#define GetClientTeam TestClientTeam
 #define GetRandomInt TestRandomInt
 #define CreateTimer TestTimer
 #define HookEvent TestHook
@@ -206,16 +221,29 @@ void Fresh()
     collected = 0;
     population = 3;
     minimum = 3;
+    testTeam = 2;
     g_WelfarePoolBalance = 100;
     affected = 1;
     savedCookie[0] = '\0';
     WelfareRobot_LoadPreference(1);
 }
 
+void ChangeTeam(int team, bool disconnect = false, int userId = -1)
+{
+    Event event = CreateEvent("player_team", true);
+    event.SetInt("userid", userId < 0 ? session : userId);
+    event.SetInt("team", team);
+    event.SetBool("disconnect", disconnect);
+    testTeam = team;
+    Event_WelfareRobotTeamChanged(event, "player_team", false);
+    delete event;
+}
+
 public void OnPluginStart()
 {
     Fresh();
     WelfareRobot_OnPluginStart();
+    Check(hookedEvents == 3, "round start, round end and team changes hooked without polling");
     Check(WelfareRobot_CanCollect(1), "owned robot defaults enabled");
     Check(!WelfareRobot_CanCollect(2), "no fake or disconnected targets");
     owned = false;
@@ -369,6 +397,96 @@ public void OnPluginStart()
     collected = 1;
     CompleteSql();
     Check(refunds == refunded + 7 && collected == 1, "another award before callback cannot double pay");
+
+    Fresh();
+    testTeam = 1;
+    before = replies;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Check(g_WelfareRobotWaitingForTeam[1] && queuedSql == null && replies == before,
+        "spectator defers automatic round-start collection silently");
+    Event_WelfareRobotRoundStart(null, "", false);
+    ChangeTeam(0);
+    ChangeTeam(1);
+    ChangeTeam(2, true);
+    ChangeTeam(2, false, session + 1);
+    Check(g_WelfareRobotWaitingForTeam[1] && queuedSql == null,
+        "unassigned, spectator, disconnect and stale user events cannot collect");
+    ChangeTeam(2);
+    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql != null,
+        "joining RED consumes deferred attempt and starts collection");
+    DataPack teamRequest = queuedSql;
+    ChangeTeam(3);
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(queuedSql == teamRequest, "subsequent team change and round end do not duplicate request");
+    CompleteSql();
+    Check(collected == 1, "deferred RED collection awards once");
+
+    Fresh();
+    testTeam = 0;
+    Event_WelfareRobotRoundStart(null, "", false);
+    ChangeTeam(3);
+    Check(queuedSql != null && !g_WelfareRobotWaitingForTeam[1], "joining BLU also releases deferred collection");
+    CompleteSql();
+
+    Fresh();
+    testTeam = 1;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(queuedSql != null && !g_WelfareRobotWaitingForTeam[1] && testTeam == 1,
+        "round end collects for connected owner who stayed spectator");
+    teamRequest = queuedSql;
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(queuedSql == teamRequest, "repeated round end cannot rearm fallback");
+    CompleteSql();
+    ChangeTeam(2);
+    Check(queuedSql == null && collected == 1, "joining after fallback cannot collect twice");
+
+    Fresh();
+    testTeam = 1;
+    Event_WelfareRobotRoundStart(null, "", false);
+    WelfareRobot_SetEnabled(1, false);
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql == null, "disabling cancels deferred attempt");
+    Fresh();
+    testTeam = 1;
+    Event_WelfareRobotRoundStart(null, "", false);
+    WelfareRobot_OnMapEnd();
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql == null, "map end discards deferred attempt");
+    Event_WelfareRobotRoundStart(null, "", false);
+    WelfareRobot_ResetClient(1);
+    ChangeTeam(2);
+    Check(!g_WelfareRobotWaitingForTeam[1] && queuedSql == null, "disconnect reset cannot pass deferred attempt to reused slot");
+
+    Fresh();
+    testTeam = 1;
+    WelfareRobot_OnPurchased(1, "automatic_welfare_robot");
+    purchaseTimer = g_WelfareRobotPurchaseTimer[1];
+    Timer_WelfareRobotPurchase(purchaseTimer, timerSerial);
+    delete purchaseTimer;
+    Check(g_WelfareRobotWaitingForTeam[1] && queuedSql == null,
+        "purchase still waits three seconds then defers spectator collection");
+    ChangeTeam(3);
+    Check(queuedSql != null, "purchase deferred attempt releases on team join");
+    CompleteSql();
+
+    Fresh();
+    testTeam = 1;
+    Event_WelfareRobotRoundStart(null, "", false);
+    Command_Welfare(1, 0);
+    Check(queuedSql != null, "manual welfare remains available in spectator");
+    CompleteSql();
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(queuedSql == null && collected == 1, "manual payout prevents deferred fallback payout");
+
+    Fresh();
+    testTeam = 1;
+    Event_WelfareRobotRoundStart(null, "", false);
+    population = 2;
+    before = replies;
+    Event_WelfareRobotRoundEnd(null, "", false);
+    Check(queuedSql == null && replies == before && !g_WelfareRobotWaitingForTeam[1],
+        "spectator fallback still respects population requirement silently");
     WelfareRobot_ResetClient(1);
     PrintToServer("[WelfareRobotProbe] %d checks, %d failures", checks, failures);
 }
