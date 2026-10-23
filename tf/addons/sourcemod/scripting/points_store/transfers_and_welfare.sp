@@ -47,6 +47,7 @@ public Action Timer_WelfareRoundWin(Handle timer)
     }
 
     bool resetAny = false;
+    int resetSerials[MAXPLAYERS + 1];
     for (int client = 1; client <= MaxClients; client++)
     {
         if (!Client_IsHumanInGame(client)
@@ -59,6 +60,7 @@ public Action Timer_WelfareRoundWin(Handle timer)
         if (ResetPerMapAwardCount(client, "welfare"))
         {
             resetAny = true;
+            resetSerials[client] = GetClientSerial(client);
         }
     }
 
@@ -75,6 +77,13 @@ public Action Timer_WelfareRoundWin(Handle timer)
     char colorTag[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(colorTag, sizeof(colorTag));
     CPrintToChatAll("%s[Gems]{default} {gold}!volunteer{default} bros can collect welfare again!", colorTag);
+    // Publish the reset before starting any robot collection. A round-start
+    // attempt may already have been consumed before this delayed reset ran.
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (resetSerials[client] > 0 && GetClientFromSerial(resetSerials[client]) == client)
+            WelfareRobot_AttemptCollection(client, true);
+    }
     return Plugin_Stop;
 }
 

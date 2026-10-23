@@ -11,6 +11,8 @@
 #define BP_ECONOMY_TABLE "test_economy"
 #define BP_ECONOMY_WELFARE_POOL_KEY "welfare_pool"
 #define CookieAccess_Private 2
+#define BP_WELFARE_VOLUNTEER_RESET_STEAMID "test-reset-marker"
+#define BP_WELFARE_VOLUNTEER_RESET_REWARD "test-reset-reward"
 
 int checks, failures, replies, publicReplies, xpSounds, welfareSounds, loads;
 int credits, refunds, awarded, collected, population = 3, minimum = 3;
@@ -19,6 +21,11 @@ int testTeam = 2, hookedEvents;
 int registeredCommands, registeredCommandMask;
 bool human = true, owned = true, cookiesCached = true, optedIn = true;
 bool welfareEnabled = true, balanceReady = true;
+bool g_WelfareVolunteerResetUsed;
+bool volunteerEligible = true, volunteerNativeAvailable = true, resetAllowed = true;
+bool checkingVolunteerReset, disconnectOnResetAnnouncement;
+int volunteerResetMarker, resetAnnouncements, messageOrder;
+int resetAnnouncementOrder, resetQueryOrder, resetCollectionOrder;
 char savedCookie[8], lastReply[512], lastQuery[512];
 DataPack queuedSql;
 float delay;
@@ -51,6 +58,11 @@ methodmap TestDatabase < Handle
         #pragma unused callback
         strcopy(lastQuery, sizeof(lastQuery), query);
         queuedSql = view_as<DataPack>(data);
+        if (checkingVolunteerReset)
+        {
+            if (!resetAnnouncementOrder) failures++;
+            resetQueryOrder = ++messageOrder;
+        }
     }
 }
 methodmap TestResults < Handle
@@ -80,6 +92,24 @@ stock void CPrintToChat(int client, const char[] format, any ...)
     if (client != 1) failures++;
     replies++;
     VFormat(lastReply, sizeof(lastReply), format, 3);
+    if (checkingVolunteerReset && StrContains(lastReply, "Your {gold}Welfare Robot{default} collected") != -1)
+    {
+        if (!resetAnnouncementOrder) failures++;
+        resetCollectionOrder = ++messageOrder;
+    }
+}
+stock void CPrintToChatAll(const char[] format, any ...)
+{
+    char output[512];VFormat(output,sizeof(output),format,2);
+    if (StrContains(output,"bros can collect welfare again!") == -1) failures++;
+    resetAnnouncements++;
+    resetAnnouncementOrder = ++messageOrder;
+    if (disconnectOnResetAnnouncement)
+    {
+        WelfareRobot_ResetClient(1);
+        session++;
+        human = false;
+    }
 }
 stock void GetCurrencyColorTag(char[] value, int maxlen) { strcopy(value, maxlen, "{cyan}"); }
 stock void GetCurrencyPrefix(char[] value, int maxlen) { strcopy(value, maxlen, "{cyan}[Gems]{default}"); }
@@ -93,6 +123,32 @@ stock int GetPerMapAwardCount(int client, const char[] type)
     #pragma unused client
     #pragma unused type
     return collected;
+}
+stock FeatureStatus TestFeatureStatus(FeatureType type, const char[] name)
+{
+    if (type != FeatureType_Native || !StrEqual(name,"TeamBalance_IsVolunteerEligible")) failures++;
+    return volunteerNativeAvailable ? FeatureStatus_Available : FeatureStatus_Unavailable;
+}
+stock bool TeamBalance_IsVolunteerEligible(int client) { return client == 1 && volunteerEligible; }
+stock int GetPerMapAwardCountForSteamId(const char[] identity, const char[] type)
+{
+    #pragma unused identity
+    #pragma unused type
+    return volunteerResetMarker;
+}
+stock bool IncrementPerMapAwardCountForSteamId(const char[] identity, const char[] type)
+{
+    #pragma unused identity
+    #pragma unused type
+    volunteerResetMarker++;
+    return true;
+}
+stock bool ResetPerMapAwardCount(int client, const char[] type)
+{
+    if (client != 1 || !StrEqual(type,"welfare")) failures++;
+    if (!resetAllowed || collected < 1) return false;
+    collected = 0;
+    return true;
 }
 stock void LoadClientBonusPoints(int client)
 {
@@ -213,6 +269,7 @@ stock void Oblivion_ChatAllEx(int client, const char[] format, any ...)
 #define CreateTimer TestTimer
 #define HookEvent TestHook
 #define RegConsoleCmd TestRegisterCommand
+#define GetFeatureStatus TestFeatureStatus
 #define LogError TestLogError
 #include "welfare_under_test.inc"
 #include "welfare_robot.sp"
@@ -241,6 +298,11 @@ void Fresh()
     testTeam = 2;
     g_WelfarePoolBalance = 100;
     affected = 1;
+    g_WelfareVolunteerResetUsed = false;
+    volunteerEligible = volunteerNativeAvailable = resetAllowed = true;
+    checkingVolunteerReset = disconnectOnResetAnnouncement = false;
+    volunteerResetMarker = resetAnnouncements = messageOrder = 0;
+    resetAnnouncementOrder = resetQueryOrder = resetCollectionOrder = 0;
     savedCookie[0] = '\0';
     WelfareRobot_LoadPreference(1);
 }
@@ -657,6 +719,105 @@ public void OnPluginStart()
     Command_Welfare(1, 0);
     Check(g_WelfareRobotEnabled[1] && StrContains(lastReply, "Minimum playercount") != -1,
         "low-population welfare prints restriction without toggling");
+    Fresh();
+    collected = 1;
+    checkingVolunteerReset = true;
+    Event_WelfareRobotRoundStart(null,"",false);
+    Check(queuedSql == null && !g_WelfareRobotCollectionPending[1],
+        "second round alone does not bypass once-per-map allowance");
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 1 && volunteerResetMarker == 1 && g_WelfareVolunteerResetUsed,
+        "delayed volunteer reset records and announces reset once");
+    Check(queuedSql != null && resetQueryOrder > resetAnnouncementOrder,
+        "delayed reset rearms consumed second-round attempt only after announcement");
+    firstRequest = queuedSql;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 1 && queuedSql == firstRequest,
+        "duplicate reset timer cannot announce or collect twice");
+    CompleteSql();
+    Check(collected == 1 && resetCollectionOrder > resetQueryOrder
+        && resetQueryOrder > resetAnnouncementOrder,
+        "robot payout output strictly follows announcement and query submission");
+
+    Fresh();
+    testTeam = 1;
+    collected = 1;
+    checkingVolunteerReset = true;
+    Timer_WelfareRoundWin(null);
+    Check(queuedSql != null && resetAnnouncements == 1,
+        "round-end reset also releases eligible spectator robot fallback");
+    CompleteSql();
+
+    Fresh();
+    collected = 1;
+    WelfareRobot_SetEnabled(1,false);
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 1 && queuedSql == null && collected == 0,
+        "disabled robot does not collect restored volunteer allowance");
+
+    Fresh();
+    collected = 1;
+    volunteerEligible = false;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 0 && queuedSql == null && collected == 1,
+        "non-volunteer receives no reset or robot rearm");
+    Fresh();
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 0 && queuedSql == null,
+        "no previously collected allowance means no reset announcement or robot attempt");
+    Fresh();
+    collected = 1;
+    resetAllowed = false;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 0 && queuedSql == null && collected == 1,
+        "failed allowance reset cannot announce or arm robot");
+    Fresh();
+    collected = 1;
+    volunteerNativeAvailable = false;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 0 && queuedSql == null,
+        "missing volunteer API cannot grant reset");
+    Fresh();
+    collected = 1;
+    volunteerResetMarker = 1;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 0 && queuedSql == null && collected == 1,
+        "persisted reset marker prevents another allowance after reload");
+
+    Fresh();
+    collected = 1;
+    checkingVolunteerReset = true;
+    disconnectOnResetAnnouncement = true;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 1 && queuedSql == null,
+        "disconnect or changed serial during announcement cannot receive robot handoff");
+
+    Fresh();
+    collected = 1;
+    checkingVolunteerReset = true;
+    population = 2;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 1 && queuedSql == null && g_WelfareRobotCollectionPending[1],
+        "reset still respects population and retains a pending collection");
+    population = 3;
+    WelfareRobot_ResumePendingCollections();
+    Check(queuedSql != null && resetQueryOrder > resetAnnouncementOrder,
+        "pending reset collection resumes when population requirement is met");
+    CompleteSql();
+
+    Fresh();
+    collected = 1;
+    checkingVolunteerReset = true;
+    g_WelfareRobotPreferenceLoaded[1] = false;
+    cookiesCached = false;
+    Timer_WelfareRoundWin(null);
+    Check(resetAnnouncements == 1 && queuedSql == null && g_WelfareRobotCollectionPending[1],
+        "reset rearm survives delayed cookies");
+    cookiesCached = true;
+    WelfareRobot_LoadPreference(1);
+    Check(queuedSql != null && resetQueryOrder > resetAnnouncementOrder,
+        "late cookie callback collects after reset announcement");
+    CompleteSql();
     WelfareRobot_ResetClient(1);
     PrintToServer("[WelfareRobotProbe] %d checks, %d failures", checks, failures);
 }

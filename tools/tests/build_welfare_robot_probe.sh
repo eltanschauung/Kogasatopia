@@ -8,7 +8,7 @@ trap 'rm -rf -- "$work"' EXIT
 source="$root/tf/addons/sourcemod/scripting/points_store"
 sed -n '/^enum WelfareAvailability$/,/^}/p' "$source/transfers_and_welfare.sp" > "$work/welfare_under_test.inc"
 sed -n '/^bool Store_HasPendingPurchaseReceipt(/,/^}/p' "$source/shop.sp" >> "$work/welfare_under_test.inc"
-for function in Command_Welfare Welfare_GetAvailability Welfare_PrintUnavailable Welfare_BeginCollection DebitWelfarePoolForClient SQL_OnWelfarePoolDebited; do
+for function in Timer_WelfareRoundWin Command_Welfare Welfare_GetAvailability Welfare_PrintUnavailable Welfare_BeginCollection DebitWelfarePoolForClient SQL_OnWelfarePoolDebited; do
     sed -n "/^\(void\|public Action\|WelfareAvailability\|public void\) $function(/,/^}/p" "$source/transfers_and_welfare.sp"
 done >> "$work/welfare_under_test.inc"
 cp "$source/welfare_robot.sp" "$work/"

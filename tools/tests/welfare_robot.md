@@ -22,6 +22,17 @@ polling or offline collection. Normal population, pool,
 balance-readiness and once-per-map requirements remain in force, including the
 existing volunteer reset. Unavailable automatic attempts are silent.
 
+The five-second round-end volunteer reset re-arms robots only for clients whose
+welfare allowance was actually reset. The global `!volunteer bros can collect
+welfare again!` announcement is sent **before** any of these collection requests
+are submitted, so the reset-triggered robot output cannot precede it. This is a
+round-end fallback and can collect for a spectator; slow-loading state remains
+pending under the normal readiness handling. Client serials protect the handoff
+against disconnect/slot reuse. Duplicate reset timers and non-volunteers cannot
+gain extra collections. This does not turn ordinary welfare into one payout per
+round: the once-per-map allowance still applies except for the existing volunteer
+reset.
+
 `!welfare` (and its existing aliases) only collects welfare or prints the normal
 unavailable reason. It never toggles the robot. Owners explicitly toggle their
 robot using `!welfarebot`, `!welfarerobot`, or `!bot` (console commands
@@ -61,6 +72,10 @@ team selection before ownership finishes loading, delayed per-map reset,
 rotated completion orders of all five readiness prerequisites, and round-end
 fallback authorization surviving asynchronous initialization. These cases
 reproduced three failures in version 1.1.7 before the readiness-aware fix.
+The probe also extracts the actual delayed volunteer-reset callback and checks
+second-round rearming, announcement-before-query/output ordering, duplicate
+timers, spectator fallback, disabled robots, missing/reset-ineligible state,
+disconnect/slot reuse and delayed prerequisites.
 
 This validates deterministic policy and callback behavior, not a real purchase
 or network/database fault injection. The production plugin must also compile
