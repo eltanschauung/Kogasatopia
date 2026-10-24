@@ -325,7 +325,7 @@ public Moderation_Start() {
         RegConsoleCmd("sm_spraymute", Command_SprayMute, "Mute spray sounds, or hide a player's current spray for seven days.");
         RegConsoleCmd("sm_mutespray", Command_SprayMute, "Mute spray sounds, or hide a player's current spray for seven days.");
         RegConsoleCmd("sm_sprayunmute", Command_SprayUnmute, "Stop hiding a player's current spray.");
-        RegAdminCmd("sm_sprayban", Command_SprayBan, ADMFLAG_BAN, "Hide a player's sprays from everyone for seven days.");
+        RegAdminCmd("sm_sprayban", Command_SprayBan, ADMFLAG_BAN, "Hide a player's sprays from other players for seven days.");
         RegAdminCmd("sm_sprayunban", Command_SprayUnban, ADMFLAG_UNBAN, "Remove a player's global spray ban.");
 
         g_hMuteSpraySoundsCookie = RegClientCookie("spraytrace_mute_sounds", "Mute spray sound effects", CookieAccess_Private);
@@ -628,7 +628,7 @@ stock ApplyGlobalSprayBan(admin, target) {
 
         new Float:zero[3];
         for(new viewer = 1; viewer <= MaxClients; viewer++) {
-                if(Moderation_ValidClient(viewer))
+                if(viewer != target && Moderation_ValidClient(viewer))
                         SendPlayerDecalToClient(target, viewer, 0, zero);
         }
 
@@ -856,6 +856,11 @@ stock bool:IsSprayHashMuteActive(const String:viewerSteamId64[], const String:sp
 
 stock bool:IsSprayerMutedForViewer(viewer, sprayer) {
         if(!g_bSprayMutesLoaded || !Moderation_ValidClient(viewer) || !Moderation_ValidClient(sprayer))
+                return false;
+
+        // Moderation affects other viewers, never the spray owner's own view.
+        // Shared by ordinary decals and the native preview/resize visibility API.
+        if(viewer == sprayer)
                 return false;
 
         new String:sprayerSteamId64[32];
