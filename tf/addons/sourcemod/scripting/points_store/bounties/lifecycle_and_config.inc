@@ -1,7 +1,7 @@
 static const char g_BountyHelpLines[][] =
 {
-    "When a client with a bounty on them is dominated, the bounty ends and pays the dominator the Gems.",
-    "Each kill, or every 2 assists as Medic, increases the bounty by 5 Gems."
+    "When a client with a bounty on them is dominated, the bounty ends and pays the dominator the %s.",
+    "Each kill, or every 2 assists as Medic, increases the bounty by 5 %s."
 };
 
 void Bounties_OnPluginStart()
@@ -144,8 +144,8 @@ public Action Command_BountyHelp(int client, int args)
 
     char firstLine[256];
     FormatEx(firstLine, sizeof(firstLine),
-        "Use {gold}'!bounty makocake 100'{default} to place a %s100 Gem{default} bounty on Makocake.",
-        g_CurrencyColorTag);
+        "Use {gold}'!bounty makocake 100'{default} to place a %s100 %s{default} bounty on Makocake.",
+        g_CurrencyColorTag, g_CurrencyLongLabel);
     CPrintToChat(client, "%s %s", g_BountyPrefix, firstLine);
     CPrintToChat(client,
         "%s Bounties last {gold}%d minutes{default} of qualifying playtime or one week in real time.",
@@ -153,7 +153,9 @@ public Action Command_BountyHelp(int client, int args)
         (GetBountyPlaytimeLimitSeconds() + 59) / 60);
     for (int i = 0; i < sizeof(g_BountyHelpLines); i++)
     {
-        CPrintToChat(client, "%s %s", g_BountyPrefix, g_BountyHelpLines[i]);
+        char helpLine[256];
+        FormatEx(helpLine, sizeof(helpLine), g_BountyHelpLines[i], g_CurrencyLongLabel);
+        CPrintToChat(client, "%s %s", g_BountyPrefix, helpLine);
     }
     CPrintToChat(client,
         "%s Individual bounties must be between %s%d and %d %s{default}.",

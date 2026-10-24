@@ -211,8 +211,8 @@ void PrintBountyTargetInstructions(int target)
     }
 
     CPrintToChat(target,
-        "%s If an enemy dominates you, they collect the bounty; if you avoid being dominated for {gold}%d minutes{default}, you collect the gems yourself!",
+        "%s If an enemy dominates you, they collect the bounty; if you avoid being dominated for {gold}%d minutes{default}, you collect the %s yourself!",
         g_BountyPrefix,
-        (GetBountyPlaytimeLimitSeconds() + 59) / 60);
+        (GetBountyPlaytimeLimitSeconds() + 59) / 60, g_CurrencyLongLabel);
 }
 

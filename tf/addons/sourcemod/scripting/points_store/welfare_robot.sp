@@ -118,12 +118,12 @@ void WelfareRobot_SetEnabled(int client, bool enabled)
         g_WelfareRobotAllowSpectator[client] = false;
     }
 
-    char color[BP_CURRENCY_COLOR_MAX + 2];
-    GetCurrencyColorTag(color, sizeof(color));
+    char prefix[96];
+    GetCurrencyPrefix(prefix, sizeof(prefix));
     if (enabled)
-        CPrintToChat(client, "%s[Gems]{default} You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start.", color);
+        CPrintToChat(client, "%s You enabled your {gold}Welfare Robot!{default} Welfare will be collected automatically when rounds start.", prefix);
     else
-        CPrintToChat(client, "%s[Gems]{default} Automatic welfare collection disabled. Use {gold}!welfarebot{default} to toggle your robot.", color);
+        CPrintToChat(client, "%s Automatic welfare collection disabled. Use {gold}!welfarebot{default} to toggle your robot.", prefix);
 }
 
 public Action Command_WelfareRobot(int client, int args)
@@ -242,8 +242,11 @@ void WelfareRobot_ResumeCollection(int client)
 
 void WelfareRobot_AnnounceCollection(int client, int amount)
 {
+    char prefix[96], currency[BP_CURRENCY_LONG_MAX];
+    GetCurrencyPrefix(prefix, sizeof(prefix));
+    GetCurrencyLongLabel(currency, sizeof(currency));
     char color[BP_CURRENCY_COLOR_MAX + 2];
     GetCurrencyColorTag(color, sizeof(color));
-    CPrintToChat(client, "%s[Gems]{default} Your {gold}Welfare Robot{default} collected %s%d Gems{default} for you!", color, color, amount);
+    CPrintToChat(client, "%s Your {gold}Welfare Robot{default} collected %s%d %s{default} for you!", prefix, color, amount, currency);
     SaySounds_TryPlayCommand(client, BP_SOUND_COMMAND, false);
 }

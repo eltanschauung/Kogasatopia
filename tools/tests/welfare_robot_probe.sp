@@ -112,8 +112,10 @@ stock void CPrintToChatAll(const char[] format, any ...)
     }
 }
 stock void GetCurrencyColorTag(char[] value, int maxlen) { strcopy(value, maxlen, "{cyan}"); }
-stock void GetCurrencyPrefix(char[] value, int maxlen) { strcopy(value, maxlen, "{cyan}[Gems]{default}"); }
-stock void GetCurrencyLongLabel(char[] value, int maxlen) { strcopy(value, maxlen, "Gems"); }
+char testCurrencyPrefix[96] = "{cyan}[Gems]{default}";
+char testCurrencyLong[64] = "Gems";
+stock void GetCurrencyPrefix(char[] value, int maxlen) { strcopy(value, maxlen, testCurrencyPrefix); }
+stock void GetCurrencyLongLabel(char[] value, int maxlen) { strcopy(value, maxlen, testCurrencyLong); }
 stock bool IsWelfareEnabled() { return welfareEnabled; }
 stock int GetWelfareMinPlayers() { return minimum; }
 stock int GetWelfareHumanPlayerCount() { return population; }
@@ -819,5 +821,16 @@ public void OnPluginStart()
         "late cookie callback collects after reset announcement");
     CompleteSql();
     WelfareRobot_ResetClient(1);
+    strcopy(testCurrencyPrefix, sizeof(testCurrencyPrefix), "{cyan}[Treats]{default}");
+    strcopy(testCurrencyLong, sizeof(testCurrencyLong), "Candy Bags");
+    WelfareRobot_AnnounceCollection(1, 10);
+    Check(StrEqual(lastReply, "{cyan}[Treats]{default} Your {gold}Welfare Robot{default} collected {cyan}10 Candy Bags{default} for you!"),
+        "robot collection uses configured short prefix and long currency name");
+    WelfareRobot_SetEnabled(1, true);
+    Check(StrContains(lastReply, "{cyan}[Treats]{default} You enabled") == 0,
+        "robot enable message uses configured prefix");
+    WelfareRobot_SetEnabled(1, false);
+    Check(StrContains(lastReply, "{cyan}[Treats]{default} Automatic welfare") == 0,
+        "robot disable message uses configured prefix");
     PrintToServer("[WelfareRobotProbe] %d checks, %d failures", checks, failures);
 }

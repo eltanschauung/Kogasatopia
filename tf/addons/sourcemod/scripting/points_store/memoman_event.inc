@@ -775,7 +775,7 @@ public void SQL_OnMemomanEventCommandBalance(Database db, DBResultSet results, c
         balance);
     CPrintToChat(
         client,
-        "Get kills with weapons from {gold}!cw{default} to steal some of {blue}Memoman{default}'s gems!");
+        "Get kills with weapons from {gold}!cw{default} to steal some of {blue}Memoman{default}'s %s!", currencyLong);
 }
 
 public Action Command_MemomanEventLeaderboard(int client, int args)

@@ -74,9 +74,9 @@ public Action Timer_WelfareRoundWin(Handle timer)
         BP_WELFARE_VOLUNTEER_RESET_STEAMID,
         BP_WELFARE_VOLUNTEER_RESET_REWARD);
 
-    char colorTag[BP_CURRENCY_COLOR_MAX + 2];
-    GetCurrencyColorTag(colorTag, sizeof(colorTag));
-    CPrintToChatAll("%s[Gems]{default} {gold}!volunteer{default} bros can collect welfare again!", colorTag);
+    char prefix[96];
+    GetCurrencyPrefix(prefix, sizeof(prefix));
+    CPrintToChatAll("%s {gold}!volunteer{default} bros can collect welfare again!", prefix);
     // Publish the reset before starting any robot collection. A round-start
     // attempt may already have been consumed before this delayed reset ran.
     for (int client = 1; client <= MaxClients; client++)

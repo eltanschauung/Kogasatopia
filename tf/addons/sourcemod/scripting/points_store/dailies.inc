@@ -136,7 +136,7 @@ void PrintDailyClassGroup(int client, int classId)
 
     if (entryCount == 0)
     {
-        CPrintToChat(client, "{default}No class-specific Gem limits.");
+        CPrintToChat(client, "{default}No class-specific %s limits.", g_CurrencyLongLabel);
     }
 }
 

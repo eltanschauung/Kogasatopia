@@ -228,13 +228,13 @@ public void SQLTxn_OnBountyPlaced(Database db, any data, int numQueries, DBResul
         if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, senderSteamId) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
         {
             CPrintToChatEx(recipient, Client_IsHumanInGame(client) ? client : recipient,
-                "%s %s placed a %s%d %s{default} bounty on %s! Dominate him to get the gems!",
+                "%s %s placed a %s%d %s{default} bounty on %s! Dominate him to get the %s!",
                 g_BountyPrefix,
                 senderDisplay,
                 currencyColor,
                 amount,
                 currencyName,
-                targetDisplay);
+                targetDisplay, g_CurrencyLongLabel);
         }
     }
     PlayBountySaySound(BOUNTY_CHALLENGE_SOUND);
