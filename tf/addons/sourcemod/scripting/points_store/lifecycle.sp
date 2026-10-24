@@ -67,6 +67,7 @@ public void OnPluginStart()
     RegConsoleCmd("sm_bpsend", Command_SendBonusPoints, "Send currency to another player.");
     RegConsoleCmd("sm_gem", Command_ShowBonusPoints, "Show your currency balance.");
     RegConsoleCmd("sm_gems", Command_ShowBonusPoints, "Show your currency balance.");
+    RegConsoleCmd("sm_treatbag", Command_ShowBonusPoints, "Show your currency balance.");
     RegConsoleCmd("sm_wallet", Command_ShowBonusPoints, "Show your currency balance.");
     AddCommandListener(CommandListener_ShowBonusPointsAlias, "gem");
     AddCommandListener(CommandListener_ShowBonusPointsAlias, "gems");
