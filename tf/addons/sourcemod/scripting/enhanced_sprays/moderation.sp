@@ -632,7 +632,7 @@ stock ApplyGlobalSprayBan(admin, target) {
                         SendPlayerDecalToClient(target, viewer, 0, zero);
         }
 
-        PrintToChatAll("\x04[Spray Trace]\x01 %N has been spray-banned for seven days.", target);
+        ReplyToCommand(admin, "\x04[Spray Trace]\x01 %N has been spray-banned for seven days.", target);
         LogAction(admin, target, "\"%L\" spray-banned \"%L\" for seven days", admin, target);
 }
 

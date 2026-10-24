@@ -48,7 +48,7 @@ constexpr int MaxClients = 4, SPRAY_HASH_LENGTH = 32;
 constexpr int SPRAY_MUTE_DURATION = 7 * 24 * 60 * 60;
 constexpr char SPRAY_MUTE_GLOBAL_VIEWER[] = "global";
 bool g_bSprayMutesLoaded, authenticated, banned, hashMuted;
-int g_hSprayMuteMap, mask, savedExpiry, savedCount, announcements, logs, warnings;
+int g_hSprayMuteMap, mask, savedExpiry, savedCount, announcements, replies, logs, warnings;
 int activeReads, hashReads, checks;
 std::vector<int> cleared;
 void Check(bool ok) { ++checks; if (!ok) std::abort(); }
@@ -77,6 +77,7 @@ void SendPlayerDecalToClient(int, int viewer, int entity, const float position[3
 }
 void PrintToChat(int, const char *) { ++warnings; }
 void PrintToChatAll(const char *, int) { ++announcements; }
+void ReplyToCommand(int admin, const char *, int) { Check(admin == 1); ++replies; }
 void LogAction(int, int, const char *, int, int) { ++logs; }
 '''
 
@@ -100,18 +101,18 @@ int main() {
         for (int target = 1; target <= MaxClients; ++target) {
             for (int auth = 0; auth < 2; ++auth) {
                 authenticated = auth; cleared.clear(); banned = false;
-                savedCount = announcements = logs = warnings = savedExpiry = 0;
+                savedCount = announcements = replies = logs = warnings = savedExpiry = 0;
                 ApplyGlobalSprayBan(1, target);
                 if (!auth) {
                     Check(!banned && cleared.empty() && savedCount == 0);
-                    Check(announcements == 0 && logs == 0 && warnings == 1);
+                    Check(announcements == 0 && replies == 0 && logs == 0 && warnings == 1);
                 } else {
                     std::vector<int> expected;
                     for (int viewer = 1; viewer <= MaxClients; ++viewer)
                         if (viewer != target && IsValidClient(viewer)) expected.push_back(viewer);
                     Check(cleared == expected);
                     Check(banned && savedCount == 1 && savedExpiry == 1000 + SPRAY_MUTE_DURATION);
-                    Check(announcements == 1 && logs == 1 && warnings == 0);
+                    Check(announcements == 0 && replies == 1 && logs == 1 && warnings == 0);
                 }
             }
         }

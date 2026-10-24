@@ -253,7 +253,7 @@
 #include <whaletracker_api>
 #define REQUIRE_PLUGIN
 
-#define PLUGIN_VERSION "5.8b"
+#define PLUGIN_VERSION "5.8c"
 #define SPRAY_SOUND "player/sprayer.wav"
 #define SPRAY_MUTE_DATABASE "default"
 #define SPRAY_MUTE_TABLE "spray_mutes"
@@ -642,7 +642,7 @@ stock ApplyGlobalSprayBan(admin, target) {
                         SendPlayerDecalToClient(target, viewer, 0, zero);
         }
 
-        PrintToChatAll("\x04[Spray Trace]\x01 %N has been spray-banned for seven days.", target);
+        ReplyToCommand(admin, "\x04[Spray Trace]\x01 %N has been spray-banned for seven days.", target);
         LogAction(admin, target, "\"%L\" spray-banned \"%L\" for seven days", admin, target);
 }
 
