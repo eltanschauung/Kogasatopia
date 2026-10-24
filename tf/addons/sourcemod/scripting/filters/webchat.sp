@@ -261,7 +261,8 @@ static void Filters_DeliverOutboxRow(int id, const char[] hash, const char[] sou
     }
     char out[896];
     if (isPlayerRelay) FormatEx(out, sizeof(out), "%s%s", sourcePrefix, msg);
-    else FormatEx(out, sizeof(out), "%s%s %s", sourcePrefix, label, msg);
+    else if (StrEqual(hash, "system")) FormatEx(out, sizeof(out), "%s%s %s", sourcePrefix, label, msg);
+    else FormatEx(out, sizeof(out), "%s%s{default} : %s", sourcePrefix, label, msg);
     if (!suppressChatBroadcast) Filters_PrintOutboxToClients(out);
     if (!fromLocalServer && !webchatOnly) PrintToServer("%s", out);
     Filters_LogDebug("Relayed chat id %d hash %s tag %s name %s msg %s (from %s:%d)",
