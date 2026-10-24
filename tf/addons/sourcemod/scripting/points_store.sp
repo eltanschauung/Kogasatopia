@@ -53,7 +53,7 @@
 #define BP_CURRENCY_SHORT_MAX 32
 #define BP_CURRENCY_LONG_MAX 64
 #define BP_CURRENCY_COLOR_MAX 32
-#define BP_WELFARE_SOUND_COMMAND "monkey"
+#define BP_WELFARE_SOUND_COMMAND "orin"
 #define BP_WELFARE_MIN 4
 #define BP_WELFARE_MAX 10
 #define BP_WELFARE_VOLUNTEER_RESET_STEAMID "__volunteer_welfare_reset__"
