@@ -76,6 +76,7 @@ char g_LotteryDrawHash[LOTTO_HASH_MAX];
 char g_LotteryDrawHashColor[BP_CURRENCY_COLOR_MAX + 2];
 
 #include "lotteries/lifecycle_and_schema.inc"
+#include "lotteries/history.inc"
 #include "lotteries/state.inc"
 #include "lotteries/ticket_cache.inc"
 #include "lotteries/commands_and_history.inc"

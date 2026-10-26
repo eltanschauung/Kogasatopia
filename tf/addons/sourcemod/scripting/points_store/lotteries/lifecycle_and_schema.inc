@@ -314,6 +314,6 @@ public void SQL_OnLotteryTicketsSchemaReady(Database db, DBResultSet results, co
         g_Database.Query(SQL_OnIgnoredResult, "CREATE INDEX IF NOT EXISTS idx_points_store_lottery_ticket_steamid64 ON points_store_lottery_tickets (steamid64)");
     }
 
-    EnsureEconomySchema();
+    LotteryHistory_EnsureSchema();
 }
 
