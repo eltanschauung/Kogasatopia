@@ -389,7 +389,7 @@ void ContinueEqualLotteryRefunds(int lotteryId)
         return;
     }
 
-    if (g_LotteryPendingTicketWrites > 0)
+    if (g_LotteryPendingTicketWrites > 0 || !g_IdempotentAwardsReady)
     {
         CreateTimer(0.5, Timer_RetryEqualLotteryRefunds, lotteryId, TIMER_FLAG_NO_MAPCHANGE);
         return;
@@ -403,7 +403,7 @@ void ContinueEqualLotteryRefunds(int lotteryId)
     char query[384];
     FormatEx(query, sizeof(query),
         "SELECT steamid64, ticket_value FROM %s "
-        ... "WHERE lottery_id = %d AND ticket_value < %d",
+        ... "WHERE lottery_id = %d AND ticket_value <> %d",
         LOTTO_TICKET_TABLE,
         lotteryId,
         requiredValue);
@@ -459,13 +459,35 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
 
     Transaction txn = new Transaction();
     char query[1024];
+    // Keep a durable, atomic receipt of the pre-conversion value and refund.
+    // The key identifies this exact ticket revision and conversion; retries
+    // cannot credit the same revision twice, even across server instances.
+    char receiptKey[256];
+    if (g_IsMySql)
+        FormatEx(receiptKey, sizeof(receiptKey),
+            "CONCAT('lotto_equal:',lottery_id,':',id,':',created_at,':',ticket_value,':',%d)", requiredValue);
+    else
+        FormatEx(receiptKey, sizeof(receiptKey),
+            "'lotto_equal:'||lottery_id||':'||id||':'||created_at||':'||ticket_value||':%d'", requiredValue);
+    FormatEx(query, sizeof(query),
+        "INSERT INTO %s (award_key,steamid64,amount,reason,created_at) "
+        ... "SELECT %s,steamid64,CASE WHEN ticket_value < %d THEN ticket_value ELSE ticket_value-%d END,"
+        ... "CASE WHEN ticket_value < %d THEN 'lottery_equal_refund' ELSE 'lottery_equal_excess_refund' END,%d "
+        ... "FROM %s WHERE lottery_id=%d AND ticket_value<>%d",
+        BP_IDEMPOTENT_AWARDS_TABLE, receiptKey, requiredValue, requiredValue,
+        requiredValue, GetTime(), LOTTO_TICKET_TABLE, lotteryId, requiredValue);
+    txn.AddQuery(query);
+
     if (g_IsMySql)
     {
         FormatEx(query, sizeof(query),
             "INSERT INTO %s (steamid64, balance) "
-            ... "SELECT steamid64, ticket_value FROM %s WHERE lottery_id = %d AND ticket_value < %d "
+            ... "SELECT steamid64, CASE WHEN ticket_value < %d THEN ticket_value ELSE ticket_value-%d END "
+            ... "FROM %s WHERE lottery_id = %d AND ticket_value <> %d "
             ... "ON DUPLICATE KEY UPDATE balance = GREATEST(0, balance + VALUES(balance))",
             BP_BALANCE_TABLE,
+            requiredValue,
+            requiredValue,
             LOTTO_TICKET_TABLE,
             lotteryId,
             requiredValue);
@@ -474,9 +496,12 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
     {
         FormatEx(query, sizeof(query),
             "INSERT INTO %s (steamid64, balance) "
-            ... "SELECT steamid64, ticket_value FROM %s WHERE lottery_id = %d AND ticket_value < %d "
+            ... "SELECT steamid64, CASE WHEN ticket_value < %d THEN ticket_value ELSE ticket_value-%d END "
+            ... "FROM %s WHERE lottery_id = %d AND ticket_value <> %d "
             ... "ON CONFLICT(steamid64) DO UPDATE SET balance = MAX(0, balance + excluded.balance), updated_at = CURRENT_TIMESTAMP",
             BP_BALANCE_TABLE,
+            requiredValue,
+            requiredValue,
             LOTTO_TICKET_TABLE,
             lotteryId,
             requiredValue);
@@ -491,7 +516,8 @@ public void SQL_OnEqualLotteryInvalidTicketsLoaded(
     txn.AddQuery(query);
 
     // Equal mode replaces every eligible stake with the required value. Keep
-    // the ticket characters/identity and do not refund the forfeited excess.
+    // the ticket characters/identity. The excess was credited above, in the
+    // same transaction, so reducing the stake cannot destroy currency.
     // This must also run when there were no undersized tickets to refund.
     FormatEx(query, sizeof(query),
         "UPDATE %s SET ticket_value = %d WHERE lottery_id = %d AND ticket_value > %d",
@@ -534,30 +560,35 @@ public void SQLTxn_OnEqualLotteryTicketsRefunded(
     for (int i = 0; i < steamIds.Length; i++)
     {
         steamIds.GetString(i, steamId, sizeof(steamId));
-        int amount = amounts.Get(i);
+        int oldValue = amounts.Get(i);
+        bool removed = oldValue < requiredValue;
+        int amount = removed ? oldValue : oldValue - requiredValue;
         int client = Kogasa_FindClientBySteamId64(steamId);
         int balanceAfter = -1;
         if (IsClientAuthorizedHuman(client))
         {
-            if (g_ClientBonusPointsLoaded[client])
-            {
-                g_ClientBonusPoints[client] += amount;
-                balanceAfter = g_ClientBonusPoints[client];
-            }
-            else
-            {
-                LoadClientBonusPoints(client);
-            }
+            // Re-read the committed balance: another server can have completed
+            // the same conversion since our initial SELECT. Never add a stale
+            // selected amount to the cache if this transaction changed no rows.
+            LoadClientBonusPoints(client);
 
             ClearClientLotteryTicketCache(client);
             g_ClientLotteryTicketLoaded[client] = true;
 
-            CPrintToChat(client,
-                "%s[Lottery]{default} An {gold}Equal Value Lottery{default} is coming; your ticket has been refunded! Bet again with a value of {gold}%d{default} to get a ticket.",
-                colorTag,
-                requiredValue);
+            if (results[0].AffectedRows > 0)
+            {
+                if (removed)
+                    CPrintToChat(client,
+                        "%s[Lottery]{default} An {gold}Equal Value Lottery{default} is coming; your ticket has been refunded! Bet again with a value of {gold}%d{default} to get a ticket.",
+                        colorTag, requiredValue);
+                else
+                    CPrintToChat(client,
+                        "%s[Lottery]{default} Your ticket is now worth {gold}%d{default}; the excess {gold}%d{default} was refunded to your balance. Your ticket characters are unchanged.",
+                        colorTag, requiredValue, amount);
+            }
         }
-        LogLotteryCreditEvent("lottery_equal_refund", steamId, amount, lotteryId, client, balanceAfter);
+        if (results[0].AffectedRows > 0)
+            LogLotteryCreditEvent(removed ? "lottery_equal_refund" : "lottery_equal_excess_refund", steamId, amount, lotteryId, client, balanceAfter);
     }
 
     delete steamIds;

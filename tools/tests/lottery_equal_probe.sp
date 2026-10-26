@@ -6,6 +6,7 @@
 // player balance, real client identity, or production lottery is ever used.
 #define LOTTO_TICKET_TABLE "test_equal_tickets"
 #define BP_BALANCE_TABLE "test_equal_balances"
+#define BP_IDEMPOTENT_AWARDS_TABLE "test_equal_receipts"
 #define BP_CURRENCY_COLOR_MAX 32
 
 Database testDb;
@@ -42,8 +43,10 @@ stock int Kogasa_FindClientBySteamId64(const char[] identity)
 stock void GetCurrencyColorTag(char[] value, int maxlen) { strcopy(value, maxlen, "{cyan}"); }
 stock void LoadClientBonusPoints(int client)
 {
-    #pragma unused client
-    failures++;
+    char query[256], identity[32];
+    strcopy(identity, sizeof(identity), client == 1 ? "test-low" : (client == 2 ? "test-high" : "test-exact"));
+    FormatEx(query, sizeof(query), "SELECT balance FROM test_equal_balances WHERE steamid64='%s'", identity);
+    g_ClientBonusPoints[client] = Scalar(query);
 }
 stock void ClearClientLotteryTicketCache(int client)
 {
@@ -53,13 +56,15 @@ stock void ClearClientLotteryTicketCache(int client)
 stock void TestChat(int client, const char[] format, any ...)
 {
     #pragma unused format
-    if (client != 1) failures++;
+    if (client != 1 && client != 2) failures++;
 }
 stock void LogLotteryCreditEvent(const char[] reason, const char[] identity,
     int amount, int lotteryId, int client, int balanceAfter)
 {
-    if (!StrEqual(reason, "lottery_equal_refund") || !StrEqual(identity, "test-low")
-        || lotteryId != 17 || client != 1 || balanceAfter != 60) failures++;
+    #pragma unused identity
+    #pragma unused client
+    if ((!StrEqual(reason, "lottery_equal_refund") && !StrEqual(reason, "lottery_equal_excess_refund"))
+        || lotteryId != 17 || balanceAfter != -1 || amount <= 0) failures++;
     refundEvents++;
     refunded += amount;
 }
@@ -127,10 +132,11 @@ void Seed()
 {
     Query("DELETE FROM test_equal_tickets");
     Query("DELETE FROM test_equal_balances");
+    Query("DELETE FROM test_equal_receipts");
     Query("INSERT INTO test_equal_balances (steamid64, balance) VALUES ('test-low', 50), ('test-high', 50), ('test-exact', 50)");
     char query[1024];
     FormatEx(query, sizeof(query),
-        "INSERT INTO test_equal_tickets VALUES (17, 'test-low', 'low', 'LOW', 10, 123), "
+        "INSERT INTO test_equal_tickets (lottery_id,steamid64,display_name,ticket,ticket_value,created_at) VALUES (17, 'test-low', 'low', 'LOW', 10, 123), "
         ... "(17, 'test-high', 'high', 'SAME-CHARACTERS-紅', 1000, 123), "
         ... "(17, 'test-exact', 'exact', 'EXACT', %d, 123), "
         ... "(17, 'test-offline', 'offline', 'OFFLINE', 2000, 123), "
@@ -168,7 +174,7 @@ void StartCase()
     g_LotteryEqualRefundInProgress = true;
     char query[256];
     FormatEx(query, sizeof(query),
-        "SELECT steamid64, ticket_value FROM test_equal_tickets WHERE lottery_id = 17 AND ticket_value < %d", testRequiredValue);
+        "SELECT steamid64, ticket_value FROM test_equal_tickets WHERE lottery_id = 17 AND ticket_value <> %d", testRequiredValue);
     DBResultSet rows = SQL_Query(testDb, query);
     if (rows == null) SetFailState("Test selection failed");
     DataPack pack = new DataPack();
@@ -180,7 +186,7 @@ void StartCase()
 }
 public void Test_Commit(Database db, any data, int numQueries, DBResultSet[] results, any[] queryData)
 {
-    Check(numQueries == 3, "refund, delete, normalization share one transaction");
+    Check(numQueries == 4, "receipt, refund, delete, normalization share one transaction");
     int before = reloads;
     SQLTxn_OnEqualLotteryTicketsRefunded(view_as<TestDatabase>(db), data, numQueries, results, queryData);
     Check(!g_LotteryEqualRefundInProgress && reloads == before + 1, "commit releases guard and reloads client tickets");
@@ -194,14 +200,22 @@ public void Test_Commit(Database db, any data, int numQueries, DBResultSet[] res
     FormatEx(query, sizeof(query), "SELECT COALESCE(SUM(ticket_value), 0) FROM test_equal_tickets WHERE lottery_id=17");
     Check(Scalar(query) == participants * testRequiredValue, "sm_pool sum reflects normalized stakes");
     Check(Scalar("SELECT COUNT(*) FROM test_equal_tickets WHERE lottery_id=17") == participants, "participant count preserved except refunded tickets");
-    Check(Scalar("SELECT balance FROM test_equal_balances WHERE steamid64='test-high'") == 50, "no refund of oversized excess");
+    int highBalance = participants == 3 ? 50 + 1000 - testRequiredValue : 50;
+    Check(Scalar("SELECT balance FROM test_equal_balances WHERE steamid64='test-high'") == highBalance, "oversized excess refunded exactly once");
+    Check(Scalar("SELECT COALESCE(SUM(balance),0) FROM test_equal_balances WHERE steamid64='test-offline'")
+        == (participants == 3 ? 2000 - testRequiredValue : 0), "offline excess refunded");
     Check(Scalar("SELECT balance FROM test_equal_balances WHERE steamid64='test-exact'") == 50, "exact stake balance unchanged");
     Check(Scalar("SELECT COUNT(*) FROM test_equal_tickets WHERE ticket_value != 2000 AND lottery_id=18") == 0, "other lottery not normalized");
     int expectedBalance = (testCase == 0 || testCase >= 4) ? 60 : 50;
     Check(Scalar("SELECT balance FROM test_equal_balances WHERE steamid64='test-low'") == expectedBalance, "undersized stake refunded exactly once");
-    Check(g_ClientBonusPoints[1] == expectedBalance && g_ClientBonusPoints[2] == 50, "connected balance cache matches database");
+    Check(g_ClientBonusPoints[1] == expectedBalance && g_ClientBonusPoints[2] == highBalance, "connected balance cache matches database");
     bool newRefund = testCase == 0 || testCase == 4 || testCase == 5;
-    Check(refundEvents == (newRefund ? 1 : 0) && refunded == (newRefund ? 10 : 0), "only actual refunds credited and logged");
+    bool newExcess = participants == 3 && testCase != 6;
+    Check(refundEvents == (newRefund ? 1 : 0) + (newExcess ? 2 : 0)
+        && refunded == (newRefund ? 10 : 0) + (newExcess ? 3000 - 2 * testRequiredValue : 0),
+        "only actual refunds credited and logged");
+    int receiptCount = (testCase == 0 || testCase >= 4) ? 3 : (testCase == 1 ? 2 : 0);
+    Check(Scalar("SELECT COUNT(*) FROM test_equal_receipts") == receiptCount, "durable receipts retained without duplicate retry credits");
     if (participants == 3)
     {
         Check(cachedTicketValue[2] == testRequiredValue && StrEqual(cachedTicket[2], "SAME-CHARACTERS-紅"), "connected ticket cache has original characters and normalized value");
@@ -224,10 +238,11 @@ public void Test_Failure(Database db, any data, int numQueries, const char[] err
 public void OnPluginStart()
 {
     char error[256];
-    testDb = SQLite_UseDatabase("lottery_equal_regression", error, sizeof(error));
+    testDb = SQLite_UseDatabase("lottery_equal_refund_regression", error, sizeof(error));
     if (testDb == null) SetFailState("Could not open isolated test database");
     Query("CREATE TABLE IF NOT EXISTS test_equal_balances (steamid64 TEXT PRIMARY KEY, balance INTEGER, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)");
-    Query("CREATE TABLE IF NOT EXISTS test_equal_tickets (lottery_id INTEGER, steamid64 TEXT, display_name TEXT, ticket TEXT, ticket_value INTEGER, created_at INTEGER, UNIQUE(lottery_id, steamid64))");
+    Query("CREATE TABLE IF NOT EXISTS test_equal_tickets (id INTEGER PRIMARY KEY, lottery_id INTEGER, steamid64 TEXT, display_name TEXT, ticket TEXT, ticket_value INTEGER, created_at INTEGER, UNIQUE(lottery_id, steamid64))");
+    Query("CREATE TABLE IF NOT EXISTS test_equal_receipts (award_key TEXT PRIMARY KEY, steamid64 TEXT, amount INTEGER, reason TEXT, created_at INTEGER)");
     StartCase();
 }
 public void OnPluginEnd()
