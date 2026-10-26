@@ -109,6 +109,7 @@ public void OnPluginEnd()
     MemomanEvent_OnPluginEnd();
     Stimulus_OnPluginEnd();
     GemsSentLeaderboard_OnPluginEnd();
+    CurrencyHistory_Stop();
     LotteryLeaderboard_OnPluginEnd();
     delete g_IdempotentAwardForward;
 

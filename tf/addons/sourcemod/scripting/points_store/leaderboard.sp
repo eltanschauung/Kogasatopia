@@ -244,6 +244,7 @@ public void PointsStore_CacheCurrencyLeaderboard(Database db, DBResultSet result
             results.FetchString(0, g_CurrencyLeaderboardNames[row], sizeof(g_CurrencyLeaderboardNames[]));
     }
     g_CurrencyLeaderboardReady = true;
+    CurrencyHistory_RecordSnapshot(g_CurrencyLeaderboardRows, g_CurrencyLeaderboardSteamIds, g_CurrencyLeaderboardBalances);
     LogMessage("[points_store] Currency leaderboard cache ready: %d rows.", g_CurrencyLeaderboardRows);
 }
 

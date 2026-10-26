@@ -188,6 +188,7 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] error, int err_max)
 #include "points_store/award_persistence.sp"
 #include "points_store/awards.sp"
 #include "points_store/leaderboard.sp"
+#include "points_store/leaderboard_history.sp"
 #include "points_store/lottery_leaderboard.sp"
 #include "points_store/balance_commands.sp"
 #include "points_store/transfers_and_welfare.sp"

@@ -47,6 +47,26 @@ void ProbeError(const char[] format, any ...) {
 #define GetCmdArg ProbeArg
 #define RegConsoleCmd ProbeRegister
 #define LogError ProbeError
+// This probe tests the sent leaderboard, not the separate history writer.
+void CurrencyHistory_RecordSnapshot(int rows, const char[][] ids, const int[] balances)
+{
+    #pragma unused rows
+    #pragma unused ids
+    #pragma unused balances
+}
+int LotteryLeaderboard_GetRows(bool &ready) { ready = false; return 0; }
+void LotteryLeaderboard_GetSteamId(int row, char[] steam, int maxlen)
+{
+    #pragma unused row
+    strcopy(steam, maxlen, "");
+}
+void LotteryLeaderboard_PrintRow(int client, int position, int row, const char[] color)
+{
+    #pragma unused client
+    #pragma unused position
+    #pragma unused row
+    #pragma unused color
+}
 #include "gems_sent_under_test.inc"
 
 void Check(bool result, const char[] description) {
