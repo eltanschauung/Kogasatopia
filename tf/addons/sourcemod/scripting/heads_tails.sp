@@ -10,7 +10,9 @@
 #define REQUIRE_PLUGIN
 
 #define EIGHT_BALL_COOLDOWN 5.0
+#define COIN_FLIP_COOLDOWN 5.0
 float g_NextEightBallUse[MAXPLAYERS + 1];
+float g_NextCoinFlipUse[MAXPLAYERS + 1];
 
 static const char g_EightBallAnswers[][] =
 {
@@ -64,6 +66,7 @@ public void OnPluginStart()
 public void OnClientPutInServer(int client)
 {
     g_NextEightBallUse[client] = 0.0;
+    g_NextCoinFlipUse[client] = 0.0;
 }
 
 public Action Command_EightBall(int client, int args)
@@ -110,6 +113,21 @@ public void OnClientSayCommand_Post(int client, const char[] command, const char
 
 void TossCoin(int client)
 {
+    if (client <= 0 || !IsClientInGame(client))
+    {
+        return;
+    }
+
+    // Commands and bare chat aliases share a per-client cooldown.
+    float now = GetEngineTime();
+    float remaining = g_NextCoinFlipUse[client] - now;
+    if (remaining > 0.0)
+    {
+        CPrintToChat(client, "{gold}[Coin Flip]{default} Wait %d seconds before flipping again.", RoundToCeil(remaining));
+        return;
+    }
+    g_NextCoinFlipUse[client] = now + COIN_FLIP_COOLDOWN;
+
     char displayName[256];
     BuildCoinFlipDisplayName(client, displayName, sizeof(displayName));
 
