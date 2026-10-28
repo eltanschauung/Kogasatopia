@@ -72,7 +72,7 @@ public Action Command_MyInteractionStats(int client, int args)
         "SELECT 0, sender, MAX(sender_name), SUM(received) AS amount FROM %s "
         ... "WHERE recipient='%s' AND kind=%d GROUP BY sender HAVING amount>0 "
         ... "UNION ALL SELECT 1, recipient, MAX(recipient_name), SUM(given) AS amount FROM %s "
-        ... "WHERE sender='%s' AND kind=%d GROUP BY recipient HAVING amount>0 ORDER BY amount DESC",
+        ... "WHERE sender='%s' AND kind=%d GROUP BY recipient HAVING amount>0 ORDER BY amount DESC, 1, 2",
         HUGS_RELATIONSHIP_TABLE, steamId, kind, HUGS_RELATIONSHIP_TABLE, steamId, kind);
     DataPack pack = new DataPack();
     pack.WriteCell(GetClientUserId(client));
@@ -96,11 +96,11 @@ public void Hugs_OnPersonalStatsLoaded(Database db, DBResultSet results, const c
         CPrintToChat(client, "{gold}[%s]{default} Counterpart statistics are temporarily unavailable.", label);
         return;
     }
-    bool printed[2];
+    int printed[2];
     while (results != null && results.FetchRow())
     {
         int direction = results.FetchInt(0);
-        if (printed[direction]) continue;
+        if (direction < 0 || direction >= sizeof(printed) || printed[direction] >= 3) continue;
         char steamId[32], name[MAX_NAME_LENGTH], display[256];
         results.FetchString(1, steamId, sizeof(steamId));
         if (PublicActivity_IsExcludedSteam(steamId)) continue;
@@ -116,9 +116,9 @@ public void Hugs_OnPersonalStatsLoaded(Database db, DBResultSet results, const c
             else if (GetClientTeam(other) == 3) strcopy(teamColor, sizeof(teamColor), "{blue}");
         }
         ReplaceString(display, sizeof(display), "{teamcolor}", teamColor, false);
-        CPrintToChat(client, "{gold}[%s]{default} %s: %s{default} ({cyan}%d{default}, recorded history).",
-            label, direction == 0 ? "Most received from" : "Most given to", display, results.FetchInt(3));
-        printed[direction] = true;
+        printed[direction]++;
+        CPrintToChat(client, "{gold}[%s]{default} %s #%d: %s{default} ({cyan}%d{default}, recorded history).",
+            label, direction == 0 ? "Most received from" : "Most given to", printed[direction], display, results.FetchInt(3));
     }
     for (int direction = 0; direction < 2; direction++)
     {
