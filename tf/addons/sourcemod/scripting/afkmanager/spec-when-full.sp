@@ -475,6 +475,24 @@ public Action SpecQueue_OnClientJoinTeam(int client, const char[] command, int a
         return Plugin_Handled;
     }
     if (!SpecQueue_ReservePendingJoin(client, false, requestedTeam)) {
+        int failure = SpecQueue_ClassifyJoinFailure();
+        if (failure != 2) {
+            if (failure == 0) {
+                // Keep team limits without treating a full team as a full server.
+                SpecQueue_LogPopulationSnapshot("join_blocked", client, currentTeam, requestedTeam, GetClientUserId(client), "requested_team_unavailable");
+                CPrintToChat(client, "{gold}[Queue]{default} That team is full; try the other team.");
+                return Plugin_Handled;
+            }
+
+            // Outstanding reservations can temporarily exhaust capacity before players join.
+            SpecQueue_LogPopulationSnapshot("join_deferred", client, currentTeam, requestedTeam, GetClientUserId(client), "pending_reservations");
+            if (putInAutoJoin && SpecQueue_IsQueuedSpectator(client)) {
+                SpecQueue_AddClientToWaitQueue(client, "pending_reservations");
+            }
+            CPrintToChat(client, "{gold}[Queue]{default} Team slots are being reserved; please try again shortly.");
+            SpecQueue_SchedulePlayerChangeChecks();
+            return Plugin_Handled;
+        }
         SpecQueue_LogPopulationSnapshot("join_blocked", client, currentTeam, requestedTeam, GetClientUserId(client), "capacity_or_team_unavailable");
         TeamBalance_MoveToSpectator(client, "full_join_attempt");
         if (putInAutoJoin && !g_SpecQueue.InQueue(client)) {
@@ -798,6 +816,14 @@ bool SpecQueue_IsPlayingTeam(int team) {
 
 int SpecQueue_GetPlayersInGame() {
     return DGM_RealPlayerCount();
+}
+
+int SpecQueue_ClassifyJoinFailure() {
+    int limit = SpecQueue_GetPlayingLimit();
+    if (limit > 0 && SpecQueue_CountPlayingHumansLocally() >= limit) {
+        return 2; // The playing roster is full.
+    }
+    return SpecQueue_IsServerFull() ? 1 : 0; // Reservations or a team limit.
 }
 
 bool SpecQueue_IsServerFull() {

@@ -166,9 +166,14 @@ public Action Run(int client, int args) {
     Check(SpecQueue_ReservePendingJoin(3, false, TEAM_RED), "bots do not consume human admission quota");
     connected[5] = true; teams[5] = 1;
     Check(!SpecQueue_ReservePendingJoin(5, false, TEAM_RED), "reserved team cannot be overbooked");
+    Check(SpecQueue_ClassifyJoinFailure() == 0, "full team with global room is not a full server");
     Check(SpecQueue_ReservePendingJoin(5, false, TEAM_BLUE), "opposite team's remaining slot is available");
     connected[6] = true; teams[6] = 1;
     Check(!SpecQueue_ReservePendingJoin(6, false, 0), "global reservations enforce full capacity");
+    Check(SpecQueue_ClassifyJoinFailure() == 1, "pending reservations are not a full playing roster");
+    teams[3] = TEAM_RED; teams[5] = TEAM_BLUE;
+    Check(SpecQueue_ClassifyJoinFailure() == 2, "full playing roster reports full");
+    teams[3] = teams[5] = 1;
     userIds[3] = 9999;
     Check(!SpecQueue_HasPendingJoin(3), "reused client slot cannot inherit old reservation");
     SpecQueue_ClearPendingJoin(3);
