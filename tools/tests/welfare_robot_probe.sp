@@ -27,6 +27,7 @@ bool checkingVolunteerReset, disconnectOnResetAnnouncement;
 int volunteerResetMarker, resetAnnouncements, messageOrder;
 int resetAnnouncementOrder, resetQueryOrder, resetCollectionOrder;
 char savedCookie[8], lastReply[512], lastQuery[512];
+char testIdentity[32] = "test-client-one";
 DataPack queuedSql;
 float delay;
 any timerSerial;
@@ -82,6 +83,12 @@ DataPack g_WelfareCollectionRequest[MAXPLAYERS + 1];
 
 stock bool Client_IsHumanInGame(int client) { return client == 1 && human; }
 stock bool IsClientAuthorizedHuman(int client) { return Client_IsHumanInGame(client); }
+stock bool GetClientSteamId64(int client, char[] value, int maxlen)
+{
+    if (!IsClientAuthorizedHuman(client)) return false;
+    strcopy(value, maxlen, testIdentity);
+    return true;
+}
 stock bool TestCookiesCached(int client) { return client == 1 && cookiesCached; }
 stock int GetCachedPurchasePrice(int client, const char[] key)
 {
@@ -290,6 +297,8 @@ void CompleteSql(const char[] error = "")
 void Fresh()
 {
     WelfareRobot_ResetClient(1);
+    if (g_WelfareRobotTeamJoinsThisMap != null) g_WelfareRobotTeamJoinsThisMap.Clear();
+    strcopy(testIdentity, sizeof(testIdentity), "test-client-one");
     if (queuedSql != null) { delete queuedSql; }
     human = owned = cookiesCached = optedIn = welfareEnabled = balanceReady = true;
     g_ClientPurchasesLoaded[1] = g_DatabaseReady = g_PerMapAwardsReady = g_EconomyStateLoaded = true;
@@ -314,6 +323,7 @@ void ChangeTeam(int team, bool disconnect = false, int userId = -1)
     Event event = CreateEvent("player_team", true);
     event.SetInt("userid", userId < 0 ? session : userId);
     event.SetInt("team", team);
+    event.SetInt("oldteam", testTeam);
     event.SetBool("disconnect", disconnect);
     testTeam = team;
     Event_WelfareRobotTeamChanged(event, "player_team", false);
@@ -546,7 +556,7 @@ public void OnPluginStart()
     Event_WelfareRobotRoundStart(null, "", false);
     WelfareRobot_ResetClient(1);
     ChangeTeam(2);
-    Check(!g_WelfareRobotCollectionPending[1] && queuedSql == null, "disconnect reset cannot pass deferred attempt to reused slot");
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == null, "new team join after slot reset waits for fresh ownership and cookies");
 
     Fresh();
     testTeam = 1;
@@ -820,6 +830,55 @@ public void OnPluginStart()
     Check(queuedSql != null && resetQueryOrder > resetAnnouncementOrder,
         "late cookie callback collects after reset announcement");
     CompleteSql();
+    Fresh();
+    testTeam = 1;
+    g_WelfareRobotCollectionPending[1] = false;
+    ChangeTeam(2);
+    Check(queuedSql != null, "first spectator-to-RED join rearms a previously consumed attempt");
+    CompleteSql();
+    collected = 0;
+    ChangeTeam(1);
+    ChangeTeam(3);
+    Check(queuedSql == null && !g_WelfareRobotCollectionPending[1],
+        "second spectator-to-team join in the same map does not rearm");
+    WelfareRobot_ResetClient(1);
+    WelfareRobot_LoadPreference(1);
+    ChangeTeam(1);
+    ChangeTeam(2);
+    Check(queuedSql == null && !g_WelfareRobotCollectionPending[1],
+        "same identity reconnect cannot reuse the first-join trigger");
+    strcopy(testIdentity, sizeof(testIdentity), "test-client-two");
+    ChangeTeam(1);
+    ChangeTeam(3);
+    Check(queuedSql != null, "new identity reusing a client slot has its own first join");
+    CompleteSql();
+
+    Fresh();
+    testTeam = 1;
+    g_WelfareRobotCollectionPending[1] = false;
+    g_ClientPurchasesLoaded[1] = false;
+    ChangeTeam(3);
+    Check(queuedSql == null && g_WelfareRobotCollectionPending[1],
+        "first BLU join rearms while ownership is still loading");
+    g_ClientPurchasesLoaded[1] = true;
+    WelfareRobot_ResumeCollection(1);
+    Check(queuedSql != null, "ownership callback completes the rearmed first-join attempt");
+    CompleteSql();
+    collected = 0;
+    WelfareRobot_OnMapEnd();
+    WelfareRobot_OnMapStart();
+    g_WelfareRobotCollectionPending[1] = false;
+    ChangeTeam(1);
+    ChangeTeam(2);
+    Check(queuedSql != null, "new map resets the identity first-join guard");
+    CompleteSql();
+
+    Fresh();
+    testTeam = 1;
+    WelfareRobot_SetEnabled(1, false);
+    ChangeTeam(2);
+    Check(queuedSql == null && !g_WelfareRobotCollectionPending[1],
+        "first-join trigger respects the owner's disabled robot preference");
     WelfareRobot_ResetClient(1);
     strcopy(testCurrencyPrefix, sizeof(testCurrencyPrefix), "{cyan}[Treats]{default}");
     strcopy(testCurrencyLong, sizeof(testCurrencyLong), "Candy Bags");

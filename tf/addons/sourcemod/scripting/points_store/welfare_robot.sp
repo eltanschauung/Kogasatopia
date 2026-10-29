@@ -7,9 +7,13 @@ bool g_WelfareRobotPreferenceDirty[MAXPLAYERS + 1];
 bool g_WelfareRobotCollectionPending[MAXPLAYERS + 1];
 bool g_WelfareRobotAllowSpectator[MAXPLAYERS + 1];
 Handle g_WelfareRobotPurchaseTimer[MAXPLAYERS + 1];
+// Identity-scoped so reconnects and recycled client slots cannot rearm the
+// first-join trigger. This is map-local state, not a persistent preference.
+StringMap g_WelfareRobotTeamJoinsThisMap;
 
 void WelfareRobot_OnPluginStart()
 {
+    g_WelfareRobotTeamJoinsThisMap = new StringMap();
     g_WelfareRobotCookie = new Cookie("points_store_welfare_robot", "Automatic welfare collection enabled", CookieAccess_Private);
     RegConsoleCmd("sm_welfarebot", Command_WelfareRobot, "Toggle your Automatic Welfare Robot.");
     RegConsoleCmd("sm_welfarerobot", Command_WelfareRobot, "Toggle your Automatic Welfare Robot.");
@@ -20,6 +24,8 @@ void WelfareRobot_OnPluginStart()
     for (int client = 1; client <= MaxClients; client++)
     {
         if (!Client_IsHumanInGame(client)) continue;
+        int team = GetClientTeam(client);
+        if (team == 2 || team == 3) WelfareRobot_RecordFirstTeamJoin(client);
         g_WelfareRobotCollectionPending[client] = true;
         if (AreClientCookiesCached(client)) WelfareRobot_LoadPreference(client);
     }
@@ -39,6 +45,7 @@ void WelfareRobot_ResetClient(int client)
 
 void WelfareRobot_OnMapEnd()
 {
+    g_WelfareRobotTeamJoinsThisMap.Clear();
     for (int client = 1; client <= MaxClients; client++)
     {
         delete g_WelfareRobotPurchaseTimer[client];
@@ -50,6 +57,8 @@ void WelfareRobot_OnMapEnd()
 
 void WelfareRobot_OnMapStart()
 {
+    // First-join identities were cleared at map end. Do not clear them here:
+    // late loading seeds already-playing clients before the initial MapStart.
     // Arm independently of asynchronous ownership/cookie/per-map readiness.
     // Do not collect until the per-map reset/restore callback has completed.
     for (int client = 1; client <= MaxClients; client++)
@@ -186,8 +195,25 @@ public void Event_WelfareRobotTeamChanged(Event event, const char[] name, bool d
     if (event.GetBool("disconnect")) return;
     int client = GetClientOfUserId(event.GetInt("userid"));
     int team = event.GetInt("team");
-    if (Client_IsHumanInGame(client) && (team == 2 || team == 3))
-        WelfareRobot_ResumeCollection(client);
+    if (!Client_IsHumanInGame(client) || (team != 2 && team != 3)) return;
+
+    if (event.GetInt("oldteam") <= 1 && WelfareRobot_RecordFirstTeamJoin(client))
+    {
+        // This is a new collection opportunity, not merely a readiness signal:
+        // earlier ownership/toggle/allowance checks may have consumed pending.
+        WelfareRobot_AttemptCollection(client);
+    }
+    else WelfareRobot_ResumeCollection(client);
+}
+
+bool WelfareRobot_RecordFirstTeamJoin(int client)
+{
+    char steamId[32];
+    if (!GetClientSteamId64(client, steamId, sizeof(steamId))) return false;
+    int seen;
+    if (g_WelfareRobotTeamJoinsThisMap.GetValue(steamId, seen)) return false;
+    g_WelfareRobotTeamJoinsThisMap.SetValue(steamId, 1);
+    return true;
 }
 
 public void Event_WelfareRobotRoundEnd(Event event, const char[] name, bool dontBroadcast)
