@@ -30,7 +30,7 @@ void DGM_RefreshRespawnVisualState()
         || (g_cvHalveRespawnWaves != null && g_cvHalveRespawnWaves.BoolValue
             && DGM_AreRespawnTimesForcedOn());
     SetConVarBool(g_cvMpDisableRespawnTimes,
-        !nativeRespawns && g_cvRespawnTime.FloatValue < 5.0);
+        g_cvInstantRespawn.BoolValue || (!nativeRespawns && g_cvRespawnTime.FloatValue < 5.0));
 }
 
 bool DGM_AreRespawnTimesForcedOn()

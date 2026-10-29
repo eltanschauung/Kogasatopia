@@ -3,6 +3,10 @@ void DGM_OnPluginStart()
 
     // The respawn time
     g_cvRespawnTime = CreateConVar("respawn_time", "3.0", "Respawn time length", _, true, 0.0, true, 30.0);
+    g_cvInstantRespawn = CreateConVar("instant_respawn", "0",
+        "Force instant respawns, overriding DGM respawn policies, native waves and Heavy immunity. 0 restores configured behavior.",
+        _, true, 0.0, true, 1.0);
+    g_cvInstantRespawn.AddChangeHook(DGM_ConVarChangeInstantRespawn);
     g_flDgmConfiguredRespawnTime = g_cvRespawnTime.FloatValue;
     g_cvPopulationRespawns = CreateConVar("dgm_population_respawns", "1", "Allow playercount changes to adjust respawn times.", _, true, 0.0, true, 1.0);
     g_cvHalveRespawnWaves = CreateConVar("dgm_halve_respawn_waves", "1",

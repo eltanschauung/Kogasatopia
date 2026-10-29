@@ -1,5 +1,14 @@
 # Respawn Modes
 
+`instant_respawn` defaults to `0` and is bounded to `0`/`1`. At `1`, it
+overrides DGM's normal, reduced/native-wave, team-specific and override delays,
+including Heavy immunity and small-format exclusions. It uses the existing
+zero-delay, client-session-owned respawn timer after the death callback returns.
+Spectators, disconnected/reused slots, changed teams and already-alive players
+are still rejected. It does not change the configured respawn ConVars.
+Toggling back to `0` cancels queued instant respawns and restores the selected
+native-wave or legacy policy, including clients already waiting to respawn.
+
 `dgm_halve_respawn_waves` defaults to `1`.
 It changes how DGM's reduced-respawn state works, not the existing
 population/setup/admin policies which select that state.

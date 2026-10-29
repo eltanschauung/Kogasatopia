@@ -129,6 +129,7 @@ public Action Command_CvarHelp(int client, int args)
 {
     char lines[][] = {
         "respawn_time: float - Default respawn delay (seconds). Set to 30 to disable plugin handling.",
+        "instant_respawn: 0/1 - Force zero-delay respawns over all DGM policies; 0 restores configured behavior.",
         "dgm_halve_respawn_waves: 0/1 - Halve map-authored native waves; unsupported maps retain legacy timers.",
         "dgm_lowpop_threshhold: int - Disable respawn times below this connected human count.",
         "sm_highpop_threshhold: int - Player count threshold to execute high-pop configs",

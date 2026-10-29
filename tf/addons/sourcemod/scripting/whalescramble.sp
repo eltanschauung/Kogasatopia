@@ -76,6 +76,7 @@ ConVar g_cvTfObjUpgradePerHit;
 ConVar g_cvNoEngineerSetupReduction;
 ConVar g_cvTimeOverride;
 ConVar g_cvRespawnTime;
+ConVar g_cvInstantRespawn;
 ConVar g_cvPopulationConfigs;
 ConVar g_cvPopulationRespawns;
 ConVar g_cvHalveRespawnWaves;

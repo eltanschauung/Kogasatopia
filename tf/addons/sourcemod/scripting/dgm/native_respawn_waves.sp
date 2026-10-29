@@ -212,7 +212,7 @@ void DGM_NativeWavesRestore()
 
 void DGM_NativeWavesSync()
 {
-    bool requested = g_cvHalveRespawnWaves.BoolValue
+    bool requested = !g_cvInstantRespawn.BoolValue && g_cvHalveRespawnWaves.BoolValue
         && !DGM_AreRespawnTimesForcedOn() && !g_InternalOverride
         && !DGM_ShouldDisableInstantRespawn();
     bool active = requested && g_bNativeWavesAvailable
@@ -319,6 +319,11 @@ public MRESReturn DGM_NativeWaveRoundPost(Address rules)
 
 void DGM_ReplyNativeWaveState(int client)
 {
+    if (g_cvInstantRespawn.BoolValue)
+    {
+        ReplyToCommand(client, "[Respawn] Instant respawn override is active; configured respawn policies are preserved.");
+        return;
+    }
     if (!g_cvHalveRespawnWaves.BoolValue)
         return;
     if (!g_bNativeWavesMapReady || FindEntityByClassname(-1, "tf_gamerules") == -1)

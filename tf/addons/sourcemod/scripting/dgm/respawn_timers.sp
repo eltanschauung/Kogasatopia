@@ -4,7 +4,7 @@ int g_iRespawnScheduledTeam[MAXPLAYERS + 1];
 
 bool DGM_HasInstantRespawnImmunity(int client)
 {
-    return g_cvHeavyInstantRespawnImmunity.BoolValue
+    return !g_cvInstantRespawn.BoolValue && g_cvHeavyInstantRespawnImmunity.BoolValue
         && Client_IsInGame(client)
         && TF2Classes_GetCurrentOrDesired(client) == TFClass_Heavy;
 }
@@ -40,6 +40,10 @@ public Action Timer_RespawnReminder(Handle timer, int serial)
         g_hRespawnReminderTimers[client] = null;
         return Plugin_Stop;
     }
+
+    // Keep the reminder timer alive for mode-off, but do not claim waves are
+    // halved while the explicit instant-respawn override owns spawning.
+    if (g_cvInstantRespawn.BoolValue) return Plugin_Continue;
 
     if (g_cvHalveRespawnWaves.BoolValue)
         CPrintToChat(client, "Respawn times are halved; use {gold}sm_respawn{default} to toggle.");
@@ -148,11 +152,24 @@ void DGM_ScheduleRespawnTimer(int client, float delay)
 public void DGM_Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
+    DGM_ScheduleDeathRespawn(client);
+}
+
+void DGM_ScheduleDeathRespawn(int client)
+{
     if (!Client_IsInGame(client))
     {
         return;
     }
     DGM_ClearRespawnTimer(client);
+
+    if (g_cvInstantRespawn.BoolValue)
+    {
+        // Never respawn inside the engine's death callback. Reuse the legacy
+        // zero-delay path, including serial, team and already-alive guards.
+        DGM_ScheduleRespawnTimer(client, 0.0);
+        return;
+    }
 
     if (DGM_ShouldDisableInstantRespawn() || g_InternalOverride || DGM_NativeWavesActive())
     {
@@ -208,10 +225,11 @@ public Action Timer_RespawnClient(Handle timer, int serial)
     g_iRespawnScheduledTeam[client] = 0;
 
     // Settings and team membership can change while the timer is queued.
-    if (!Client_IsInGame(client) || g_InternalOverride
+    if (!Client_IsInGame(client)) return Plugin_Stop;
+    if (!g_cvInstantRespawn.BoolValue && (g_InternalOverride
         || DGM_AreRespawnTimesForcedOn() || DGM_ShouldDisableInstantRespawn()
         || DGM_NativeWavesActive()
-        || DGM_HasInstantRespawnImmunity(client))
+        || DGM_HasInstantRespawnImmunity(client)))
     {
         return Plugin_Stop;
     }
@@ -221,4 +239,18 @@ public Action Timer_RespawnClient(Handle timer, int serial)
         TF2_RespawnPlayer(client);
     }
     return Plugin_Stop;
+}
+
+public void DGM_ConVarChangeInstantRespawn(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    if (StrEqual(oldValue, newValue)) return;
+    DGM_ClearAllRespawnTimers();
+    DGM_NativeWavesSync();
+    DGM_RefreshRespawnVisualState();
+    // Reconcile already-dead clients too. Turning off cancels pending instant
+    // timers and either restores native waves or re-arms the legacy delay.
+    for (int client = 1; client <= MaxClients; client++)
+        if (Client_IsInGame(client) && !IsPlayerAlive(client)
+            && GetClientTeam(client) > view_as<int>(TFTeam_Spectator))
+            DGM_ScheduleDeathRespawn(client);
 }
