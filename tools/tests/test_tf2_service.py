@@ -73,6 +73,8 @@ class LifecycleTests(unittest.TestCase):
             path.write_text('#!/bin/sh\nexec ./srcds_run -game tf\n')
             path.chmod(0o700)
         self.config.steamcmd.touch()
+        self.disk_usage = self.enterContext(patch('tf2_service.shutil.disk_usage'))
+        self.disk_usage.return_value = Mock(free=4 * 1024 ** 3)
 
     def start_case(self, current=True, update_error=None, screen_error=None):
         events = []
@@ -153,6 +155,36 @@ class LifecycleTests(unittest.TestCase):
 
     @patch('tf2_service.screens', return_value={})
     @patch('tf2_service.engines', return_value={})
+    @patch('tf2_service.subprocess.run')
+    def test_insufficient_disk_space_blocks_update_before_steamcmd(self, run, engines, screens):
+        for readings in ([Mock(free=250 * 1024 ** 2)],
+                         [Mock(free=4 * 1024 ** 3), Mock(free=0)]):
+            with self.subTest(readings=readings):
+                self.disk_usage.side_effect = readings
+                with self.assertRaisesRegex(RuntimeError, 'Insufficient disk space.*1024 MiB required'):
+                    service.update(self.config)
+                run.assert_not_called()
+
+    def test_minimum_disk_space_checks_bootstrap_and_game_paths(self):
+        self.disk_usage.return_value = Mock(free=service.MIN_UPDATE_FREE_BYTES)
+        service.check_update_space(self.config)
+        self.assertEqual(self.disk_usage.call_args_list[0].args, (self.config.steamcmd.parent.resolve(),))
+        self.assertEqual(self.disk_usage.call_args_list[1].args, (self.config.game.resolve(),))
+
+    @patch('tf2_service.screens', return_value={})
+    @patch('tf2_service.engines', return_value={})
+    def test_steamcmd_disk_failure_is_actionable_without_dumping_private_output(self, engines, screens):
+        def fail(args, **kwargs):
+            kwargs['stdout'].write(b'private-token\nFatal Error: Steamcmd needs 250MB of free disk space to update.\n')
+            return Mock(returncode=1)
+        with patch('tf2_service.subprocess.run', side_effect=fail):
+            with self.assertRaisesRegex(RuntimeError, 'insufficient disk space') as raised:
+                service.update(self.config)
+        self.assertNotIn('private-token', str(raised.exception))
+        self.assertIn('Private log:', str(raised.exception))
+
+    @patch('tf2_service.screens', return_value={})
+    @patch('tf2_service.engines', return_value={})
     @patch('tf2_service.installed_version', return_value='123')
     @patch('tf2_service.check_current', return_value=True)
     def test_real_update_command_and_private_log(self, current, version, engines, screens):
@@ -161,6 +193,22 @@ class LifecycleTests(unittest.TestCase):
         logs = list(self.config.state.glob('steamcmd-*.private.log'))
         self.assertEqual(len(logs), 1)
         self.assertEqual(logs[0].stat().st_mode & 0o777, 0o600)
+
+    @patch('tf2_service.screens', return_value={})
+    @patch('tf2_service.engines', return_value={})
+    @patch('tf2_service.installed_version', return_value='123')
+    @patch('tf2_service.check_current', return_value=True)
+    def test_update_preserves_space_free_alias_for_mixed_case_target(self, current, version, engines, screens):
+        target = self.config.game.parent / 'Team Fortress 2 Dedicated Server'
+        target.mkdir()
+        alias = self.config.game.parent / 'tf2'
+        alias.symlink_to(target, target_is_directory=True)
+        config = service.Config(alias, self.config.steamcmd, self.config.state)
+        with patch('tf2_service.subprocess.run', side_effect=self.fake_steamcmd) as run:
+            service.update(config)
+        args = run.call_args.args[0]
+        self.assertEqual(args[args.index('+force_install_dir') + 1], str(alias.absolute()))
+        self.assertNotIn(str(target), args)
 
     @patch('tf2_service.screens', return_value={})
     @patch('tf2_service.engines', return_value={})

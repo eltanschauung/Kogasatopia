@@ -35,6 +35,12 @@ checks; individual legacy `start_*_screen.sh` helpers bypass the update gate.
 4. If current, skip SteamCMD entirely. If outdated, unavailable, malformed, or
    the local version is unreadable, run anonymous SteamCMD for server app 232250
    against the existing shared installation, **without `validate`**.
+   Before invoking SteamCMD, require at least 1 GiB available on both its
+   bootstrap filesystem and the game filesystem. This is a minimum safety
+   margin, not a guarantee that every update will fit. Insufficient space is
+   reported directly in the journal; the wrapper never deletes data itself.
+   Preserve the configured `/home/kogasa/hlserver/tf2` alias in the command:
+   do not resolve it to the mixed-case Steam library path containing spaces.
 5. Require SteamCMD's successful exit and app-success marker. If Valve still
    explicitly reports an outdated version afterward, fail with neither screen
    started. A failed post-update API request may rely on confirmed SteamCMD
@@ -60,6 +66,14 @@ Startup decisions appear in `journalctl -u tf2`. The safe last-start summary is
 mode-0600 `steamcmd-*.private.log` files there, not in Git or chat. Do not dump
 raw screen output: existing private launch arguments can contain secrets.
 
+SteamCMD failures include the exit code and private-log path. Known disk-space
+errors are summarized without copying arbitrary private output into the journal.
+The production lowercase `steamapps/common/team fortress 2 dedicated server`
+path aliases the existing mixed-case installation. Both spellings must resolve
+to the same directory, not two partial installations. If recovering split
+files, stop both engines first and preserve conflicting files before merging;
+do not launch using only a recovered `steam.inf` without the rest of the update.
+
 ```sh
 python3 -m unittest discover -s tools/tests -p test_tf2_service.py -v
 # The existing watchdog suite uses its pinned virtualenv:
@@ -68,5 +82,6 @@ python3 -m unittest discover -s tools/tests -p test_tf2_service.py -v
 
 Tests mock version responses, SteamCMD, and screen operations. They cover
 current/outdated/unknown decisions, failure cleanup, update ordering, shared
-locking, no validation, no API-key transmission, and MGE-only shutdown. They do
+locking, disk-space preflight, configured install-alias preservation, private
+failure reporting, no validation, no API-key transmission, and MGE-only shutdown. They do
 not start production engines or update production files.

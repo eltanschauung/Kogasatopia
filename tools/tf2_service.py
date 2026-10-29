@@ -12,6 +12,7 @@ import logging
 import os
 from pathlib import Path
 import re
+import shutil
 import signal
 import subprocess
 import time
@@ -24,6 +25,7 @@ ROLES = ('tf2', 'mge')
 APP_ID = '232250'
 GAME_ID = '440'
 API = 'https://api.steampowered.com/ISteamApps/UpToDateCheck/v1/'
+MIN_UPDATE_FREE_BYTES = 1024 ** 3
 
 
 @dataclass(frozen=True)
@@ -193,14 +195,28 @@ def lifecycle_lock(config):
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
+def check_update_space(config):
+    # SteamCMD must update itself as well as the shared game installation.
+    for path in (config.steamcmd.parent.resolve(), config.game.resolve()):
+        free = shutil.disk_usage(path).free
+        if free < MIN_UPDATE_FREE_BYTES:
+            raise RuntimeError(
+                f'Insufficient disk space for SteamCMD/TF2 update at {path}: '
+                f'{free // (1024 ** 2)} MiB free; at least '
+                f'{MIN_UPDATE_FREE_BYTES // (1024 ** 2)} MiB required. '
+                'Free disk space and retry systemctl restart tf2; both screens remain stopped.')
+
+
 def update(config):
     if not config.steamcmd.is_file():
         raise RuntimeError('SteamCMD launcher is missing')
     if screens() or engines(config):
         raise RuntimeError('Refusing to update shared files while a managed server is running')
-    # Force the existing shared installation, not a second Steam library. No validate.
+    check_update_space(config)
+    # Preserve the configured alias: resolving it exposes a mixed-case path with
+    # spaces that SteamCMD can mis-handle when committing updated files on Linux.
     args = [str(config.steamcmd), '+@ShutdownOnFailedCommand', '1',
-            '+@NoPromptForPassword', '1', '+force_install_dir', str(config.game.resolve()),
+            '+@NoPromptForPassword', '1', '+force_install_dir', str(config.game.absolute()),
             '+login', 'anonymous', '+app_update', APP_ID, '+quit']
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     log = config.state / f'steamcmd-{stamp}.private.log'
@@ -214,7 +230,11 @@ def update(config):
         tail = output.read()
     success = re.search(rb"Success! App '232250' (?:fully installed|already up to date)\.", tail)
     if result.returncode or not success:
-        raise RuntimeError('SteamCMD did not confirm success; both screens remain stopped (private log saved)')
+        reason = ('SteamCMD reported insufficient disk space'
+                  if b'free disk space' in tail.lower() or b'not enough disk space' in tail.lower()
+                  else 'SteamCMD did not confirm success')
+        raise RuntimeError(f'{reason}; exit code {result.returncode}; '
+                           f'both screens remain stopped. Private log: {log}')
     installed_version(config.game)  # An incomplete installation must not launch.
     if check_current(config) is False:
         raise RuntimeError('TF2 remains outdated after SteamCMD; both screens remain stopped')
