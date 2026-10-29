@@ -9,6 +9,11 @@ are still rejected. It does not change the configured respawn ConVars.
 Toggling back to `0` cancels queued instant respawns and restores the selected
 native-wave or legacy policy, including clients already waiting to respawn.
 
+`sm_instant_respawn`, `sm_instant_respawns` and `sm_instant` toggle this ConVar.
+All three allow server-console use and require the kick admin flag, matching
+`sm_respawn`. The instant-respawn vote executes `tf/cfg/toggle_respawns.cfg`,
+which now invokes `sm_instant_respawn` rather than changing the underlying policy.
+
 `dgm_halve_respawn_waves` defaults to `1`.
 It changes how DGM's reduced-respawn state works, not the existing
 population/setup/admin policies which select that state.

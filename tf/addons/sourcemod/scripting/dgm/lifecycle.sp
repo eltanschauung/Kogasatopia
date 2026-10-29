@@ -85,6 +85,9 @@ void DGM_OnPluginStart()
     HookEvent("player_changeclass", DGM_Event_PlayerChangeClass, EventHookMode_Post);
 
 	RegAdminCmd("sm_respawn", Command_RespawnToggle, ADMFLAG_KICK, "Toggles respawn times");
+	RegAdminCmd("sm_instant_respawn", Command_InstantRespawnToggle, ADMFLAG_KICK, "Toggle forced instant respawns.");
+	RegAdminCmd("sm_instant_respawns", Command_InstantRespawnToggle, ADMFLAG_KICK, "Toggle forced instant respawns.");
+	RegAdminCmd("sm_instant", Command_InstantRespawnToggle, ADMFLAG_KICK, "Toggle forced instant respawns.");
 	RegAdminCmd("sm_noset", Command_ResetSetup, ADMFLAG_KICK, "Set round setup time to 10 seconds");
 	RegAdminCmd("sm_extend", Command_ExtendTimer, ADMFLAG_KICK, "sm_extend <seconds> - Set round timer time");
 	RegAdminCmd("sm_settime", Command_ExtendTimer, ADMFLAG_KICK, "sm_settime [seconds] - Show or set round timer time");

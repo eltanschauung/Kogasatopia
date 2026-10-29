@@ -168,6 +168,17 @@ public Action Command_CvarHelp(int client, int args)
     return Plugin_Handled;
 }
 
+public Action Command_InstantRespawnToggle(int client, int args)
+{
+    bool enabled = !g_cvInstantRespawn.BoolValue;
+    // Use the ConVar's change hook for all timer/native-wave reconciliation.
+    g_cvInstantRespawn.BoolValue = enabled;
+    CPrintToChatAll("{gold}[Respawn]{default} Instant respawns %s.", enabled ? "enabled" : "disabled; configured respawns restored");
+    PrintToServer("[Respawn] Instant respawns %s.", enabled ? "enabled" : "disabled; configured respawns restored");
+    LogAction(client, -1, "Toggled instant_respawn to %d.", enabled ? 1 : 0);
+    return Plugin_Handled;
+}
+
 public Action Command_RespawnToggle(int client, int args)
 {
     if (DGM_ShouldDisableInstantRespawn())

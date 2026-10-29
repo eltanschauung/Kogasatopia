@@ -13,6 +13,12 @@ methodmap TestConVar < Handle
     property bool BoolValue
     {
         public get() { return values[view_as<int>(this)] != 0.0; }
+        public set(bool enabled)
+        {
+            values[view_as<int>(this)] = enabled ? 1.0 : 0.0;
+            if (view_as<int>(this) == 1)
+                DGM_ConVarChangeInstantRespawn(this, enabled ? "0" : "1", enabled ? "1" : "0");
+        }
     }
     property float FloatValue
     {
@@ -31,6 +37,7 @@ TestConVar g_cvMpDisableRespawnTimes = view_as<TestConVar>(9);
 bool g_InternalOverride, inGame = true, alive, smallMode, nativeWaves, heavy;
 int team = 2, serial = 100, respawns, checks, failures;
 float lastDelay;
+int toggleAnnouncements, lastToggleActor = -1;
 Handle g_hRespawnTimers[MAXPLAYERS + 1], g_hRespawnReminderTimers[MAXPLAYERS + 1];
 stock bool Client_IsInGame(int client) { return client == 1 && inGame; }
 stock bool TestInGame(int client) { return Client_IsInGame(client); }
@@ -57,6 +64,17 @@ stock void CPrintToChat(int client, const char[] format, any ...)
     #pragma unused client
     #pragma unused format
 }
+stock void CPrintToChatAll(const char[] format, any ...)
+{
+    #pragma unused format
+    toggleAnnouncements++;
+}
+stock void TestLogAction(int client, int target, const char[] format, any ...)
+{
+    #pragma unused target
+    #pragma unused format
+    lastToggleActor = client;
+}
 stock void DGM_NativeWavesSync()
 {
     nativeWaves = !g_cvInstantRespawn.BoolValue && g_cvHalveRespawnWaves.BoolValue
@@ -72,8 +90,10 @@ stock void DGM_NativeWavesSync()
 #define TF2_RespawnPlayer TestRespawn
 #define CreateTimer TestTimer
 #define SetConVarBool TestSetConVarBool
+#define LogAction TestLogAction
 #include "instant_visual_under_test.inc"
 #include "respawn_timers.sp"
+#include "instant_command_under_test.inc"
 
 void Check(bool pass, const char[] name)
 {
@@ -152,6 +172,13 @@ public void OnPluginStart()
         "Heavy immunity returns when force mode turns off");
     Reset(); values[3] = 8.0; DGM_ScheduleDeathRespawn(1);
     Check(lastDelay == 8.0, "legacy override delay unchanged when disabled");
+    Reset();
+    Check(Command_InstantRespawnToggle(0, 0) == Plugin_Handled && values[1] == 1.0 && lastDelay == 0.0,
+        "console toggle enables instant respawn through the ConVar hook");
+    Check(toggleAnnouncements == 1 && lastToggleActor == 0, "console toggle announces and audits");
+    Check(Command_InstantRespawnToggle(1, 0) == Plugin_Handled && values[1] == 0.0 && lastDelay == 3.0,
+        "admin toggle disables instant respawn and restores the configured delay");
+    Check(toggleAnnouncements == 2 && lastToggleActor == 1, "admin toggle announces and audits");
     DGM_ClearAllRespawnTimers();
     PrintToServer("[InstantRespawnProbe] %d checks, %d failures", checks, failures);
 }
