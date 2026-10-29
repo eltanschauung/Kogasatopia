@@ -11,6 +11,9 @@
 #define HAT_EF_BONEMERGE_FASTCULL 0x0800
 
 #define MAX_HATS 32
+#define HAT_MAX_SLOTS 8
+#define HAT_SLOT_NAME_MAX 64
+#define HAT_SLOT_LIST_MAX (HAT_MAX_SLOTS * HAT_SLOT_NAME_MAX)
 #define HAT_COOKIE_VALUE_LEN 100
 const float HAT_COOKIE_SAVE_DELAY = 2.0;
 const float HAT_POSTINVENTORY_DELAY = 0.1;
@@ -41,7 +44,7 @@ enum struct HatConfig
 	bool force;
 	char id[64];
 	char name[64];
-	char slot[64];
+	char slot[HAT_SLOT_LIST_MAX];
 	char chatColor[32];
 	char chatColorBlu[32];
 	char prefix[128];
@@ -69,6 +72,8 @@ HatConfig g_Hats[MAX_HATS];
 int g_iHatEquippedClass[MAXPLAYERS + 1][MAX_HATS];
 int g_iHatCount = 0;
 int g_iDefaultHatIndex = -1;
+int g_iHatSlotCount[MAX_HATS];
+char g_szHatSlots[MAX_HATS][HAT_MAX_SLOTS][HAT_SLOT_NAME_MAX];
 enum
 {
 	CLASSMASK_ALL = (1 << 9) - 1,
@@ -82,6 +87,7 @@ enum
 	CLASSMASK_SNIPER = (1 << 7),
 	CLASSMASK_SPY = (1 << 8)
 };
+#include "hats/slots.sp"
 #include "hats/class_variants.sp"
 #include "hats/particles.sp"
 #include "hats/lifecycle.sp"

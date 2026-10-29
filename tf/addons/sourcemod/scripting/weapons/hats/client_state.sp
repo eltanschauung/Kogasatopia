@@ -189,7 +189,7 @@ bool NormalizeClientHatSlots(int client)
 		for (int j = 0; j < i; j++)
 		{
 			if (g_bHatEnabled[client][j]
-				&& StrEqual(g_Hats[i].slot, g_Hats[j].slot, false))
+				&& CustomHats_FindSharedSlot(i, j) >= 0)
 			{
 				g_bHatEnabled[client][i] = false;
 				RemoveHatIndex(client, i);
@@ -216,11 +216,12 @@ void SetClientHatEnabled(int client, int hatIndex, bool enabled, bool announceCo
 	{
 		for (int i = 0; i < g_iHatCount; i++)
 		{
-			if (i == hatIndex || !g_bHatEnabled[client][i]
-				|| !StrEqual(g_Hats[i].slot, g_Hats[hatIndex].slot, false))
+			if (i == hatIndex || !g_bHatEnabled[client][i])
 			{
 				continue;
 			}
+			int sharedSlot = CustomHats_FindSharedSlot(i, hatIndex);
+			if (sharedSlot < 0) continue;
 
 			g_bHatEnabled[client][i] = false;
 			RemoveHatIndex(client, i);
@@ -230,7 +231,7 @@ void SetClientHatEnabled(int client, int hatIndex, bool enabled, bool announceCo
 				GetHatChatColorForClientTeam(client, i, color, sizeof(color));
 				CPrintToChat(client,
 					"{gold}[CustomHats]{default} {%s}%s{default} was uneqipped due to sharing slot '%s'.",
-					color, g_Hats[i].name, g_Hats[i].slot);
+					color, g_Hats[i].name, g_szHatSlots[i][sharedSlot]);
 			}
 		}
 	}

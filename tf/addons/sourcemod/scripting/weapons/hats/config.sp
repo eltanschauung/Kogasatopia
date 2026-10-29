@@ -77,7 +77,14 @@ void LoadConfig()
 				ResetHatConfig(hat);
 				strcopy(hat.id, sizeof(hat.id), hatId);
 				kv.GetString("name", hat.name, sizeof(hat.name), hatId);
-				kv.GetString("slot", hat.slot, sizeof(hat.slot), "default");
+				char slotList[HAT_SLOT_LIST_MAX + 1];
+				kv.GetString("slot", slotList, sizeof(slotList), "default");
+				if (strlen(slotList) >= HAT_SLOT_LIST_MAX)
+				{
+					LogError("[CustomHats] Slot list for %s is too long (max %d bytes).", hat.id, HAT_SLOT_LIST_MAX - 1);
+					continue;
+				}
+				strcopy(hat.slot, sizeof(hat.slot), slotList);
 				TrimString(hat.slot);
 				Strings_ToLower(hat.slot, sizeof(hat.slot));
 				if (!hat.slot[0])

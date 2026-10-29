@@ -232,6 +232,12 @@ bool AddHatConfig(HatConfig hat)
 		strcopy(hat.name, sizeof(hat.name), hat.id);
 	}
 	int hatIndex = g_iHatCount;
+	if (!CustomHats_ParseSlots(hatIndex, hat.slot))
+	{
+		LogError("[CustomHats] Invalid slot list for %s (max %d distinct slots; names must be shorter than %d characters).",
+			hat.id, HAT_MAX_SLOTS, HAT_SLOT_NAME_MAX);
+		return false;
+	}
 	g_Hats[hatIndex] = hat;
 	if (hat.enabled && !hat.force && g_iDefaultHatIndex < 0)
 	{
