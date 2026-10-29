@@ -104,6 +104,7 @@ public void OnPluginStart()
 
 public void OnPluginEnd()
 {
+    WelfareRobot_OnPluginEnd();
     Lotteries_OnPluginEnd();
     Bounties_OnPluginEnd();
     MemomanEvent_OnPluginEnd();
@@ -188,6 +189,11 @@ public void OnClientPutInServer(int client)
 {
     GameplayRewards_OnClientPutInServer(client);
     WelfareRobot_OnClientPutInServer(client);
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+    WelfareRobot_OnClientReady(client);
 }
 
 public void OnClientDisconnect(int client)

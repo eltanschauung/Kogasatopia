@@ -20,6 +20,8 @@ int session = 1001, chosenAmount = 7, affected = 1;
 int testTeam = 2, hookedEvents;
 int registeredCommands, registeredCommandMask;
 bool human = true, owned = true, cookiesCached = true, optedIn = true;
+bool authorized = true;
+float testNow = 100.0;
 bool welfareEnabled = true, balanceReady = true;
 bool g_WelfareVolunteerResetUsed;
 bool volunteerEligible = true, volunteerNativeAvailable = true, resetAllowed = true;
@@ -80,9 +82,10 @@ StringMap g_StorePendingPurchaseReceipts[MAXPLAYERS + 1];
 int g_WelfarePoolBalance = 100, g_CumulativeSpentBalance;
 int g_PerMapStateGeneration = 1;
 DataPack g_WelfareCollectionRequest[MAXPLAYERS + 1];
+DataPack g_StorePurchaseLoad[MAXPLAYERS + 1], g_StoreBalanceLoad[MAXPLAYERS + 1];
 
 stock bool Client_IsHumanInGame(int client) { return client == 1 && human; }
-stock bool IsClientAuthorizedHuman(int client) { return Client_IsHumanInGame(client); }
+stock bool IsClientAuthorizedHuman(int client) { return Client_IsHumanInGame(client) && authorized; }
 stock bool GetClientSteamId64(int client, char[] value, int maxlen)
 {
     if (!IsClientAuthorizedHuman(client)) return false;
@@ -187,15 +190,18 @@ stock Handle TestTimer(float interval, Timer callback, any serial, int flags)
 {
     #pragma unused callback
     if (flags != TIMER_FLAG_NO_MAPCHANGE) failures++;
-    delay = interval;
-    timerSerial = serial;
+    if (interval != 1.0)
+    {
+        delay = interval;
+        timerSerial = serial;
+    }
     return CreateDataPack();
 }
 stock void TestHook(const char[] name, EventHook callback, EventHookMode mode)
 {
     #pragma unused callback
     hookedEvents++;
-    if (StrEqual(name, "player_team"))
+    if (StrEqual(name, "player_team") || StrEqual(name, "player_spawn"))
     {
         if (mode != EventHookMode_Post) failures++;
     }
@@ -280,6 +286,8 @@ stock void Oblivion_ChatAllEx(int client, const char[] format, any ...)
 #define RegConsoleCmd TestRegisterCommand
 #define GetFeatureStatus TestFeatureStatus
 #define LogError TestLogError
+stock float TestEngineTime() { return testNow; }
+#define GetEngineTime TestEngineTime
 #include "welfare_under_test.inc"
 #include "welfare_robot.sp"
 
@@ -296,6 +304,11 @@ void CompleteSql(const char[] error = "")
 }
 void Fresh()
 {
+    delete g_WelfareRobotRetryTimer;
+    g_WelfareRobotNextPoolRetry = 0.0;
+    g_StorePurchaseLoad[1] = g_StoreBalanceLoad[1] = null;
+    authorized = true;
+    testNow = 100.0;
     WelfareRobot_ResetClient(1);
     if (g_WelfareRobotTeamJoinsThisMap != null) g_WelfareRobotTeamJoinsThisMap.Clear();
     strcopy(testIdentity, sizeof(testIdentity), "test-client-one");
@@ -330,13 +343,211 @@ void ChangeTeam(int team, bool disconnect = false, int userId = -1)
     delete event;
 }
 
+void RetryTick()
+{
+    Handle timer = g_WelfareRobotRetryTimer;
+    Check(timer != null, "unresolved collection has a retry wakeup");
+    if (timer == null) return;
+    testNow += BP_WELFARE_ROBOT_RETRY_INTERVAL;
+    Timer_WelfareRobotRetry(timer);
+    delete timer;
+}
+
+void Spawn()
+{
+    Event event = CreateEvent("player_spawn", true);
+    event.SetInt("userid", session);
+    Event_WelfareRobotSpawn(event, "player_spawn", false);
+    delete event;
+}
+
+void TestReconciliation()
+{
+    Fresh();
+    human = false;
+    WelfareRobot_OnMapEnd();
+    WelfareRobot_OnMapStart();
+    Event_WelfareRobotRoundStart(null, "", false);
+    human = true;
+    testTeam = 1;
+    WelfareRobot_OnClientPutInServer(1);
+    Event event = CreateEvent("player_team", true);
+    event.SetInt("userid", session);
+    event.SetInt("oldteam", 1);
+    event.SetInt("team", 2);
+    Event_WelfareRobotTeamChanged(event, "player_team", false);
+    delete event;
+    Check(queuedSql == null && g_WelfareRobotCollectionPending[1],
+        "late map entrant waits when team event precedes team property update");
+    testTeam = 2;
+    RetryTick();
+    Check(queuedSql != null, "catch-up timer collects after late entrant actually reaches RED");
+    CompleteSql();
+    Check(collected == 1, "late map entrant receives exactly one collection");
+
+    Fresh();
+    population = 2;
+    WelfareRobot_AttemptCollection(1);
+    population = 3;
+    RetryTick();
+    Check(queuedSql != null, "population recovery wakes robot without another event");
+    CompleteSql();
+    WelfareRobot_ResumePendingCollections();
+    Check(queuedSql == null && g_WelfareRobotRetryTimer == null,
+        "completed collection needs no background retry timer");
+
+    Fresh();
+    g_WelfarePoolBalance = 0;
+    WelfareRobot_AttemptCollection(1);
+    RetryTick();
+    Check(queuedSql == null, "retry cannot withdraw from an empty pool");
+    g_WelfarePoolBalance = 100;
+    RetryTick();
+    Check(queuedSql != null, "funded pool wakes pending robot without a round event");
+    CompleteSql();
+
+    Fresh();
+    authorized = false;
+    g_WelfareRobotPreferenceLoaded[1] = false;
+    g_ClientPurchasesLoaded[1] = balanceReady = false;
+    WelfareRobot_AttemptCollection(1);
+    RetryTick();
+    Check(queuedSql == null && !g_WelfareRobotPreferenceLoaded[1],
+        "retry does not read unauthenticated preferences or issue a debit");
+    authorized = true;
+    g_StorePurchaseLoad[1] = new DataPack();
+    g_StoreBalanceLoad[1] = new DataPack();
+    int beforeLoads = loads;
+    RetryTick();
+    Check(g_WelfareRobotPreferenceLoaded[1] && queuedSql == null && loads == beforeLoads,
+        "retry hydrates cookies but never duplicates outstanding ownership/balance reads");
+    delete g_StorePurchaseLoad[1];
+    delete g_StoreBalanceLoad[1];
+    RetryTick();
+    Check(loads == beforeLoads, "missing load retries respect the five-second throttle");
+    testNow += BP_WELFARE_ROBOT_LOAD_RETRY_INTERVAL;
+    RetryTick();
+    Check(loads == beforeLoads + 2, "missing ownership and balance loads are retried after throttle");
+    g_ClientPurchasesLoaded[1] = balanceReady = true;
+    RetryTick();
+    Check(queuedSql != null, "robot completes when delayed authorization/load data finally arrives");
+    CompleteSql();
+
+    Fresh();
+    g_WelfareRobotCollectionPending[1] = false;
+    Spawn();
+    Check(queuedSql != null, "first spawn catches a missing playing-team event");
+    DataPack request = queuedSql;
+    Spawn();
+    Check(queuedSql == request, "repeated spawn cannot duplicate the first-join withdrawal");
+    CompleteSql();
+    Fresh();
+    g_WelfareRobotCollectionPending[1] = false;
+    ChangeTeam(3);
+    Check(queuedSql != null, "first observed RED-to-BLU restore does not require a spectator oldteam");
+    CompleteSql();
+
+    Fresh();
+    WelfareRobot_AttemptCollection(1);
+    CompleteSql("simulated transient database error");
+    Check(queuedSql == null && g_WelfareRobotCollectionPending[1],
+        "failed automatic withdrawal rearms instead of losing the collection opportunity");
+    RetryTick();
+    Check(queuedSql != null, "automatic SQL failure retries on timer, not recursively");
+    CompleteSql();
+    Check(collected == 1, "recovered SQL failure pays once");
+
+    Fresh();
+    WelfareRobot_AttemptCollection(1);
+    affected = 0;
+    CompleteSql();
+    Check(g_WelfareRobotCollectionPending[1] && collected == 0,
+        "contended conditional pool debit preserves pending work without crediting");
+    affected = 1;
+    RetryTick();
+    Check(queuedSql != null, "pool contention is recoverable without another gameplay event");
+    CompleteSql();
+
+    Fresh();
+    testTeam = 1;
+    WelfareRobot_AttemptCollection(1, true);
+    CompleteSql("simulated spectator fallback error");
+    Check(g_WelfareRobotCollectionPending[1] && g_WelfareRobotAllowSpectator[1],
+        "failed round-end collection retains spectator fallback permission");
+    RetryTick();
+    Check(queuedSql != null, "spectator fallback retries after database recovery");
+    CompleteSql();
+    Check(!g_WelfareRobotAllowSpectator[1] && collected == 1,
+        "successful spectator recovery consumes fallback permission");
+
+    Fresh();
+    testTeam = 1;
+    authorized = false;
+    g_WelfareRobotPreferenceLoaded[1] = false;
+    WelfareRobot_AttemptCollection(1, true);
+    authorized = true;
+    WelfareRobot_OnClientReady(1);
+    Check(queuedSql != null && g_WelfareRobotAllowSpectator[1],
+        "late authorization preserves the already-granted round-end fallback");
+    CompleteSql();
+
+    Fresh();
+    Command_Welfare(1, 0);
+    request = queuedSql;
+    WelfareRobot_AttemptCollection(1);
+    Check(g_WelfareRobotCollectionPending[1] && queuedSql == request,
+        "robot waiting behind a manual withdrawal retains pending work");
+    RetryTick();
+    Check(queuedSql == request, "retry cannot overlap an existing manual pool debit");
+    CompleteSql();
+    RetryTick();
+    Check(queuedSql == null && collected == 1 && !g_WelfareRobotCollectionPending[1],
+        "manual completion resolves pending robot without double payment");
+
+    Fresh();
+    WelfareRobot_AttemptCollection(1);
+    g_PerMapStateGeneration++;
+    CompleteSql("simulated old-map failure");
+    Check(!g_WelfareRobotCollectionPending[1] && g_WelfareRobotRetryTimer == null,
+        "old-map SQL failure never rearms a new-map collection");
+    Fresh();
+    WelfareRobot_AttemptCollection(1);
+    WelfareRobot_ResetClient(1);
+    session++;
+    CompleteSql("simulated disconnected-session failure");
+    Check(!g_WelfareRobotCollectionPending[1], "stale session failure cannot rearm a recycled client");
+
+    Fresh();
+    population = 2;
+    WelfareRobot_AttemptCollection(1);
+    Check(g_WelfareRobotRetryTimer != null, "map has active unresolved collection timer");
+    WelfareRobot_OnMapEnd();
+    Check(g_WelfareRobotRetryTimer == null && !g_WelfareRobotCollectionPending[1],
+        "map end cancels retries and clears old pending work");
+    WelfareRobot_OnMapStart();
+    Handle current = g_WelfareRobotRetryTimer;
+    Handle stale = new DataPack();
+    Check(Timer_WelfareRobotRetry(stale) == Plugin_Stop && g_WelfareRobotRetryTimer == current,
+        "stale callback cannot replace the new map's authoritative timer");
+    delete stale;
+    Fresh();
+    testTeam = 1;
+    WelfareRobot_OnClientPutInServer(1);
+    RetryTick();
+    Check(g_WelfareRobotCollectionPending[1] && g_WelfareRobotRetryTimer == null && queuedSql == null,
+        "idle spectator retains deferral without sustaining background polling");
+    WelfareRobot_OnPluginEnd();
+    Check(g_WelfareRobotTeamJoinsThisMap == null && g_WelfareRobotRetryTimer == null,
+        "plugin unload releases retry and first-join state");
+}
+
 public void OnPluginStart()
 {
     Fresh();
     g_ClientPurchasesLoaded[1] = false;
     WelfareRobot_OnPluginStart();
     g_ClientPurchasesLoaded[1] = true;
-    Check(hookedEvents == 3, "round start, round end and team changes hooked without polling");
+    Check(hookedEvents == 4, "round start/end, team changes and spawn catch-up hooked");
     Check(registeredCommands == 3 && registeredCommandMask == 7, "all three explicit robot command aliases registered");
     Check(WelfareRobot_CanCollect(1), "owned robot defaults enabled");
     Check(!WelfareRobot_CanCollect(2), "no fake or disconnected targets");
@@ -660,7 +871,7 @@ public void OnPluginStart()
         "round-end fallback remains authorized while ownership loads");
     g_ClientPurchasesLoaded[1] = true;
     WelfareRobot_ResumeCollection(1);
-    Check(queuedSql != null && !g_WelfareRobotAllowSpectator[1], "late ownership callback collects spectator fallback exactly once");
+    Check(queuedSql != null && !g_WelfareRobotCollectionPending[1], "late ownership callback collects spectator fallback exactly once");
     CompleteSql();
 
     Fresh();
@@ -891,5 +1102,6 @@ public void OnPluginStart()
     WelfareRobot_SetEnabled(1, false);
     Check(StrContains(lastReply, "{cyan}[Treats]{default} Automatic welfare") == 0,
         "robot disable message uses configured prefix");
+    TestReconciliation();
     PrintToServer("[WelfareRobotProbe] %d checks, %d failures", checks, failures);
 }

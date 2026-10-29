@@ -339,6 +339,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
     if (error[0] != '\0')
     {
         LogError("[points_store] Welfare pool debit failed: %s", error);
+        WelfareRobot_RetryFailedCollection(client, generation, ownsRequest, automatic);
         if (!automatic && ownsRequest && Client_IsHumanInGame(client))
         {
             CPrintToChat(client, "%s Could not collect welfare right now.", prefix);
@@ -348,6 +349,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
 
     if (results == null || results.AffectedRows <= 0)
     {
+        WelfareRobot_RetryFailedCollection(client, generation, ownsRequest, automatic);
         LoadEconomyState();
         if (!automatic && ownsRequest && Client_IsHumanInGame(client))
         {
@@ -369,6 +371,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
         QueueEconomyDelta(BP_ECONOMY_WELFARE_POOL_KEY, amount);
         g_WelfarePoolBalance += amount;
         LogEconomyEvent("welfare_pool_refund", client, amount, "welfare", 0, g_WelfarePoolBalance, g_CumulativeSpentBalance);
+        WelfareRobot_RetryFailedCollection(client, generation, ownsRequest, automatic);
         if (!automatic && ownsRequest && Client_IsHumanInGame(client))
         {
             CPrintToChat(client, "%s Could not collect welfare right now.", prefix);

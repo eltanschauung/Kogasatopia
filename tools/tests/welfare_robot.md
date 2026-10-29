@@ -7,7 +7,9 @@ enabled/disabled preference is a private ClientPrefs cookie.
 
 On each `teamplay_round_start`, connected human owners with their robot enabled
 attempt collection if already on RED/BLU. Spectators/unassigned owners defer the
-attempt until a `player_team` post event places them on RED/BLU. If still waiting
+attempt until a `player_team` post event places them on RED/BLU. The first
+observed playing-team event or spawn also catches restored team membership,
+without requiring `oldteam` to have been spectator. If still waiting
 at round end (`teamplay_round_win`, TF2's round-end event), attempt collection in
 spectator instead. The three-second purchase attempt follows the same team gate.
 Map start and client entry also arm collection, so the initial round-start event
@@ -17,8 +19,16 @@ readiness callbacks resume pending collections; "not loaded" is never treated
 as "not owned". Round-end spectator permission remains attached to the pending
 attempt until consumed, or is reset by the next round/map. Known disabled or
 non-owned robots do not retain work. Deferred state is consumed before SQL
-begins, and cleared on disable, disconnect, or map end. There is no background
-polling or offline collection. Normal population, pool,
+begins, and cleared on disable, disconnect, or map end. A single shared one-shot
+timer retries unresolved eligible work once a second, rather than depending on
+another round/team/database event to wake it. Missing ownership/balance reads
+are retried at most every five seconds and never while their request tokens
+are outstanding. Pool refreshes are also throttled to five seconds. There is no
+per-client/frame timer, no persistent polling of idle spectators, and no offline
+collection. The timer stops when work is resolved and is cancelled at map end
+or plugin unload. Authorization, team entry, and first spawn provide catch-up
+signals for clients still loading when the initial round-start event occurred.
+Normal population, pool,
 balance-readiness and once-per-map requirements remain in force, including the
 existing volunteer reset. Unavailable automatic attempts are silent.
 
@@ -47,7 +57,11 @@ Pool updates remain conditional on sufficient funds. Callback validation checks
 the client serial, request token, map-state generation, ownership and enabled
 state before awarding automatic currency. A successful withdrawal that cannot
 be credited is returned to the pool using the existing economy-delta path.
-Disconnect/map-end invalidation never deletes a SQL-owned DataPack.
+Disconnect/map-end invalidation never deletes a SQL-owned DataPack. Failed
+automatic debits rearm only the same live client session/map generation and
+retry on the shared timer, never recursively inside a SQL callback. Round-end
+spectator permission survives a failed debit. A robot waiting behind a manual
+withdrawal stays pending until the shared once-per-map guard resolves it.
 
 ## Regression probe
 
@@ -76,6 +90,13 @@ The probe also extracts the actual delayed volunteer-reset callback and checks
 second-round rearming, announcement-before-query/output ordering, duplicate
 timers, spectator fallback, disabled robots, missing/reset-ineligible state,
 disconnect/slot reuse and delayed prerequisites.
+Retry regressions cover clients joining after the initial round-start event,
+team events arriving before the observable team property changes, missing
+team events recovered by spawn, authorization/cookie/ownership/balance delays,
+request-token deduplication and read throttling, population/pool recovery with
+no new lifecycle event, SQL errors/pool contention, spectator fallback recovery,
+manual/automatic overlap, map-generation/serial invalidation, stale timer
+rejection, map/unload cancellation, and no perpetual idle-spectator polling.
 
 This validates deterministic policy and callback behavior, not a real purchase
 or network/database fault injection. The production plugin must also compile
