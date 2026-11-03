@@ -167,8 +167,37 @@ void BuildEquipMenu() {
 		}
 		
 		s_EquipMenu.AddItem(uid, item.displayName);
+		
+		// paint option; only drawn while the item is equipped (see OnEquipMenuEvent)
+		if (item.paintable) {
+			char paintKey[MAX_ITEM_IDENTIFIER_LENGTH + 8], paintLabel[MAX_ITEM_NAME_LENGTH + 8];
+			FormatEx(paintKey, sizeof(paintKey), "%s%s", WEAPON_PAINT_MENU_PREFIX, uid);
+			FormatEx(paintLabel, sizeof(paintLabel), "Paint %s", item.displayName);
+			s_EquipMenu.AddItem(paintKey, paintLabel);
+		}
 	}
 	delete itemList;
+}
+
+/**
+ * Returns the item uid if a menu item key is a "Paint <item>" entry.
+ */
+static bool GetPaintEntryUid(const char[] key, char[] uid, int maxlen) {
+	int prefixLength = strlen(WEAPON_PAINT_MENU_PREFIX);
+	if (strncmp(key, WEAPON_PAINT_MENU_PREFIX, prefixLength) != 0) {
+		return false;
+	}
+	strcopy(uid, maxlen, key[prefixLength]);
+	return true;
+}
+
+/**
+ * Shows the weapon list for the class / slot the client was last browsing in sm_cw.
+ */
+void WeaponsLoadout_DisplayEquipMenu(int client) {
+	if (g_iPlayerClassInMenu[client]) {
+		s_EquipMenu.Display(client, 30);
+	}
 }
 
 /**
@@ -344,8 +373,16 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 			int client = param1;
 			int position = param2;
 			
+			char key[MAX_ITEM_IDENTIFIER_LENGTH + 8];
+			menu.GetItem(position, key, sizeof(key));
+			
 			char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-			menu.GetItem(position, uid, sizeof(uid));
+			if (GetPaintEntryUid(key, uid, sizeof(uid))) {
+				EmitSoundToClient(client, SOUND_MENU_BUTTON_CLICK);
+				WeaponsPaint_ShowMenu(client, uid);
+				return 0;
+			}
+			strcopy(uid, sizeof(uid), key);
 			
 			EmitSoundToClient(client, SOUND_MENU_BUTTON_EQUIP);
 			
@@ -380,8 +417,22 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 			int client = param1;
 			int position = param2;
 			
+			char key[MAX_ITEM_IDENTIFIER_LENGTH + 8];
+			menu.GetItem(position, key, sizeof(key));
+			
 			char uid[MAX_ITEM_IDENTIFIER_LENGTH];
-			menu.GetItem(position, uid, sizeof(uid));
+			if (GetPaintEntryUid(key, uid, sizeof(uid))) {
+				// paint entries only show under the item while it's equipped in this slot
+				CustomItemDefinition paintItem;
+				if (!GetCustomItemDefinition(uid, paintItem) || !paintItem.paintable
+						|| !ItemVisibleInEquipMenu(client, paintItem)
+						|| !StrEqual(g_CurrentLoadout[client][g_iPlayerClassInMenu[client]]
+								[g_iPlayerSlotInMenu[client]].uid, uid)) {
+					return ITEMDRAW_IGNORE;
+				}
+				return ITEMDRAW_DEFAULT;
+			}
+			strcopy(uid, sizeof(uid), key);
 			
 			if (!uid[0]) {
 				// "no custom item" is always visible
@@ -402,8 +453,14 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 			int client = param1;
 			int position = param2;
 			
-			char uid[MAX_ITEM_IDENTIFIER_LENGTH], itemName[MAX_ITEM_NAME_LENGTH];
+			char uid[MAX_ITEM_IDENTIFIER_LENGTH + 8], itemName[MAX_ITEM_NAME_LENGTH + 8];
 			menu.GetItem(position, uid, sizeof(uid), _, itemName, sizeof(itemName));
+			
+			char paintUid[MAX_ITEM_IDENTIFIER_LENGTH];
+			if (GetPaintEntryUid(uid, paintUid, sizeof(paintUid))) {
+				// "Paint <item>" label is fixed when the menu is built
+				return 0;
+			}
 			
 			CustomItemDefinition item;
 			GetCustomItemDefinition(uid, item);
@@ -430,6 +487,11 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 					strcopy(itemName, sizeof(itemName), localizedName);
 					redraw = true;
 				}
+			}
+			
+			if (uid[0] && item.paintable) {
+				Format(itemName, sizeof(itemName), "%s (Paintable)", itemName);
+				redraw = true;
 			}
 			
 			if (equipped) {

@@ -440,6 +440,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		if (IsValidEntity(weaponvm)) {
 			SetEntityModel(weaponvm, vm);
 			CopyKillstreakSheen(weapon, weaponvm);
+			WeaponsPaint_CopyToWearable(weapon, weaponvm);
 			EquipWeaponModelWearable(client, weaponvm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponvm, client, "viewmodel_wearable_vm", true, weapon);
 			
@@ -461,6 +462,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		if (IsValidEntity(weaponwm)) {
 			SetEntityModel(weaponwm, wm);
 			CopyKillstreakSheen(weapon, weaponwm);
+			WeaponsPaint_CopyToWearable(weapon, weaponwm);
 			
 			EquipWeaponModelWearable(client, weaponwm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponwm, client, "worldmodel_wearable", true, weapon);
@@ -623,6 +625,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			if (IsValidEntity(weaponvm)) {
 				SetEntityModel(weaponvm, vm);
 				CopyKillstreakSheen(weapon, weaponvm);
+				WeaponsPaint_CopyToWearable(weapon, weaponvm);
 				EquipWeaponModelWearable(client, weaponvm, weapon);
 				Weapons_MarkValidatedAttachedEntity(weaponvm, client, "fallback_weapon_viewmodel", true, weapon);
 				
