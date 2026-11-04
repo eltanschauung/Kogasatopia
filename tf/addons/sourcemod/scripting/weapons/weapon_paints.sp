@@ -1,7 +1,7 @@
 /**
  * Paint support for custom items marked `"paintable" "true"` in weapons.cfg.
  *
- * Paints are chosen from the sm_cw menu (a "Paint <item>" entry under the equipped item) and are
+ * Paints are chosen before equipping a paintable item from the sm_cw menu and are
  * applied the same way the custom hats module paints hats: through the "set item tint RGB"
  * attributes (142 / 261).  Whether the paint actually shows depends on the item's materials
  * using the ItemTintColor proxy.
@@ -18,18 +18,21 @@
 // Encoded choice: 0 = no paint, 1..N = stock paint index, flag | rgb = custom color.
 #define WEAPON_PAINT_CUSTOM_FLAG 0x1000000
 #define WEAPON_PAINT_RGB_MASK 0xFFFFFF
+#define WEAPON_PAINT_NEAR_BLACK 0x010101
 
 #define WEAPON_PAINT_COOKIE_CHUNKS 4
 #define WEAPON_PAINT_COOKIE_LEN 100
 #define WEAPON_PAINT_PROMPT_SECONDS 60.0
 #define WEAPON_PAINT_MENU_KEY_CUSTOM "custom"
-#define WEAPON_PAINT_MENU_PREFIX "paint:"
 
 static Cookie s_PaintCookies[WEAPON_PAINT_COOKIE_CHUNKS];
 static StringMap s_PaintChoices[MAXPLAYERS + 1];
 static int s_PaintCookieChunksUsed[MAXPLAYERS + 1];
 
 static char s_PaintMenuUid[MAXPLAYERS + 1][MAX_ITEM_IDENTIFIER_LENGTH];
+static int s_PaintMenuClass[MAXPLAYERS + 1];
+static int s_PaintMenuSlot[MAXPLAYERS + 1];
+static int s_PaintMenuRevision[MAXPLAYERS + 1];
 static char s_PaintPromptUid[MAXPLAYERS + 1][MAX_ITEM_IDENTIFIER_LENGTH];
 static bool s_bAwaitingCustomPaint[MAXPLAYERS + 1];
 static float s_flCustomPaintPromptTime[MAXPLAYERS + 1];
@@ -50,7 +53,7 @@ void WeaponsPaint_OnPluginStart() {
 
 void WeaponsPaint_OnClientCookiesCached(int client) {
 	ResetPaintChoices(client);
-	WeaponsPaint_ClearPrompt(client);
+	WeaponsPaint_ClearSelection(client);
 
 	char chunk[WEAPON_PAINT_COOKIE_LEN];
 	int chunksUsed;
@@ -81,7 +84,14 @@ static void ReadPaintCookieChunk(StringMap choices, const char[] chunk) {
 void WeaponsPaint_OnClientDisconnect(int client) {
 	delete s_PaintChoices[client];
 	s_PaintCookieChunksUsed[client] = 0;
+	WeaponsPaint_ClearSelection(client);
+}
+
+void WeaponsPaint_ClearSelection(int client) {
 	s_PaintMenuUid[client][0] = '\0';
+	s_PaintMenuClass[client] = 0;
+	s_PaintMenuSlot[client] = -1;
+	s_PaintMenuRevision[client] = 0;
 	WeaponsPaint_ClearPrompt(client);
 }
 
@@ -112,35 +122,58 @@ void WeaponsPaint_CopyToWearable(int weapon, int wearable) {
 	}
 	CopyPaintAttribute(weapon, wearable, WEAPON_PAINT_ATTRIB_RED);
 	CopyPaintAttribute(weapon, wearable, WEAPON_PAINT_ATTRIB_BLU);
+	if (WeaponsPaint_HasTint(weapon)) {
+		// ItemTintColor ignores an uninitialized CEconItemView. Keep the renderer's
+		// undefined defindex: copying a real item's schema can replace its model.
+		SetEntProp(wearable, Prop_Send, "m_bOnlyIterateItemViewAttributes", 1);
+		SetEntProp(wearable, Prop_Send, "m_bInitialized", 1);
+	}
+}
+
+bool WeaponsPaint_HasTint(int entity) {
+	return WeaponsAttrib_GetByDefIndex(entity, WEAPON_PAINT_ATTRIB_RED) != Address_Null
+			|| WeaponsAttrib_GetByDefIndex(entity, WEAPON_PAINT_ATTRIB_BLU) != Address_Null;
+}
+
+bool WeaponsPaint_WearableMatches(int weapon, int wearable) {
+	if (WeaponsPaint_HasTint(weapon)
+			&& !GetEntProp(wearable, Prop_Send, "m_bInitialized")) return false;
+	return PaintAttributeMatches(weapon, wearable, WEAPON_PAINT_ATTRIB_RED)
+			&& PaintAttributeMatches(weapon, wearable, WEAPON_PAINT_ATTRIB_BLU);
+}
+
+static bool PaintAttributeMatches(int from, int to, int defindex) {
+	Address source = WeaponsAttrib_GetByDefIndex(from, defindex);
+	Address target = WeaponsAttrib_GetByDefIndex(to, defindex);
+	if (!source || !target) return source == target;
+	return WeaponsAttrib_GetValue(source) == WeaponsAttrib_GetValue(target);
 }
 
 /**
  * Shows the paint selection menu for a paintable item.  Only reached from the sm_cw menu.
  */
 void WeaponsPaint_ShowMenu(int client, const char[] uid) {
-	s_bAwaitingCustomPaint[client] = false;
+	// uid may refer to the prompt buffer that ClearSelection resets.
+	char requestedUid[MAX_ITEM_IDENTIFIER_LENGTH];
+	strcopy(requestedUid, sizeof(requestedUid), uid);
+	WeaponsPaint_ClearSelection(client);
 	CustomItemDefinition item;
-	if (!GetCustomItemDefinition(uid, item) || !WeaponsLoadout_CanPaintItem(client, item)) {
+	if (!GetCustomItemDefinition(requestedUid, item) || !WeaponsLoadout_CanPaintItem(client, item)) {
 		WeaponsLoadout_DisplayEquipMenu(client);
 		return;
 	}
-	strcopy(s_PaintMenuUid[client], sizeof(s_PaintMenuUid[]), uid);
+	strcopy(s_PaintMenuUid[client], sizeof(s_PaintMenuUid[]), requestedUid);
+	WeaponsLoadout_GetMenuContext(client, s_PaintMenuClass[client], s_PaintMenuSlot[client]);
+	s_PaintMenuRevision[client] = Weapons_GetLoadoutRevision(client);
 
 	char current[64];
-	DescribePaintChoice(GetPaintChoice(client, uid), current, sizeof(current));
+	DescribePaintChoice(GetPaintChoice(client, requestedUid), current, sizeof(current));
 
 	Menu menu = new Menu(MenuHandler_WeaponPaint);
 	menu.SetTitle("Select Paint: %s\nCurrent: %s", item.displayName, current);
 
-	char key[8], name[48];
-	CustomHats_GetPaintName(0, name, sizeof(name));
-	menu.AddItem("0", name);
+	CustomHats_AddPaintMenuItems(menu);
 	menu.AddItem(WEAPON_PAINT_MENU_KEY_CUSTOM, "Custom paint (type a chat color)");
-	for (int i = 1; i < CustomHats_GetPaintCount(); i++) {
-		IntToString(i, key, sizeof(key));
-		CustomHats_GetPaintName(i, name, sizeof(name));
-		menu.AddItem(key, name);
-	}
 
 	menu.ExitBackButton = true;
 	menu.Display(client, 30);
@@ -164,6 +197,7 @@ static int MenuHandler_WeaponPaint(Menu menu, MenuAction action, int client, int
 		CPrintToChat(client, "{gold}[Weapons]{default} %s applied.", name);
 		WeaponsLoadout_DisplayEquipMenu(client);
 	} else if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsClientInGame(client)) {
+		WeaponsPaint_ClearSelection(client);
 		WeaponsLoadout_DisplayEquipMenu(client);
 	} else if (action == MenuAction_End) {
 		delete menu;
@@ -171,10 +205,19 @@ static int MenuHandler_WeaponPaint(Menu menu, MenuAction action, int client, int
 	return 0;
 }
 
+static bool GetPendingPaintItem(int client, const char[] uid, CustomItemDefinition item) {
+	int playerClass, slot;
+	WeaponsLoadout_GetMenuContext(client, playerClass, slot);
+	return uid[0] && StrEqual(uid, s_PaintMenuUid[client])
+			&& s_PaintMenuClass[client] == playerClass
+			&& s_PaintMenuSlot[client] == slot
+			&& s_PaintMenuRevision[client] == Weapons_GetLoadoutRevision(client)
+			&& GetCustomItemDefinition(uid, item) && WeaponsLoadout_CanPaintItem(client, item);
+}
+
 static void StartCustomPaintPrompt(int client) {
 	CustomItemDefinition item;
-	if (!GetCustomItemDefinition(s_PaintMenuUid[client], item)
-			|| !WeaponsLoadout_CanPaintItem(client, item)) return;
+	if (!GetPendingPaintItem(client, s_PaintMenuUid[client], item)) return;
 	strcopy(s_PaintPromptUid[client], sizeof(s_PaintPromptUid[]), s_PaintMenuUid[client]);
 	s_bAwaitingCustomPaint[client] = true;
 	s_flCustomPaintPromptTime[client] = GetEngineTime();
@@ -226,9 +269,9 @@ Action WeaponsPaint_OnClientSayCommand(int client, const char[] message) {
 		return Plugin_Handled;
 	}
 
-	// a paint value of 0 means "unpainted" to the game, so pure black becomes #000001
+	// 0 means no paint; 1 is TF2's legacy team-paint sentinel, not near-black.
 	if (rgb == 0) {
-		rgb = 1;
+		rgb = WEAPON_PAINT_NEAR_BLACK;
 	}
 
 	s_bAwaitingCustomPaint[client] = false;
@@ -295,8 +338,9 @@ static int GetPaintChoice(int client, const char[] uid) {
 
 static bool SetPaintChoice(int client, const char[] uid, int choice) {
 	CustomItemDefinition item;
-	if (!uid[0] || !GetCustomItemDefinition(uid, item) || !WeaponsLoadout_CanPaintItem(client, item)) {
-		CPrintToChat(client, "{gold}[Weapons]{default} This item is no longer equipped or available to paint.");
+	if (!GetPendingPaintItem(client, uid, item)) {
+		WeaponsPaint_ClearSelection(client);
+		CPrintToChat(client, "{gold}[Weapons]{default} This item is no longer available. Select it again.");
 		return false;
 	}
 	if (!s_PaintChoices[client]) {
@@ -314,7 +358,9 @@ static bool SetPaintChoice(int client, const char[] uid, int choice) {
 		CPrintToChat(client, "{gold}[Weapons]{default} Paint storage is full. Clear another item's paint first.");
 		return false;
 	}
-	RefreshLiveItemPaint(client, uid);
+	if (!WeaponsLoadout_EquipMenuItem(client, item)) return false;
+	RefreshLiveItemPaint(client, item.uid);
+	WeaponsPaint_ClearSelection(client);
 	return true;
 }
 
@@ -325,8 +371,8 @@ static void ResetPaintChoices(int client) {
 }
 
 /**
- * Repaints the live item and its existing model wearables, with normal validation
- * as a fallback if an override model is missing.
+ * Repaints the live item and queues replacement render wearables if their
+ * client-cached tint no longer matches.
  */
 static void RefreshLiveItemPaint(int client, const char[] uid) {
 	if (!IsClientInGame(client)) {
@@ -377,7 +423,9 @@ static bool EntityHasItemUID(int entity, const char[] uid) {
 
 static void SetPaintAttributes(int entity, int choice) {
 	if (choice & WEAPON_PAINT_CUSTOM_FLAG) {
-		float value = float(choice & WEAPON_PAINT_RGB_MASK);
+		int rgb = choice & WEAPON_PAINT_RGB_MASK;
+		// Older cookies encoded black as 1, which the engine treats as team paint.
+		float value = float(rgb <= 1 ? WEAPON_PAINT_NEAR_BLACK : rgb);
 		SetItemPaintTintAttribute(entity, WEAPON_PAINT_ATTRIB_RED, value);
 		SetItemPaintTintAttribute(entity, WEAPON_PAINT_ATTRIB_BLU, value);
 	} else if (choice > 0) {
@@ -427,8 +475,7 @@ static bool FindChatColorName(int rgb, char[] buffer, int maxlen) {
 		}
 	}
 	delete names;
-	// black is stored as #000001 so it isn't mistaken for "unpainted"
-	if (!found && rgb == 1) {
+	if (!found && (rgb == 1 || rgb == WEAPON_PAINT_NEAR_BLACK)) {
 		strcopy(buffer, maxlen, "black");
 		found = true;
 	}
@@ -441,7 +488,7 @@ static bool DecodePaintChoice(const char[] value, int &choice) {
 		if (!ParseHexColor(value[1], rgb)) {
 			return false;
 		}
-		choice = WEAPON_PAINT_CUSTOM_FLAG | (rgb ? rgb : 1);
+		choice = WEAPON_PAINT_CUSTOM_FLAG | (rgb ? rgb : WEAPON_PAINT_NEAR_BLACK);
 		return true;
 	}
 	int paint;

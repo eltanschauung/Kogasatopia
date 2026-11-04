@@ -385,7 +385,7 @@ public void OnMapEnd()
     for (int client = 1; client <= MaxClients; client++)
     {
         Weapons_ResetLoadoutRequests(client);
-        WeaponsPaint_ClearPrompt(client);
+        WeaponsPaint_ClearSelection(client);
     }
     WeaponsMovement_OnMapEnd();
     WeaponsSound_Clear();

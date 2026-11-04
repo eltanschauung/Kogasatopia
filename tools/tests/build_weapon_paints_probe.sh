@@ -14,10 +14,14 @@ done >> "$work/paint_under_test.inc"
 for function in SetItemPaintTintAttribute ApplyPaint; do
     sed -n "/^void $function(/,/^}/p" "$source/hats/rendering.sp"
 done >> "$work/paint_under_test.inc"
-for function in ParseChatColor ParseHexColor DecodePaintChoice EncodePaintChoice BuildPaintCookieChunks ReadPaintCookieChunk SetPaintAttributes CopyPaintAttribute; do
+for function in ParseChatColor ParseHexColor DecodePaintChoice EncodePaintChoice BuildPaintCookieChunks ReadPaintCookieChunk SetPaintAttributes CopyPaintAttribute PaintAttributeMatches; do
     sed -n "/^static \(bool\|void\) $function(/,/^}/p" "$source/weapon_paints.sp"
 done >> "$work/paint_under_test.inc"
 sed -n '/^void WeaponsPaint_CopyToWearable(/,/^}/p' "$source/weapon_paints.sp" >> "$work/paint_under_test.inc"
+for function in WeaponsPaint_HasTint WeaponsPaint_WearableMatches; do
+    sed -n "/^bool $function(/,/^}/p" "$source/weapon_paints.sp"
+done >> "$work/paint_under_test.inc"
 sed -n '/^void WeaponsModels_ApplyWeaponPaint(/,/^}/p' "$source/model_overrides.sp" >> "$work/paint_under_test.inc"
+sed -n '/^bool WeaponsModels_PaintNeedsRefresh(/,/^}/p' "$source/model_overrides.sp" >> "$work/paint_under_test.inc"
 sed -i 's/^static bool /bool /; s/^static void /void /' "$work/paint_under_test.inc"
 "$scripting/spcomp" "$root/tools/tests/weapon_paints_probe.sp" -i "$work" -i "$scripting/include" -o "$output"

@@ -240,14 +240,20 @@ void QueueClientModelUpdate(int client) {
 void WeaponsModels_ApplyWeaponPaint(int client, int weapon) {
 	if (!Weapons_IsValidClient(client) || weapon <= MaxClients || !IsValidEntity(weapon)
 			|| g_iAppliedWeaponRef[client] != EntIndexToEntRef(weapon)) return;
-	int wearables[3];
+	if (WeaponsModels_PaintNeedsRefresh(client, weapon)) QueueClientModelUpdate(client);
+}
+
+bool WeaponsModels_PaintNeedsRefresh(int client, int weapon) {
+	// The offhand model belongs to Demoman's shield, not this weapon. Like the
+	// arms, it must neither inherit the melee paint nor invalidate its renderers.
+	int wearables[2];
 	wearables[0] = EntRefToEntIndex(g_iLastViewmodelRef[client]);
 	wearables[1] = EntRefToEntIndex(g_iLastWorldModelRef[client]);
-	wearables[2] = EntRefToEntIndex(g_iLastOffHandViewmodelRef[client]);
 	for (int i; i < sizeof(wearables); i++) {
-		if (wearables[i] > MaxClients && IsValidEntity(wearables[i]))
-			WeaponsPaint_CopyToWearable(weapon, wearables[i]);
+		if (wearables[i] > MaxClients && IsValidEntity(wearables[i])
+				&& !WeaponsPaint_WearableMatches(weapon, wearables[i])) return true;
 	}
+	return false;
 }
 
 /**
@@ -790,7 +796,9 @@ bool ClientWeaponModelNeedsRefresh(int client) {
 		return true;
 	}
 
-	return false;
+	// CEconItemView caches its first paint lookup on the client. Recreate the
+	// render wearables instead of changing attributes on an already-drawn item.
+	return WeaponsModels_PaintNeedsRefresh(client, weapon);
 }
 
 bool GetWeaponOverrideModels(int weapon, char[] vm, int vmLen, char[] wm, int wmLen, bool &hasViewOverride, bool &hasWorldOverride) {

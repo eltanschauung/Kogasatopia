@@ -220,17 +220,21 @@ public int MenuHandler_Hats(Menu menu, MenuAction action, int client, int item)
 	return 0;
 }
 
-void ShowHatPaintMenu(int client)
+void CustomHats_AddPaintMenuItems(Menu menu)
 {
-	Menu menu = new Menu(MenuHandler_HatPaint);
-	menu.SetTitle("Select Paint");
-
 	char key[8];
 	for (int i = 0; i < sizeof(g_PaintNames); i++)
 	{
 		IntToString(i, key, sizeof(key));
 		menu.AddItem(key, g_PaintNames[i]);
 	}
+}
+
+void ShowHatPaintMenu(int client)
+{
+	Menu menu = new Menu(MenuHandler_HatPaint);
+	menu.SetTitle("Select Paint");
+	CustomHats_AddPaintMenuItems(menu);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, 20);

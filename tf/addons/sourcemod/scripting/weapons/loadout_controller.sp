@@ -884,13 +884,12 @@ Action DisplayItemDescriptions(int client, int argc)
 bool FormatItemDescription(const CustomItemDefinition item, char[] buffer, int maxlen)
 {
     buffer[0] = '\0';
-    if (!item.descriptionPositive[0] && !item.descriptionNeutral[0] && !item.descriptionNegative[0] && !item.paintable) return false;
+    if (!item.descriptionPositive[0] && !item.descriptionNeutral[0] && !item.descriptionNegative[0]) return false;
     FormatEx(buffer, maxlen, "{gold}%s{default}:", item.displayName);
     bool needsComma;
     if (item.descriptionPositive[0]) AppendItemDescriptionPart(buffer, maxlen, "{green}", item.descriptionPositive, needsComma);
     if (item.descriptionNeutral[0]) AppendItemDescriptionPart(buffer, maxlen, "{default}", item.descriptionNeutral, needsComma);
     if (item.descriptionNegative[0]) AppendItemDescriptionPart(buffer, maxlen, "{red}", item.descriptionNegative, needsComma);
-    if (item.paintable) AppendItemDescriptionPart(buffer, maxlen, "{default}", "Paintable.", needsComma);
     return true;
 }
 

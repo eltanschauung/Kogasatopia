@@ -9,7 +9,9 @@ int g_iAppliedWeaponRef[MAXPLAYERS + 1];
 int g_iLastViewmodelRef[MAXPLAYERS + 1];
 int g_iLastWorldModelRef[MAXPLAYERS + 1];
 int g_iLastOffHandViewmodelRef[MAXPLAYERS + 1];
+int queuedModelUpdates;
 stock bool Weapons_IsValidClient(int client) { return client == 1; }
+stock void QueueClientModelUpdate(int client) { if (client == 1) queuedModelUpdates++; }
 #include "paint_under_test.inc"
 
 int checks, failures;
@@ -40,7 +42,7 @@ public void OnPluginStart()
     Check(!ParseChatColor("#ABCDEFg", color), "reject trailing hex input");
     Check(!ParseChatColor("#12345g", color), "reject invalid hex input");
     Check(!ParseChatColor("not-a-color", color), "reject unknown color");
-    Check(DecodePaintChoice("#000000", choice) && choice == (WEAPON_PAINT_CUSTOM_FLAG | 1), "near-black encoding");
+    Check(DecodePaintChoice("#000000", choice) && choice == (WEAPON_PAINT_CUSTOM_FLAG | WEAPON_PAINT_NEAR_BLACK), "near-black avoids the native team-color sentinel");
     Check(!DecodePaintChoice("", choice), "reject empty cookie choice");
     Check(!DecodePaintChoice("30", choice) && !DecodePaintChoice("-1", choice), "reject invalid stock indexes");
     Check(DecodePaintChoice("29", choice) && choice == 29, "last stock paint");
@@ -80,27 +82,48 @@ public void OnPluginStart()
     int wearable = CreateEntityByName("tf_wearable");
     Check(weapon > MaxClients && wearable > MaxClients, "real TF2 econ entities created");
     if (weapon > MaxClients && wearable > MaxClients) {
+        SetEntProp(wearable, Prop_Send, "m_iItemDefinitionIndex", 65535);
+        Check(!GetEntProp(wearable, Prop_Send, "m_bInitialized"), "model-only wearable starts uninitialized");
         SetPaintAttributes(weapon, WEAPON_PAINT_CUSTOM_FLAG | 0xFF8800);
         Check(Tint(weapon, 142) == 16746496.0 && Tint(weapon, 261) == 16746496.0, "custom tint on weapon");
-        CopyPaintAttribute(weapon, wearable, 142);
-        CopyPaintAttribute(weapon, wearable, 261);
+        WeaponsPaint_CopyToWearable(weapon, wearable);
         Check(Tint(wearable, 142) == Tint(weapon, 142) && Tint(wearable, 261) == Tint(weapon, 261), "tint propagated to wearable");
-        SetPaintAttributes(weapon, 27);
-        Check(Tint(weapon, 142) == 12073019.0 && Tint(weapon, 261) == 5801378.0, "stock team paint has separate RED and BLU values");
+        Check(GetEntProp(wearable, Prop_Send, "m_bInitialized") == 1
+            && GetEntProp(wearable, Prop_Send, "m_bOnlyIterateItemViewAttributes") == 1
+            && GetEntProp(wearable, Prop_Send, "m_iItemDefinitionIndex") == 65535,
+            "paint initializes the renderer without importing another schema model");
+        Check(WeaponsPaint_WearableMatches(weapon, wearable), "fresh renderer paint matches");
+        SetEntProp(wearable, Prop_Send, "m_bInitialized", 0);
+        Check(!WeaponsPaint_WearableMatches(weapon, wearable), "uninitialized renderer requires rebuild even with matching tints");
+        WeaponsPaint_CopyToWearable(weapon, wearable);
         g_iAppliedWeaponRef[1] = EntIndexToEntRef(weapon);
         g_iLastViewmodelRef[1] = EntIndexToEntRef(wearable);
         g_iLastWorldModelRef[1] = g_iLastOffHandViewmodelRef[1] = INVALID_ENT_REFERENCE;
         WeaponsModels_ApplyWeaponPaint(1, weapon);
-        Check(Tint(wearable, 142) == 12073019.0 && Tint(wearable, 261) == 5801378.0,
-            "paint selection refreshes an already-valid model in place");
+        Check(queuedModelUpdates == 0, "matching paints do not churn model entities");
+        SetPaintAttributes(weapon, 27);
+        Check(Tint(weapon, 142) == 12073019.0 && Tint(weapon, 261) == 5801378.0, "stock team paint has separate RED and BLU values");
+        WeaponsModels_ApplyWeaponPaint(1, weapon);
+        Check(queuedModelUpdates == 1 && Tint(wearable, 142) == 16746496.0
+            && WeaponsModels_PaintNeedsRefresh(1, weapon),
+            "changed paint queues a fresh client item instead of overwriting a cached color");
+        WeaponsPaint_CopyToWearable(weapon, wearable);
         SetPaintAttributes(weapon, 0);
         Check(Tint(weapon, 142) == -1.0 && Tint(weapon, 261) == -1.0, "No Paint removes both runtime tints");
         g_iAppliedWeaponRef[1] = INVALID_ENT_REFERENCE;
         WeaponsModels_ApplyWeaponPaint(1, weapon);
-        Check(Tint(wearable, 142) == 12073019.0, "a different tracked weapon cannot repaint this model");
+        Check(queuedModelUpdates == 1, "a different tracked weapon cannot repaint this model");
         g_iAppliedWeaponRef[1] = EntIndexToEntRef(weapon);
         WeaponsModels_ApplyWeaponPaint(1, weapon);
-        Check(Tint(wearable, 142) == -1.0 && Tint(wearable, 261) == -1.0, "stale wearable tints cleared");
+        Check(queuedModelUpdates == 2, "removing paint also rebuilds the cached renderer");
+        WeaponsPaint_CopyToWearable(weapon, wearable);
+        Check(Tint(wearable, 142) == -1.0 && Tint(wearable, 261) == -1.0, "No Paint renderer has no stale tints");
+        SetPaintAttributes(weapon, WEAPON_PAINT_CUSTOM_FLAG | 1);
+        Check(Tint(weapon, 142) == float(WEAPON_PAINT_NEAR_BLACK), "old black cookies no longer turn into team paint");
+        g_iLastViewmodelRef[1] = INVALID_ENT_REFERENCE;
+        g_iLastOffHandViewmodelRef[1] = EntIndexToEntRef(wearable);
+        WeaponsModels_ApplyWeaponPaint(1, weapon);
+        Check(queuedModelUpdates == 2, "unrelated shield offhand cannot inherit paint or cause endless rebuilds");
     }
     if (weapon > MaxClients) RemoveEntity(weapon);
     if (wearable > MaxClients) RemoveEntity(wearable);
