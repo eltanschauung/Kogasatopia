@@ -47,154 +47,163 @@ void ApplyStyle(int entity, int style)
 	}
 }
 
+void SetItemPaintTintAttribute(int entity, int defindex, float value)
+{
+	Address current = WeaponsAttrib_GetByDefIndex(entity, defindex);
+	if (!current || WeaponsAttrib_GetValue(current) != value)
+	{
+		WeaponsAttrib_SetByDefIndex(entity, defindex, value);
+	}
+}
+
 void ApplyPaint(int hat, int paint)
 {
 	switch (paint)
 	{
 		case 1:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 3100495.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 3100495.0);
+			SetItemPaintTintAttribute(hat, 142, 3100495.0);
+			SetItemPaintTintAttribute(hat, 261, 3100495.0);
 		}
 		case 2:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 8208497.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 8208497.0);
+			SetItemPaintTintAttribute(hat, 142, 8208497.0);
+			SetItemPaintTintAttribute(hat, 261, 8208497.0);
 		}
 		case 3:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 1315860.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 1315860.0);
+			SetItemPaintTintAttribute(hat, 142, 1315860.0);
+			SetItemPaintTintAttribute(hat, 261, 1315860.0);
 		}
 		case 4:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 12377523.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 12377523.0);
+			SetItemPaintTintAttribute(hat, 142, 12377523.0);
+			SetItemPaintTintAttribute(hat, 261, 12377523.0);
 		}
 		case 5:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 2960676.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 2960676.0);
+			SetItemPaintTintAttribute(hat, 142, 2960676.0);
+			SetItemPaintTintAttribute(hat, 261, 2960676.0);
 		}
 		case 6:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 8289918.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 8289918.0);
+			SetItemPaintTintAttribute(hat, 142, 8289918.0);
+			SetItemPaintTintAttribute(hat, 261, 8289918.0);
 		}
 		case 7:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 15132390.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 15132390.0);
+			SetItemPaintTintAttribute(hat, 142, 15132390.0);
+			SetItemPaintTintAttribute(hat, 261, 15132390.0);
 		}
 		case 8:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 15185211.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 15185211.0);
+			SetItemPaintTintAttribute(hat, 142, 15185211.0);
+			SetItemPaintTintAttribute(hat, 261, 15185211.0);
 		}
 		case 9:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 14204632.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 14204632.0);
+			SetItemPaintTintAttribute(hat, 142, 14204632.0);
+			SetItemPaintTintAttribute(hat, 261, 14204632.0);
 		}
 		case 10:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 15308410.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 15308410.0);
+			SetItemPaintTintAttribute(hat, 142, 15308410.0);
+			SetItemPaintTintAttribute(hat, 261, 15308410.0);
 		}
 		case 11:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 8421376.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 8421376.0);
+			SetItemPaintTintAttribute(hat, 142, 8421376.0);
+			SetItemPaintTintAttribute(hat, 261, 8421376.0);
 		}
 		case 12:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 7511618.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 7511618.0);
+			SetItemPaintTintAttribute(hat, 142, 7511618.0);
+			SetItemPaintTintAttribute(hat, 261, 7511618.0);
 		}
 		case 13:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 13595446.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 13595446.0);
+			SetItemPaintTintAttribute(hat, 142, 13595446.0);
+			SetItemPaintTintAttribute(hat, 261, 13595446.0);
 		}
 		case 14:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 10843461.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 10843461.0);
+			SetItemPaintTintAttribute(hat, 142, 10843461.0);
+			SetItemPaintTintAttribute(hat, 261, 10843461.0);
 		}
 		case 15:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 5322826.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 5322826.0);
+			SetItemPaintTintAttribute(hat, 142, 5322826.0);
+			SetItemPaintTintAttribute(hat, 261, 5322826.0);
 		}
 		case 16:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 12955537.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 12955537.0);
+			SetItemPaintTintAttribute(hat, 142, 12955537.0);
+			SetItemPaintTintAttribute(hat, 261, 12955537.0);
 		}
 		case 17:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 16738740.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 16738740.0);
+			SetItemPaintTintAttribute(hat, 142, 16738740.0);
+			SetItemPaintTintAttribute(hat, 261, 16738740.0);
 		}
 		case 18:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 6901050.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 6901050.0);
+			SetItemPaintTintAttribute(hat, 142, 6901050.0);
+			SetItemPaintTintAttribute(hat, 261, 6901050.0);
 		}
 		case 19:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 3329330.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 3329330.0);
+			SetItemPaintTintAttribute(hat, 142, 3329330.0);
+			SetItemPaintTintAttribute(hat, 261, 3329330.0);
 		}
 		case 20:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 15787660.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 15787660.0);
+			SetItemPaintTintAttribute(hat, 142, 15787660.0);
+			SetItemPaintTintAttribute(hat, 261, 15787660.0);
 		}
 		case 21:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 8154199.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 8154199.0);
+			SetItemPaintTintAttribute(hat, 142, 8154199.0);
+			SetItemPaintTintAttribute(hat, 261, 8154199.0);
 		}
 		case 22:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 4345659.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 4345659.0);
+			SetItemPaintTintAttribute(hat, 142, 4345659.0);
+			SetItemPaintTintAttribute(hat, 261, 4345659.0);
 		}
 		case 23:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 6637376.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 2636109.0);
+			SetItemPaintTintAttribute(hat, 142, 6637376.0);
+			SetItemPaintTintAttribute(hat, 261, 2636109.0);
 		}
 		case 24:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 3874595.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 1581885.0);
+			SetItemPaintTintAttribute(hat, 142, 3874595.0);
+			SetItemPaintTintAttribute(hat, 261, 1581885.0);
 		}
 		case 25:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 12807213.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 12091445.0);
+			SetItemPaintTintAttribute(hat, 142, 12807213.0);
+			SetItemPaintTintAttribute(hat, 261, 12091445.0);
 		}
 		case 26:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 4732984.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 3686984.0);
+			SetItemPaintTintAttribute(hat, 142, 4732984.0);
+			SetItemPaintTintAttribute(hat, 261, 3686984.0);
 		}
 		case 27:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 12073019.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 5801378.0);
+			SetItemPaintTintAttribute(hat, 142, 12073019.0);
+			SetItemPaintTintAttribute(hat, 261, 5801378.0);
 		}
 		case 28:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 8400928.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 2452877.0);
+			SetItemPaintTintAttribute(hat, 142, 8400928.0);
+			SetItemPaintTintAttribute(hat, 261, 2452877.0);
 		}
 		case 29:
 		{
-			WeaponsAttrib_SetByDefIndex(hat, 142, 11049612.0);
-			WeaponsAttrib_SetByDefIndex(hat, 261, 8626083.0);
+			SetItemPaintTintAttribute(hat, 142, 11049612.0);
+			SetItemPaintTintAttribute(hat, 261, 8626083.0);
 		}
 	}
 }

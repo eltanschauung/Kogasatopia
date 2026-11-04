@@ -30,6 +30,7 @@ static StringMap s_PaintChoices[MAXPLAYERS + 1];
 static int s_PaintCookieChunksUsed[MAXPLAYERS + 1];
 
 static char s_PaintMenuUid[MAXPLAYERS + 1][MAX_ITEM_IDENTIFIER_LENGTH];
+static char s_PaintPromptUid[MAXPLAYERS + 1][MAX_ITEM_IDENTIFIER_LENGTH];
 static bool s_bAwaitingCustomPaint[MAXPLAYERS + 1];
 static float s_flCustomPaintPromptTime[MAXPLAYERS + 1];
 
@@ -49,6 +50,7 @@ void WeaponsPaint_OnPluginStart() {
 
 void WeaponsPaint_OnClientCookiesCached(int client) {
 	ResetPaintChoices(client);
+	WeaponsPaint_ClearPrompt(client);
 
 	char chunk[WEAPON_PAINT_COOKIE_LEN];
 	int chunksUsed;
@@ -58,29 +60,33 @@ void WeaponsPaint_OnClientCookiesCached(int client) {
 			continue;
 		}
 		chunksUsed = i + 1;
-
-		char entries[16][WEAPON_PAINT_COOKIE_LEN];
-		int count = ExplodeString(chunk, ",", entries, sizeof(entries), sizeof(entries[]));
-		for (int e; e < count; e++) {
-			int separator = FindCharInString(entries[e], ':', true);
-			if (separator <= 0) {
-				continue;
-			}
-			entries[e][separator] = '\0';
-
-			int choice;
-			if (DecodePaintChoice(entries[e][separator + 1], choice) && choice) {
-				s_PaintChoices[client].SetValue(entries[e], choice);
-			}
-		}
+		ReadPaintCookieChunk(s_PaintChoices[client], chunk);
 	}
 	s_PaintCookieChunksUsed[client] = chunksUsed;
+}
+
+static void ReadPaintCookieChunk(StringMap choices, const char[] chunk) {
+	char entries[WEAPON_PAINT_COOKIE_LEN / 4 + 1][WEAPON_PAINT_COOKIE_LEN];
+	int count = ExplodeString(chunk, ",", entries, sizeof(entries), sizeof(entries[]));
+	for (int e; e < count; e++) {
+		int separator = FindCharInString(entries[e], ':', true);
+		if (separator <= 0) continue;
+		entries[e][separator] = '\0';
+		int choice;
+		if (DecodePaintChoice(entries[e][separator + 1], choice) && choice)
+			choices.SetValue(entries[e], choice);
+	}
 }
 
 void WeaponsPaint_OnClientDisconnect(int client) {
 	delete s_PaintChoices[client];
 	s_PaintCookieChunksUsed[client] = 0;
 	s_PaintMenuUid[client][0] = '\0';
+	WeaponsPaint_ClearPrompt(client);
+}
+
+void WeaponsPaint_ClearPrompt(int client) {
+	s_PaintPromptUid[client][0] = '\0';
 	s_bAwaitingCustomPaint[client] = false;
 }
 
@@ -93,6 +99,7 @@ void WeaponsPaint_ApplyToEntity(int client, const CustomItemDefinition item, int
 		return;
 	}
 	SetPaintAttributes(entity, GetPaintChoice(client, item.uid));
+	WeaponsModels_ApplyWeaponPaint(client, entity);
 }
 
 /**
@@ -111,8 +118,9 @@ void WeaponsPaint_CopyToWearable(int weapon, int wearable) {
  * Shows the paint selection menu for a paintable item.  Only reached from the sm_cw menu.
  */
 void WeaponsPaint_ShowMenu(int client, const char[] uid) {
+	s_bAwaitingCustomPaint[client] = false;
 	CustomItemDefinition item;
-	if (!GetCustomItemDefinition(uid, item) || !item.paintable) {
+	if (!GetCustomItemDefinition(uid, item) || !WeaponsLoadout_CanPaintItem(client, item)) {
 		WeaponsLoadout_DisplayEquipMenu(client);
 		return;
 	}
@@ -149,7 +157,7 @@ static int MenuHandler_WeaponPaint(Menu menu, MenuAction action, int client, int
 		}
 
 		int paint = ClampPaintIndex(StringToInt(info));
-		SetPaintChoice(client, s_PaintMenuUid[client], paint);
+		if (!SetPaintChoice(client, s_PaintMenuUid[client], paint)) return 0;
 
 		char name[48];
 		CustomHats_GetPaintName(paint, name, sizeof(name));
@@ -164,6 +172,10 @@ static int MenuHandler_WeaponPaint(Menu menu, MenuAction action, int client, int
 }
 
 static void StartCustomPaintPrompt(int client) {
+	CustomItemDefinition item;
+	if (!GetCustomItemDefinition(s_PaintMenuUid[client], item)
+			|| !WeaponsLoadout_CanPaintItem(client, item)) return;
+	strcopy(s_PaintPromptUid[client], sizeof(s_PaintPromptUid[]), s_PaintMenuUid[client]);
 	s_bAwaitingCustomPaint[client] = true;
 	s_flCustomPaintPromptTime[client] = GetEngineTime();
 
@@ -202,7 +214,7 @@ Action WeaponsPaint_OnClientSayCommand(int client, const char[] message) {
 	if (StrEqual(input, "cancel", false)) {
 		s_bAwaitingCustomPaint[client] = false;
 		CPrintToChat(client, "{gold}[Weapons]{default} Custom paint cancelled.");
-		WeaponsPaint_ShowMenu(client, s_PaintMenuUid[client]);
+		WeaponsPaint_ShowMenu(client, s_PaintPromptUid[client]);
 		return Plugin_Handled;
 	}
 
@@ -220,7 +232,7 @@ Action WeaponsPaint_OnClientSayCommand(int client, const char[] message) {
 	}
 
 	s_bAwaitingCustomPaint[client] = false;
-	SetPaintChoice(client, s_PaintMenuUid[client], WEAPON_PAINT_CUSTOM_FLAG | rgb);
+	if (!SetPaintChoice(client, s_PaintPromptUid[client], WEAPON_PAINT_CUSTOM_FLAG | rgb)) return Plugin_Handled;
 
 	char description[64];
 	DescribePaintChoice(WEAPON_PAINT_CUSTOM_FLAG | rgb, description, sizeof(description));
@@ -281,20 +293,29 @@ static int GetPaintChoice(int client, const char[] uid) {
 	return 0;
 }
 
-static void SetPaintChoice(int client, const char[] uid, int choice) {
-	if (!uid[0]) {
-		return;
+static bool SetPaintChoice(int client, const char[] uid, int choice) {
+	CustomItemDefinition item;
+	if (!uid[0] || !GetCustomItemDefinition(uid, item) || !WeaponsLoadout_CanPaintItem(client, item)) {
+		CPrintToChat(client, "{gold}[Weapons]{default} This item is no longer equipped or available to paint.");
+		return false;
 	}
 	if (!s_PaintChoices[client]) {
 		s_PaintChoices[client] = new StringMap();
 	}
+	int previous = GetPaintChoice(client, uid);
 	if (choice) {
 		s_PaintChoices[client].SetValue(uid, choice);
 	} else {
 		s_PaintChoices[client].Remove(uid);
 	}
-	SavePaintChoices(client);
+	if (!SavePaintChoices(client)) {
+		if (previous) s_PaintChoices[client].SetValue(uid, previous);
+		else s_PaintChoices[client].Remove(uid);
+		CPrintToChat(client, "{gold}[Weapons]{default} Paint storage is full. Clear another item's paint first.");
+		return false;
+	}
 	RefreshLiveItemPaint(client, uid);
+	return true;
 }
 
 static void ResetPaintChoices(int client) {
@@ -304,8 +325,8 @@ static void ResetPaintChoices(int client) {
 }
 
 /**
- * Repaints the client's currently spawned copy of the item (if any) and rebuilds the custom
- * model wearables so they pick up the new paint.
+ * Repaints the live item and its existing model wearables, with normal validation
+ * as a fallback if an override model is missing.
  */
 static void RefreshLiveItemPaint(int client, const char[] uid) {
 	if (!IsClientInGame(client)) {
@@ -357,20 +378,24 @@ static bool EntityHasItemUID(int entity, const char[] uid) {
 static void SetPaintAttributes(int entity, int choice) {
 	if (choice & WEAPON_PAINT_CUSTOM_FLAG) {
 		float value = float(choice & WEAPON_PAINT_RGB_MASK);
-		WeaponsAttrib_SetByDefIndex(entity, WEAPON_PAINT_ATTRIB_RED, value);
-		WeaponsAttrib_SetByDefIndex(entity, WEAPON_PAINT_ATTRIB_BLU, value);
+		SetItemPaintTintAttribute(entity, WEAPON_PAINT_ATTRIB_RED, value);
+		SetItemPaintTintAttribute(entity, WEAPON_PAINT_ATTRIB_BLU, value);
 	} else if (choice > 0) {
 		ApplyPaint(entity, ClampPaintIndex(choice));
 	} else {
-		WeaponsAttrib_RemoveByDefIndex(entity, WEAPON_PAINT_ATTRIB_RED);
-		WeaponsAttrib_RemoveByDefIndex(entity, WEAPON_PAINT_ATTRIB_BLU);
+		if (WeaponsAttrib_GetByDefIndex(entity, WEAPON_PAINT_ATTRIB_RED))
+			WeaponsAttrib_RemoveByDefIndex(entity, WEAPON_PAINT_ATTRIB_RED);
+		if (WeaponsAttrib_GetByDefIndex(entity, WEAPON_PAINT_ATTRIB_BLU))
+			WeaponsAttrib_RemoveByDefIndex(entity, WEAPON_PAINT_ATTRIB_BLU);
 	}
 }
 
 static void CopyPaintAttribute(int from, int to, int defindex) {
 	Address attribute = WeaponsAttrib_GetByDefIndex(from, defindex);
 	if (attribute) {
-		WeaponsAttrib_SetByDefIndex(to, defindex, WeaponsAttrib_GetValue(attribute));
+		SetItemPaintTintAttribute(to, defindex, WeaponsAttrib_GetValue(attribute));
+	} else if (WeaponsAttrib_GetByDefIndex(to, defindex)) {
+		WeaponsAttrib_RemoveByDefIndex(to, defindex);
 	}
 }
 
@@ -420,7 +445,8 @@ static bool DecodePaintChoice(const char[] value, int &choice) {
 		return true;
 	}
 	int paint;
-	if (StringToIntEx(value, paint) != strlen(value) || paint < 0) {
+	if (!value[0] || StringToIntEx(value, paint) != strlen(value)
+			|| paint < 0 || paint >= CustomHats_GetPaintCount()) {
 		return false;
 	}
 	choice = ClampPaintIndex(paint);
@@ -435,31 +461,51 @@ static void EncodePaintChoice(int choice, char[] buffer, int maxlen) {
 	}
 }
 
-static void SavePaintChoices(int client) {
+static bool SavePaintChoices(int client) {
 	if (!AreClientCookiesCached(client) || !s_PaintChoices[client]) {
-		return;
+		return false;
 	}
 
 	char chunks[WEAPON_PAINT_COOKIE_CHUNKS][WEAPON_PAINT_COOKIE_LEN];
+	int chunksUsed;
+	// Build the entire value first; never commit a partial/truncated cookie set.
+	if (!BuildPaintCookieChunks(s_PaintChoices[client], chunks, chunksUsed)) return false;
+	int chunksToWrite = chunksUsed > s_PaintCookieChunksUsed[client]
+			? chunksUsed : s_PaintCookieChunksUsed[client];
+	if (chunksToWrite == 0) chunksToWrite = 1;
+	for (int i; i < chunksToWrite; i++) {
+		s_PaintCookies[i].Set(client, i < chunksUsed ? chunks[i] : "");
+	}
+	s_PaintCookieChunksUsed[client] = chunksUsed;
+	return true;
+}
+
+static bool BuildPaintCookieChunks(StringMap choices,
+		char chunks[WEAPON_PAINT_COOKIE_CHUNKS][WEAPON_PAINT_COOKIE_LEN], int &chunksUsed) {
+	for (int i; i < WEAPON_PAINT_COOKIE_CHUNKS; i++) chunks[i][0] = '\0';
+	chunksUsed = 0;
 	int chunk;
 
-	StringMapSnapshot uids = s_PaintChoices[client].Snapshot();
+	StringMapSnapshot uids = choices.Snapshot();
 	char uid[MAX_ITEM_IDENTIFIER_LENGTH], value[16], entry[MAX_ITEM_IDENTIFIER_LENGTH + 16];
 	for (int i; i < uids.Length; i++) {
 		uids.GetKey(i, uid, sizeof(uid));
 		int choice;
-		if (!s_PaintChoices[client].GetValue(uid, choice) || !choice) {
+		if (!choices.GetValue(uid, choice) || !choice) {
 			continue;
 		}
 		EncodePaintChoice(choice, value, sizeof(value));
 		FormatEx(entry, sizeof(entry), "%s:%s", uid, value);
+		if (strlen(entry) >= WEAPON_PAINT_COOKIE_LEN) {
+			delete uids;
+			return false;
+		}
 
 		int needed = strlen(chunks[chunk]) + strlen(entry) + (chunks[chunk][0] ? 1 : 0);
 		if (needed >= sizeof(chunks[])) {
 			if (++chunk >= WEAPON_PAINT_COOKIE_CHUNKS) {
-				LogError("[Weapons] Cannot persist all weapon paints for %N: cookie limit reached.", client);
-				chunk = WEAPON_PAINT_COOKIE_CHUNKS - 1;
-				break;
+				delete uids;
+				return false;
 			}
 		}
 		if (chunks[chunk][0]) {
@@ -469,14 +515,6 @@ static void SavePaintChoices(int client) {
 	}
 	delete uids;
 
-	int chunksUsed = chunks[0][0] ? chunk + 1 : 0;
-	int chunksToWrite = chunksUsed > s_PaintCookieChunksUsed[client]
-			? chunksUsed : s_PaintCookieChunksUsed[client];
-	if (chunksToWrite == 0) {
-		chunksToWrite = 1;
-	}
-	for (int i; i < chunksToWrite; i++) {
-		s_PaintCookies[i].Set(client, i < chunksUsed ? chunks[i] : "");
-	}
-	s_PaintCookieChunksUsed[client] = chunksUsed;
+	chunksUsed = chunks[0][0] ? chunk + 1 : 0;
+	return true;
 }

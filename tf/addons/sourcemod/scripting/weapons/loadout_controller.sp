@@ -57,6 +57,7 @@ void Weapons_ResetLoadoutRequests(int client)
 
 public void OnClientConnected(int client)
 {
+    WeaponsPaint_OnClientDisconnect(client);
     Weapons_ResetLoadoutRequests(client);
     WeaponsCommands_ResetClient(client);
     g_bRetrievedLoadout[client] = false;

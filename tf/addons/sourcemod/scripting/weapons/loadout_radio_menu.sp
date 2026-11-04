@@ -200,6 +200,18 @@ void WeaponsLoadout_DisplayEquipMenu(int client) {
 	}
 }
 
+bool WeaponsLoadout_CanPaintItem(int client, const CustomItemDefinition item) {
+	if (client <= 0 || client > MaxClients || !IsClientInGame(client)
+			|| !AreClientCookiesCached(client) || !item.paintable) return false;
+	int playerClass = g_iPlayerClassInMenu[client];
+	int slot = g_iPlayerSlotInMenu[client];
+	if (!Weapons_LoadoutClassValid(playerClass) || slot < 0 || slot >= NUM_ITEMS
+			|| view_as<int>(TF2Classes_GetCurrentOrDesired(client)) != playerClass) return false;
+	return item.loadoutPosition[playerClass] == slot
+			&& StrEqual(g_CurrentLoadout[client][playerClass][slot].uid, item.uid)
+			&& CanPlayerEquipItemForClass(client, playerClass, item);
+}
+
 /**
  * Determines visibility of items in the loadout menu.
  */
@@ -424,10 +436,7 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 			if (GetPaintEntryUid(key, uid, sizeof(uid))) {
 				// paint entries only show under the item while it's equipped in this slot
 				CustomItemDefinition paintItem;
-				if (!GetCustomItemDefinition(uid, paintItem) || !paintItem.paintable
-						|| !ItemVisibleInEquipMenu(client, paintItem)
-						|| !StrEqual(g_CurrentLoadout[client][g_iPlayerClassInMenu[client]]
-								[g_iPlayerSlotInMenu[client]].uid, uid)) {
+				if (!GetCustomItemDefinition(uid, paintItem) || !WeaponsLoadout_CanPaintItem(client, paintItem)) {
 					return ITEMDRAW_IGNORE;
 				}
 				return ITEMDRAW_DEFAULT;
@@ -453,7 +462,7 @@ static int OnEquipMenuEvent(Menu menu, MenuAction action, int param1, int param2
 			int client = param1;
 			int position = param2;
 			
-			char uid[MAX_ITEM_IDENTIFIER_LENGTH + 8], itemName[MAX_ITEM_NAME_LENGTH + 8];
+			char uid[MAX_ITEM_IDENTIFIER_LENGTH + 8], itemName[MAX_ITEM_NAME_LENGTH + 96];
 			menu.GetItem(position, uid, sizeof(uid), _, itemName, sizeof(itemName));
 			
 			char paintUid[MAX_ITEM_IDENTIFIER_LENGTH];
