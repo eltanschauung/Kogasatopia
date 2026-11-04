@@ -1,2 +1,0 @@
-# One SteamID64 per line; blank lines and comments are ignored.
-# Copy to public_activity_exclusions.txt on the server. Keep actual accounts untracked.

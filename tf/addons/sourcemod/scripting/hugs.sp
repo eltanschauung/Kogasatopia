@@ -2,9 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <public_activity>
-#include <oblivion>
-#include <oblivion_messages>
+#include <public_messages>
 #include <clientprefs>
 #include <dbi>
 #include <sdktools>

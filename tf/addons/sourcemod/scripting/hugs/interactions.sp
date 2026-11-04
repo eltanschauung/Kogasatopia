@@ -73,7 +73,7 @@
 		for (int i = 0; i < target_count; i++)
 		{
 			int target = target_list[i];
-			if (target == client || Oblivion_InteractionBlocked(client, target)) continue;
+			if (target == client) continue;
 
 			if (!EnsureStatsReady(target, false))
 			{
@@ -90,14 +90,14 @@
 			}
 
 			// Send message to the sender
-			if (!Oblivion_ShouldHide(client, target)) PrintToChat(client, "\x01[SM] You hugged \x04%s\x01!", targetNameDisplay);
+			PrintToChat(client, "\x01[SM] You hugged \x04%s\x01!", targetNameDisplay);
 
 			// Update hug stats
 			// If it's a group target, we don't increment per target here
 			UpdateHugStats(client, target, !isGroupTarget);
 
 			// Update last huggers list
-			if (!PublicActivity_IsExcluded(client)) UpdateLastHuggers(target, clientName);
+			UpdateLastHuggers(target, clientName);
 
 			successCount++;
 		}
@@ -178,7 +178,7 @@
 		for (int i = 0; i < target_count; i++)
 		{
 			int target = target_list[i];
-			if (target == client || Oblivion_InteractionBlocked(client, target)) continue;
+			if (target == client) continue;
 
 			if (!EnsureStatsReady(target, false))
 			{
@@ -195,14 +195,14 @@
 			}
 
 			// Send message to the sender
-			if (!Oblivion_ShouldHide(client, target)) PrintToChat(client, "\x01[SM] You fed \x04%s\x01!", targetNameDisplay);
+			PrintToChat(client, "\x01[SM] You fed \x04%s\x01!", targetNameDisplay);
 
 			// Update feed stats
 			// If it's a group target, we don't increment per target here
 			UpdateFeedStats(client, target, !isGroupTarget);
 
 			// Update last feeders list
-			if (!PublicActivity_IsExcluded(client)) UpdateLastFeeders(target, clientName);
+			UpdateLastFeeders(target, clientName);
 
 			successCount++;
 		}
@@ -283,7 +283,7 @@
 		for (int i = 0; i < target_count; i++)
 		{
 			int target = target_list[i];
-			if (target == client || Oblivion_InteractionBlocked(client, target)) continue;
+			if (target == client) continue;
 
 			if (IsRapeProtected(target))
 			{
@@ -306,7 +306,7 @@
 			}
 
 			// Send message to the sender
-			if (!Oblivion_ShouldHide(client, target)) PrintToChat(client, "\x01[SM] You raped \x04%s\x01!", targetNameDisplay);
+			PrintToChat(client, "\x01[SM] You raped \x04%s\x01!", targetNameDisplay);
 
 			// Update rape stats
 			// If it's a group target, we don't increment per target here
@@ -385,7 +385,7 @@
 
 		char rankStr[64];
 		GetRapeRank(count, rankStr, sizeof(rankStr));
-		Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: %s!", name, rankStr);
+		PublicChat_AllEx(client, "%s's rapes have reached a new rank: %s!", name, rankStr);
 
 		return Plugin_Handled;
 	}

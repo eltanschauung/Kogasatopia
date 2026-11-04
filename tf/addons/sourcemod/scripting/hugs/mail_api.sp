@@ -124,7 +124,7 @@
 		if (rape)
 		{
 			g_iRapesReceived[receiver] += amount;
-			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastRapistsByName(receiver, senderName);
+			UpdateLastRapistsByName(receiver, senderName);
 			if (sender > 0)
 			{
 				checkRapeChievements(sender);
@@ -133,12 +133,12 @@
 		else if (feed)
 		{
 			g_iFeedsReceived[receiver] += amount;
-			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastFeeders(receiver, senderName);
+			UpdateLastFeeders(receiver, senderName);
 		}
 		else
 		{
 			g_iHugsReceived[receiver] += amount;
-			if (!PublicActivity_IsExcludedSteam(senderSteamId64)) UpdateLastHuggers(receiver, senderName);
+			UpdateLastHuggers(receiver, senderName);
 		}
 		SaveClientStats(receiver);
 		Hugs_RecordRelationshipSteam(senderSteamId64, receiverSteamId64, rape ? 2 : (feed ? 1 : 0), amount, amount, senderName);
@@ -154,7 +154,7 @@
 		bool rape,
 		bool feed)
 	{
-		if (Oblivion_InteractionBlocked(sender, receiver)) return;
+
 		char senderDisplay[256];
 		BuildMailedHugsChatName(sender, senderSteamId64, senderName, senderDisplay, sizeof(senderDisplay));
 
@@ -163,7 +163,7 @@
 		char action[16];
 		strcopy(action, sizeof(action), rape ? "raped" : (feed ? "fed" : "hugged"));
 
-		if (!IsClientRedlisted(receiver) && Oblivion_SteamMessageVisible(receiver, senderSteamId64))
+		if (!IsClientRedlisted(receiver))
 		{
 			CPrintToChatEx(receiver, sender > 0 ? sender : receiver,
 				"{green}[Hugs] %s{default} %s you!", senderDisplay, action);

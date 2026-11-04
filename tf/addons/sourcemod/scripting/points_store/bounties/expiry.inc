@@ -107,7 +107,7 @@ public void SQLTxn_OnBountiesExpired(Database db, any data, int numQueries, DBRe
             BuildBountyDisplayName(targetSteamId, targetName, targetDisplay, sizeof(targetDisplay));
             for (int recipient = 1; recipient <= MaxClients; recipient++)
             {
-                if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, senderSteamId) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
+                if (Client_IsHumanInGame(recipient))
                 {
                     CPrintToChatEx(recipient, sender > 0 ? sender : recipient,
                         "%s %s's bounty on %s expired due to one week without resolution!",
@@ -135,4 +135,3 @@ public void SQLTxn_OnBountyExpiryFailed(Database db, any data, int numQueries, c
     g_BountyExpiryPending = false;
     LogError("[points_store] Bounty expiry failed at query %d: %s", failIndex, error);
 }
-

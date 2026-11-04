@@ -89,8 +89,7 @@ public Action Command_ListOptedInClients(int client, int args)
     char names[MAXPLAYERS][MAX_NAME_LENGTH];
     for (int target = 1; target <= MaxClients; target++)
     {
-        if (!IsClientInGame(target) || IsFakeClient(target)
-            || (client > 0 && Oblivion_ShouldHide(client, target))) continue;
+        if (!IsClientInGame(target) || IsFakeClient(target)) continue;
         int groups;
         bool audible = SaySounds_ShouldPlay(target);
         if (audible) for (int i = 0; i < gGroupNames.Length; i++)

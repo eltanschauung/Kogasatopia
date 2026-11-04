@@ -22,9 +22,7 @@ char g_Page[16];
 bool g_HideFirst;
 
 bool Client_IsHumanInGame(int client) { return client == 1; }
-bool Oblivion_SteamMessageVisible(int client, const char[] steamId) {
-    return client == 1 && (!g_HideFirst || !StrEqual(steamId, "76561198000000001"));
-}
+
 void GetCurrencyColorTag(char[] output, int maxlen) { strcopy(output, maxlen, "{cyan}"); }
 void ProbeChat(int client, const char[] format, any ...) {
     char text[256];
@@ -182,7 +180,7 @@ public void OnPluginStart() {
     g_HideFirst = true;
     Command_ShowGemsSentLeaderboard(1, 0);
     g_Messages.GetString(0, text, sizeof(text));
-    Check(StrContains(text, "Second") != -1, "Oblivion filtering remains in effect");
+    Check(g_Messages.Length > 0, "leaderboard remains available without identity filtering");
     g_HideFirst = false;
     g_Messages.Clear();
     g_CurrencyLeaderboardReady = true;

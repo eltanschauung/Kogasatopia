@@ -49,7 +49,7 @@ bool ProbeFake(int client) { return false; }
 bool ProbeEntity(int entity) { return entity == 1024 && validEntity; }
 bool ProbeWeapon(int entity) { return entity == 1024 && realWeapon; }
 int ProbeSlot(int entity) { slotReads++; return weaponSlot; }
-bool Oblivion_ShouldHide(int target, int author) { return false; }
+
 void ProbeChat(int target, const char[] format, any ...) { messages++; }
 void ProbeChatEx(int target, int author, const char[] format, any ...) { messages++; }
 bool WeaponsSound_EmitCustomMeleeAttribute(int client, int weapon, const char[] attribute, const char[] context) {

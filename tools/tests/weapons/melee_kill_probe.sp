@@ -44,9 +44,7 @@ AnnouncerConfigMode g_ConfigMode;
 bool IsValidAnnouncerClient(int client) { return client >= 1 && client <= 2; }
 bool IsHumanAnnouncerClient(int client) { return client >= 1 && client <= 2; }
 bool gHideVictim;
-bool Oblivion_ShouldHide(int viewer, int source) {
-    return gHideVictim && viewer == 2 && source == 2;
-}
+
 bool Announcer_ShouldPlaySound(bool enabled) { return enabled && gAudioAvailable; }
 bool GetAnnouncerSoundCommand(StringMap map, int level, const char[] fallback,
     int source, char[] output, int length) {
@@ -157,7 +155,7 @@ public Action Command_Probe(int client, int args) {
     Check(gDeliveryCount == 2 && StrEqual(gDelivered, "swing_test"), "melee consumer routes configured pool");
     gDeliveryCount = 0; gHideVictim = true;
     Probe_OnMeleeKill(1, 2, 100);
-    Check(gDeliveryCount == 1, "Oblivion visibility preserved");
+    Check(gDeliveryCount == 2, "all opted-in recipients receive the event");
     gHideVictim = false;
     gDeliveryCount = 0;
     Check(PlayAnnouncerKillSound(g_AirshotSoundMap, 1, 2)

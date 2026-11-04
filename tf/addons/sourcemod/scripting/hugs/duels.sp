@@ -21,7 +21,7 @@
 		TrimString(targetName);
 
 		int target = FindPlayerBySubstring(targetName, client);
-		if (target == 0 || Oblivion_InteractionBlocked(client, target))
+		if (target == 0)
 		{
 			PrintToChat(client, "No player found matching \"%s\".", targetName);
 			return Plugin_Handled;
@@ -177,15 +177,7 @@ void Hugs_PrintDuelAnnouncement(const char[] format, any ...)
     VFormat(message, sizeof(message), format, 2);
     for (int viewer = 1; viewer <= MaxClients; viewer++)
     {
-        if (!IsClientInGame(viewer)
-            || Oblivion_ShouldHide(viewer, g_iRequester)
-            || Oblivion_ShouldHide(viewer, g_iTarget)) continue;
+        if (!IsClientInGame(viewer)) continue;
         PrintToChat(viewer, "%s", message);
     }
-}
-
-public void Oblivion_OnStateChanged()
-{
-    if ((g_bDuelRequested || g_bDuelActive)
-        && Oblivion_InteractionBlocked(g_iRequester, g_iTarget)) ResetDuel();
 }

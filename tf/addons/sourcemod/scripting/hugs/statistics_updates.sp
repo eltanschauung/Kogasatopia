@@ -162,7 +162,7 @@ void UpdateLastFeeders(int recipient, const char[] feederName)
 
 void UpdateLastRapists(int recipient, int sender)
 {
-    if (PublicActivity_IsExcluded(sender)) { checkRapeChievements(sender); return; }
+
 	char rapistName[MAX_NAME_LENGTH];
 	GetClientName(sender, rapistName, sizeof(rapistName));
 	UpdateLastRapistsByName(recipient, rapistName);

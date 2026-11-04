@@ -97,7 +97,7 @@ Action ChatCommandListener(int client, const char[] command, int argc)
 
     }
 
-    if (PlaySaySound(soundPath, groupName, initiator))
+    if (PlaySaySound(soundPath, groupName))
     {
         LogSaySoundUsage("saysound_used", initiator, 0, selectedCommand, soundPath, groupName, fromGroup, sourceGroup, false, "chat");
     }

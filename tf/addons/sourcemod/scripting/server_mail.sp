@@ -4,7 +4,7 @@
 #include <sourcemod>
 #include <clientprefs>
 #include <multicolors>
-#include <oblivion_messages>
+#include <public_messages>
 #undef REQUIRE_PLUGIN
 #include <filters_api>
 #include <hugs_api>

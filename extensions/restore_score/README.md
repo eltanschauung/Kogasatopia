@@ -36,7 +36,7 @@ correction upward as new progress, repeatedly.
 The extension changes only the outgoing score property through its send proxy.
 The stored score and genuine Strange/MvM progression remain under TF2's control.
 Reconnect credit and deductions are applied to the displayed score, including
-Oblivion's private resources. Hidden/disconnected rows remain zero. Scores clear
+all player-resource entities. Hidden/disconnected rows remain zero. Scores clear
 on map/match reset; an empty server clears the reconnect cache, excluding TV.
 
 64 isolated Windows server checks passed, including reproduction of the old

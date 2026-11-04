@@ -38,7 +38,7 @@ void AnnounceBonusPointsMilestone(int client, int balance)
     GetCurrencyLongLabel(currencyLong, sizeof(currencyLong));
     BuildPurchaseDisplayName(client, displayName, sizeof(displayName));
 
-    Oblivion_ChatAllEx(client, "%s %s{default} now has %s%d %s{default}!", prefix, displayName, colorTag, balance, currencyLong);
+    PublicChat_AllEx(client, "%s %s{default} now has %s%d %s{default}!", prefix, displayName, colorTag, balance, currencyLong);
     PlayLevelUpSound(client);
 }
 
@@ -700,4 +700,3 @@ void PrintBonusPointsDelta(int client, int points, const char[] type, int target
 
     CPrintToChat(client, "%s {limegreen}%s%i%s", prefix, sign, points, perMapSuffix);
 }
-

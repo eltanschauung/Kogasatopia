@@ -10,7 +10,7 @@ Add a flat command pool alongside the other sections in announcers.cfg:
 ```
 
 The command must already exist in saysounds.cfg. Paid announcer ownership,
-disabled packs, SaySounds opt-outs, synchronized selection and Oblivion
+disabled packs, SaySounds opt-outs, synchronized selection and recipient
 visibility use the existing airshot announcer playback pipeline.
 There is no fallback sound when this section is absent or empty.
 

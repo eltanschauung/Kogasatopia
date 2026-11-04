@@ -17,7 +17,7 @@ A suicide has only a victim, not a separate killer. World deaths and invalid
 clients are handled without indexing invalid preferences. Each recipient gets
 at most one sound from this pipeline. Sound-list/group selections resolve once,
 not once per listener. Existing volume, forced groups, opt-outs, purchase/API
-restrictions, and Oblivion filtering continue through the existing helpers.
+restrictions, and recipient preferences continue through the existing helpers.
 
 Weapon override fallback keeps the old global eligibility decision, including
 participants who would previously have heard it. This prevents unrelated
@@ -54,7 +54,7 @@ Run `sm_saysounds_death_probe` in an isolated TF2 lab. Coverage includes both
 random outcomes, shared selection, usage deduplication, default/missing/invalid
 preferences, suicides, world deaths, invalid victims, weapon overrides and
 their inaudible fallback, per-client group/volume opt-outs, forced groups,
-Oblivion filtering, paid-sound denial, and no duplicate emissions.
+paid-sound denial, and no duplicate emissions.
 
 Validated in the isolated TF2 lab: **487 checks, 0 failures**. Production
 Saysounds also compiles without warnings on SourceMod 1.12.0.7221.

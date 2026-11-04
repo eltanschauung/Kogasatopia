@@ -2,8 +2,6 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <public_activity>
-#include <oblivion>
 #include <clientprefs>
 #include <sdktools>
 #include <sdktools_functions>
@@ -63,7 +61,6 @@
 #define TRIPLE_GRADIENT_ACCESS_ITEM "triple_gradient_upgrade"
 #define CHAT_PREFIX_MAXLEN 128
 #define FILTERS_CROSS_SERVER_TAG_MAX 64
-#define FILTERS_CHAT_DATABASE_IMMUNE_STEAMID64 "76561198081148684"
 #define PARSEE_STEAMID64 "76561199812613650"
 #define PARSEE_STEAMID2 "STEAM_0:0:926173961"
 #define PARSEE_FALLBACK_NAME "Mizuhashi Parsee"

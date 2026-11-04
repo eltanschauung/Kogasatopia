@@ -21,7 +21,7 @@ char g_HugsProtectorSteam[MAXPLAYERS + 1][32], g_HugsProtectedSteam[MAXPLAYERS +
 			return Plugin_Handled;
 		}
 
-		if (Oblivion_InteractionBlocked(client, target)) return Plugin_Handled;
+
 
 		if (target == client)
 		{
@@ -43,7 +43,7 @@ char g_HugsProtectorSteam[MAXPLAYERS + 1][32], g_HugsProtectedSteam[MAXPLAYERS +
 		float duration = g_hRapeProtectionDuration.FloatValue;
 		g_hRapeProtectionTimer[target] = CreateTimer(duration, Timer_RapeProtectionExpired, GetClientSerial(target));
 
-		Oblivion_ChatPairAllEx(client, target, "{green}[Hugs]{default} %s{default} is now protecting %s{default} from rape!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
+		PublicChat_AllEx(client, "{green}[Hugs]{default} %s{default} is now protecting %s{default} from rape!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
 		return Plugin_Handled;
 	}
 
@@ -58,7 +58,7 @@ char g_HugsProtectorSteam[MAXPLAYERS + 1][32], g_HugsProtectedSteam[MAXPLAYERS +
 		g_hRapeProtectionTimer[target] = null;
 		if (IsHumanClientInGame(target))
 		{
-			Oblivion_ChatSteamAll(g_HugsProtectorSteam[target], g_HugsProtectedSteam[target], "{green}[Hugs]{default} %s{default}'s rape protection of %s{default} has now expired!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
+			PublicChat_SteamAll(g_HugsProtectorSteam[target], "{green}[Hugs]{default} %s{default}'s rape protection of %s{default} has now expired!", g_szRapeProtectorName[target], g_szRapeProtectedName[target]);
 		}
 		g_iRapeProtectorUserId[target] = 0;
 		g_szRapeProtectorName[target][0] = '\0';

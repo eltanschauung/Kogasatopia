@@ -5,7 +5,7 @@ bool Filters_ShouldReceiveChat(int receiver, int sender)
         return false;
     }
 
-    if (Oblivion_ShouldHide(receiver, sender)) return false;
+
 
     if (!Filters_RedlistEnabled())
     {
@@ -38,7 +38,7 @@ void Filters_PrintToChatAll(const char[] message, bool skipArchivedMuted = false
 
 static void Filters_PrintRecreatedChat(int receiver, int sender, const char[] message)
 {
-    if (Oblivion_ShouldHide(receiver, sender)) return;
+
     char rendered[MAX_BUFFER_LENGTH];
     FormatEx(rendered, sizeof(rendered), "\x01%s", message);
 
@@ -101,7 +101,7 @@ void Filters_SendChatToReceiver(int receiver, int sender, const char[] message, 
         return;
     }
 
-    if (Oblivion_ShouldHide(receiver, sender)) return;
+
 
     if (Filters_HasMutedArchivedSpeakers(receiver) && Filters_IsConnectedParseeClient(sender))
     {
@@ -199,7 +199,7 @@ void Filters_UpdateVoiceOverrides()
                 }
             }
 
-            if (Oblivion_ShouldHide(receiver, sender)) shouldBlock = true;
+
 
             // This is an additional restriction, not an override of mutes or
             // quarantine rules. Block pending post-admin assignments as well.
@@ -472,15 +472,4 @@ void SendToWhitelistedAdmins(int sender, const char[] message, const char[] pref
 void SendToWhitelistedAdminsBlacklisted(int sender, const char[] message, const char[] prefix = "")
 {
     SendToWhitelistedAdmins(sender, message, prefix);
-}
-
-
-public void Oblivion_OnStateChanged()
-{
-    Filters_UpdateVoiceOverrides();
-}
-
-public void Filters_OblivionRefreshVoice(any unused)
-{
-    Filters_UpdateVoiceOverrides();
 }

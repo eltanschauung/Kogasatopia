@@ -2,7 +2,6 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <oblivion>
 #include <clientprefs>
 #include <textparse>
 #include <morecolors>

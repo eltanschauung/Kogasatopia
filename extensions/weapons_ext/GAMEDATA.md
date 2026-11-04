@@ -43,8 +43,7 @@ installation; their bindings are now versioned here. Legacy standalone extension
 sources are historical, non-deployed references, not supported consumers of the
 retired files. Do not restore their binaries or run their old updaters.
 
-`sm-tf2.games` remains separate: SourceMod owns/updates it, TF2Tools consumes it,
-and Oblivion also uses it. SDKTools, SDKHooks, econ-data, buildings, and all other
+`sm-tf2.games` remains separate: SourceMod owns/updates it, TF2Tools consumes it. SDKTools, SDKHooks, econ-data, buildings, and all other
 shared/non-Weapons gamedata remain untouched.
 
 ## Updating and validating

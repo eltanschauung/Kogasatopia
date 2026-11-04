@@ -155,7 +155,7 @@ public int Native_PlayCommandAs(Handle plugin, int numParams)
     }
 
     PrecacheSound(soundPath, true);
-    bool played = PlaySaySoundToTarget(targetClient, soundPath, groupName, forcePlayback, sourceClient);
+    bool played = PlaySaySoundToTarget(targetClient, soundPath, groupName, forcePlayback);
     if (played)
     {
         LogSaySoundUsage("saysound_used", sourceClient, targetClient, selectedCommand, soundPath, groupName, fromGroup, sourceGroup, true, "api_command_as");

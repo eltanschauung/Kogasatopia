@@ -561,7 +561,7 @@ static bool EmitSaySoundToClient(int client, const char[] soundPath, float emitV
     return true;
 }
 
-bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] groupName, bool forcePlayback = false, int initiator = 0)
+bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] groupName, bool forcePlayback = false)
 {
     bool played = false;
 
@@ -569,7 +569,7 @@ bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] group
     {
         for (int i = 1; i <= MaxClients; i++)
         {
-            if (Oblivion_ShouldHide(i, initiator)) continue;
+
             float emitVolume;
             if (!CanPlaySaySoundToClient(i, groupName, emitVolume, forcePlayback))
             {
@@ -585,7 +585,7 @@ bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] group
         return played;
     }
 
-    if (Oblivion_ShouldHide(client, initiator)) return false;
+
     float emitVolume;
     if (!CanPlaySaySoundToClient(client, groupName, emitVolume, forcePlayback))
     {
@@ -595,7 +595,7 @@ bool PlaySaySoundToTarget(int client, const char[] soundPath, const char[] group
     return EmitSaySoundToClient(client, soundPath, emitVolume);
 }
 
-bool PlaySaySound(const char[] soundPath, const char[] groupName, int initiator = 0)
+bool PlaySaySound(const char[] soundPath, const char[] groupName)
 {
-    return PlaySaySoundToTarget(0, soundPath, groupName, false, initiator);
+    return PlaySaySoundToTarget(0, soundPath, groupName, false);
 }

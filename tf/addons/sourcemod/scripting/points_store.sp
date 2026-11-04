@@ -7,7 +7,7 @@
 #include <tf2>
 #include <tf2_stocks>
 #include <multicolors>
-#include <oblivion_messages>
+#include <public_messages>
 #undef REQUIRE_PLUGIN
 #include <dgm_api>
 #include <filters_api>

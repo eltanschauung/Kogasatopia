@@ -121,11 +121,11 @@ public void SQL_OnLotteryTicketRefunded(Database db, DBResultSet results, const 
 
     if (Client_IsHumanInGame(client))
     {
-        Oblivion_ChatAllEx(client, "{default}%s refunded his lottery ticket! %s(%d){default}", displayName, colorTag, amount);
+        PublicChat_AllEx(client, "{default}%s refunded his lottery ticket! %s(%d){default}", displayName, colorTag, amount);
     }
     else
     {
-        Oblivion_ChatSteamAll(steamId, "", "{default}%s refunded his lottery ticket! %s(%d){default}", displayName, colorTag, amount);
+        PublicChat_SteamAll(steamId, "{default}%s refunded his lottery ticket! %s(%d){default}", displayName, colorTag, amount);
     }
 }
 
@@ -183,4 +183,3 @@ public void SQL_OnLotteryPrizePoolLoaded(Database db, DBResultSet results, const
     PrintLotteryTime(client, false);
     CPrintToChat(client, "{default}Participants: {gold}%d", participants);
 }
-

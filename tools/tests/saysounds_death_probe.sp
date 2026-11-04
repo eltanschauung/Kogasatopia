@@ -78,18 +78,14 @@ bool CanPlaySaySoundToClient(int client, const char[] group, float &emitVolume, 
     emitVolume = volume[client];
     return emitVolume > 0.0 && !mutedGroup[client][index];
 }
-bool Oblivion_ShouldHide(int client, int initiator)
-{
-    return client > 0 && client <= TEST_CLIENTS && initiator >= 0
-        && initiator <= TEST_CLIENTS && hidden[client][initiator];
-}
+
 bool PlaySaySoundToTarget(int client, const char[] path, const char[] group,
     bool forcePlayback = false, int initiator = 0)
 {
     Check(client > 0 && client <= TEST_CLIENTS, "no unfiltered global broadcast");
     Check(!forcePlayback, "personal sounds do not bypass preferences");
     float emitVolume;
-    if (!CanPlaySaySoundToClient(client, group, emitVolume) || Oblivion_ShouldHide(client, initiator))
+    if (!CanPlaySaySoundToClient(client, group, emitVolume))
         return false;
     plays[client]++;
     strcopy(heard[client], sizeof(heard[]), path);

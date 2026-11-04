@@ -265,7 +265,7 @@ stock void BuildPurchaseDisplayName(int client, char[] value, int maxlen)
     #pragma unused client
     strcopy(value, maxlen, "Test");
 }
-stock void Oblivion_ChatAllEx(int client, const char[] format, any ...)
+stock void PublicChat_AllEx(int client, const char[] format, any ...)
 {
     #pragma unused client
     #pragma unused format

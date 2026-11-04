@@ -617,14 +617,14 @@ public void SQL_OnLotteryFinished(Database db, DBResultSet results, const char[]
     GetLotteryShortHash(hash, shortHash, sizeof(shortHash));
     char winnerDelta[32];
     FormatLotteryPayoutDelta(winnerDelta, sizeof(winnerDelta), winnerPrize, g_LotteryDrawWinnerTicketValue);
-    Oblivion_ChatSteamAll(winnerSteamId, "", "%s[Lotto]{default} %s won lottery %s%s{default} for %s%d %s{default} %s{default}!", colorTag, winnerName, hashColor, shortHash, colorTag, winnerPrize, currencyLong, winnerDelta);
+    PublicChat_SteamAll(winnerSteamId, "%s[Lotto]{default} %s won lottery %s%s{default} for %s%d %s{default} %s{default}!", colorTag, winnerName, hashColor, shortHash, colorTag, winnerPrize, currencyLong, winnerDelta);
 
     for (int i = 0; i < g_LotteryDrawExtraWinnerCount; i++)
     {
         char extraDelta[32];
         GetCurrencyLongLabelForAmount(g_LotteryDrawExtraWinnerPrizes[i], currencyLong, sizeof(currencyLong));
         FormatLotteryPayoutDelta(extraDelta, sizeof(extraDelta), g_LotteryDrawExtraWinnerPrizes[i], g_LotteryDrawExtraWinnerTicketValues[i]);
-        Oblivion_ChatSteamAll(g_LotteryDrawExtraWinnerSteamIds[i], "", "{default}%s won %s%d %s{default} %s{default}!", g_LotteryDrawExtraWinnerNames[i], colorTag, g_LotteryDrawExtraWinnerPrizes[i], currencyLong, extraDelta);
+        PublicChat_SteamAll(g_LotteryDrawExtraWinnerSteamIds[i], "{default}%s won %s%d %s{default} %s{default}!", g_LotteryDrawExtraWinnerNames[i], colorTag, g_LotteryDrawExtraWinnerPrizes[i], currencyLong, extraDelta);
     }
 
     g_LotteryDrawInProgress = false;
@@ -641,4 +641,3 @@ public void SQL_OnLotteryFinished(Database db, DBResultSet results, const char[]
     ResetLotteryDrawState();
     EnsureActiveLottery();
 }
-

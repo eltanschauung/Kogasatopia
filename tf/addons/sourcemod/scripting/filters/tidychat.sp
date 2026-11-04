@@ -55,7 +55,7 @@ static void TidyChat_PrintTeamJoinAlert(int client, int team)
     }
 
     for (int viewer = 1; viewer <= MaxClients; viewer++)
-        if (IsClientInGame(viewer) && !Oblivion_ShouldHide(viewer, client))
+        if (IsClientInGame(viewer))
             CPrintToChatEx(viewer, client, "%s %s", renderedName, teamText);
 }
 

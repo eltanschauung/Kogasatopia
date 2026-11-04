@@ -209,7 +209,7 @@ static void Filters_DeliverOutboxRow(int id, const char[] hash, const char[] sou
     int sourcePort, bool webchatOnly, bool parseeReplacement)
 {
     bool isPlayerRelay = strncmp(hash, "player:", 7) == 0;
-    if (isPlayerRelay && PublicActivity_IsExcludedSteam(hash[7])) return;
+
     char label[256], colorTag[32] = "{gold}";
     if (!isPlayerRelay)
     {
@@ -362,19 +362,12 @@ void Filters_GetEscapedCrossServerTag(char[] buffer, int maxlen)
     if (maxlen > 0 && !Filters_TryGetEscapedCrossServerTag(buffer, maxlen)) buffer[0] = '\0';
 }
 
-static bool Filters_IsChatDatabaseImmune(int client)
-{
-    if (PublicActivity_IsExcluded(client)) return true;
-    char steamId64[KOGASA_STEAMID_MAX];
-    return client > 0 && client <= MaxClients && IsClientInGame(client)
-        && Kogasa_GetClientSteamId64(client, steamId64, sizeof(steamId64), true)
-        && StrEqual(steamId64, FILTERS_CHAT_DATABASE_IMMUNE_STEAMID64);
-}
+
 
 void Filters_QueueOutboxMessage(int timestamp, const char[] iphash, const char[] displayName,
     const char[] message, bool webchatOnly, bool alertFlag, bool parseeReplacement = false)
 {
-    if (strncmp(iphash, "player:", 7) == 0 && PublicActivity_IsExcludedSteam(iphash[7])) return;
+
     if (!g_bDbReady || g_hFiltersDb == null) return;
     char sanitizedMsg[512], escapedMsg[1025], escapedHash[129], escapedDisplay[257];
     char escapedServerTag[(FILTERS_CROSS_SERVER_TAG_MAX * 2) + 1];
@@ -405,7 +398,7 @@ void Filters_QueueOutboxMessage(int timestamp, const char[] iphash, const char[]
 
 void Filters_RelayChatToServers(int client, const char[] message, bool parseeReplacement = false)
 {
-    if (Filters_IsChatDatabaseImmune(client) || !Filters_DbAvailable() || !g_bOutboxStampReady) return;
+    if (!Filters_DbAvailable() || !g_bOutboxStampReady) return;
     char hash[64], displayName[128];
     displayName[0] = '\0';
     if (client > 0 && client <= MaxClients && IsClientInGame(client))
@@ -421,7 +414,7 @@ void Filters_RelayChatToServers(int client, const char[] message, bool parseeRep
 
 void Filters_LogChatMessage(int client, const char[] message, bool parseeReplacement = false)
 {
-    if (Filters_IsChatDatabaseImmune(client) || !Filters_DbAvailable()) return;
+    if (!Filters_DbAvailable()) return;
     char steamId[32], name[MAX_NAME_LENGTH], escapedName[(MAX_NAME_LENGTH * 2) + 1];
     char sanitizedMsg[512], escapedMsg[1025], escapedSteam[65];
     char escapedServerTag[(FILTERS_CROSS_SERVER_TAG_MAX * 2) + 1];
@@ -457,7 +450,6 @@ void Filters_LogChatMessage(int client, const char[] message, bool parseeReplace
 
 void Filters_LogAttributedChat(const char[] steamId64, const char[] displayName, const char[] message, const char[] relayMessage)
 {
-    if (PublicActivity_IsExcludedSteam(steamId64) || StrEqual(steamId64, FILTERS_CHAT_DATABASE_IMMUNE_STEAMID64)) return;
     if (!Filters_DbAvailable()) return;
     char escapedSteam[65], escapedName[(PRENAME_MAX_RENAME * 2) + 1];
     char sanitizedMsg[512], escapedMsg[1025];
@@ -522,7 +514,7 @@ public void Filters_EventPlayerDisconnect(Event event, const char[] name, bool d
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (client <= 0 || client > MaxClients) return;
     g_iPendingConnectUserId[client] = 0;
-    if (!Filters_IsRealClientInGame(client) || Filters_IsChatDatabaseImmune(client)) return;
+    if (!Filters_IsRealClientInGame(client)) return;
 
     char playerName[MAX_NAME_LENGTH];
     GetClientName(client, playerName, sizeof(playerName));
@@ -534,7 +526,7 @@ void Filters_AnnounceClientJoin(int client)
     if (client <= 0 || client > MaxClients || !IsClientInGame(client) || IsFakeClient(client)) return;
     if (g_iPendingConnectUserId[client] != GetClientUserId(client)) return;
     g_iPendingConnectUserId[client] = 0;
-    if (Filters_IsChatDatabaseImmune(client)) return;
+
     char steam2[32], steam64[32], prename[PRENAME_MAX_RENAME];
     Prename_GetClientIds(client, steam2, sizeof(steam2), steam64, sizeof(steam64));
     if (Prename_TryGetIdRule(steam64, steam2, prename, sizeof(prename)))

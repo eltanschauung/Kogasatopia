@@ -371,21 +371,11 @@ public void SQL_OnMailDeliveryChecked(Database db, DBResultSet results, const ch
 
         if (IsMailClient(receiver))
         {
-            Oblivion_ChatSteamAll(receiverSteamId, "",
-                "{cornflowerblue}[Mail] %s{default} received a Stimulus Check! (%s%d %s{default})",
-                coloredReceiver,
-                currencyColor,
-                gems,
-                currencyName);
+            PublicChat_SteamAll(receiverSteamId, "{cornflowerblue}[Mail] %s{default} received a Stimulus Check! (%s%d %s{default})", coloredReceiver, currencyColor, gems, currencyName);
         }
         else
         {
-            Oblivion_ChatSteamAll(receiverSteamId, "",
-                "{cornflowerblue}[Mail] %s{default} received a Stimulus Check! (%s%d %s{default})",
-                coloredReceiver,
-                currencyColor,
-                gems,
-                currencyName);
+            PublicChat_SteamAll(receiverSteamId, "{cornflowerblue}[Mail] %s{default} received a Stimulus Check! (%s%d %s{default})", coloredReceiver, currencyColor, gems, currencyName);
         }
         return;
     }
@@ -403,23 +393,11 @@ public void SQL_OnMailDeliveryChecked(Database db, DBResultSet results, const ch
         int author = IsMailClient(liveSender) ? liveSender : receiver;
         if (IsMailClient(author))
         {
-            Oblivion_ChatSteamAll(senderSteamId, receiverSteamId,
-                "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!",
-                coloredSender,
-                coloredReceiver,
-                currencyColor,
-                gems,
-                currencyName);
+            PublicChat_SteamAll(senderSteamId, "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!", coloredSender, coloredReceiver, currencyColor, gems, currencyName);
         }
         else
         {
-            Oblivion_ChatSteamAll(senderSteamId, receiverSteamId,
-                "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!",
-                coloredSender,
-                coloredReceiver,
-                currencyColor,
-                gems,
-                currencyName);
+            PublicChat_SteamAll(senderSteamId, "{cornflowerblue}[Mail] %s{default} gifted %s{default} %s%d %s{default}!", coloredSender, coloredReceiver, currencyColor, gems, currencyName);
         }
         return;
     }
@@ -441,4 +419,3 @@ public void SQL_OnMailDeliveryChecked(Database db, DBResultSet results, const ch
             coloredSender);
     }
 }
-

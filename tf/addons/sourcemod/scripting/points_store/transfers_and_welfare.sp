@@ -177,7 +177,7 @@ public Action Command_SendBonusPoints(int client, int args)
     }
 
     for (int viewer = 1; viewer <= MaxClients; viewer++)
-        if (Oblivion_MessageVisible(viewer, client, target)
+        if ((IsClientInGame(viewer) && !IsFakeClient(viewer))
             && GetFeatureStatus(FeatureType_Native, "SaySounds_PlayCommandAs") == FeatureStatus_Available)
             SaySounds_PlayCommandAs(client, viewer, BP_SOUND_COMMAND, true);
     LogTransferEvent("transfer_success", "ok", client, target, amount);
@@ -192,7 +192,7 @@ public Action Command_SendBonusPoints(int client, int args)
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!Client_IsHumanInGame(i) || !Oblivion_MessageVisible(i, client, target))
+        if (!Client_IsHumanInGame(i) || !(IsClientInGame(i) && !IsFakeClient(i)))
         {
             continue;
         }
@@ -364,9 +364,7 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
         g_WelfarePoolBalance = 0;
     }
 
-    if (!ownsRequest || generation != g_PerMapStateGeneration || !Client_IsHumanInGame(client)
-        || (automatic && !WelfareRobot_CanCollect(client))
-        || !ApplyBonusPoints(client, amount, false, false, 1.0, "welfare", 0, 0.0, 1))
+    if (!ownsRequest || generation != g_PerMapStateGeneration || !Client_IsHumanInGame(client) || automatic && !WelfareRobot_CanCollect(client) || !ApplyBonusPoints(client, amount, false, false, 1.0, "welfare", 0, 0.0, 1))
     {
         QueueEconomyDelta(BP_ECONOMY_WELFARE_POOL_KEY, amount);
         g_WelfarePoolBalance += amount;
@@ -391,6 +389,5 @@ public void SQL_OnWelfarePoolDebited(Database db, DBResultSet results, const cha
 
     char displayName[256];
     BuildPurchaseDisplayName(client, displayName, sizeof(displayName));
-    Oblivion_ChatAllEx(client, "{default}%s collected %s%d %s{default} from {gold}!welfare{default}", displayName, colorTag, amount, currencyLong);
+    PublicChat_AllEx(client, "{default}%s collected %s%d %s{default} from {gold}!welfare{default}", displayName, colorTag, amount, currencyLong);
 }
-

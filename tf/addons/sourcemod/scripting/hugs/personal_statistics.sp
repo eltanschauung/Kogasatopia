@@ -111,9 +111,9 @@ public void Hugs_OnPersonalStatsLoaded(Database db, DBResultSet results, const c
         }
         char steamId[32], name[MAX_NAME_LENGTH], display[256];
         results.FetchString(1, steamId, sizeof(steamId));
-        if (PublicActivity_IsExcludedSteam(steamId)) continue;
+
         int other = Kogasa_FindClientBySteamId64(steamId);
-        if (other > 0 && Oblivion_ShouldHide(client, other)) continue;
+
         results.FetchString(2, name, sizeof(name));
         if (!name[0]) strcopy(name, sizeof(name), "Unknown player");
         BuildMailedHugsChatName(other, steamId, name, display, sizeof(display));

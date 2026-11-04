@@ -2,8 +2,6 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <public_activity>
-#include <oblivion>
 #include <clientprefs>
 #include <textparse>
 
@@ -441,8 +439,7 @@ bool PlayAnnouncerKillSound(StringMap soundMap, int attacker, int victim)
     StringMap choices = new StringMap();
     bool played;
     for (int viewer = 1; viewer <= MaxClients; viewer++)
-        if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, attacker)
-            && !Oblivion_ShouldHide(viewer, victim)) played = Announcer_PlaySound(viewer, attacker, commandName, choices) || played;
+        if (IsHumanAnnouncerClient(viewer)) played = Announcer_PlaySound(viewer, attacker, commandName, choices) || played;
     delete choices;
     return played;
 }
@@ -694,7 +691,7 @@ void AnnounceKillstreakEnd(int client, int killstreak)
         char displayName[256];
         GetClientChatDisplayName(client, displayName, sizeof(displayName));
         for (int viewer = 1; viewer <= MaxClients; viewer++)
-            if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, client))
+            if (IsHumanAnnouncerClient(viewer))
                 CPrintToChatEx(viewer, client, "%s{default}'s killstreak was shut down! (%d)", displayName, killstreak);
         return;
     }
@@ -702,7 +699,7 @@ void AnnounceKillstreakEnd(int client, int killstreak)
     char clientName[MAX_NAME_LENGTH];
     GetClientName(client, clientName, sizeof(clientName));
     for (int viewer = 1; viewer <= MaxClients; viewer++)
-        if (IsHumanAnnouncerClient(viewer) && !Oblivion_ShouldHide(viewer, client))
+        if (IsHumanAnnouncerClient(viewer))
             PrintCenterText(viewer, "%s's killstreak was shut down! (%d)", clientName, killstreak);
 }
 
@@ -991,7 +988,7 @@ void FormatMultikillMessage(const char[] clientName, const char[] label, int kil
 
 void Announcer_CenterText(int target, int sourceClient, const char[] commandName, bool useSound, const char[] message, StringMap choices = null)
 {
-    if (target > 0 && Oblivion_ShouldHide(target, sourceClient)) return;
+
     if (target > 0)
     {
         if (IsHumanAnnouncerClient(target) && (!useSound || Announcer_PlaySound(target, sourceClient, commandName, choices)))
@@ -1108,7 +1105,7 @@ static bool Announcer_PlaySoundInContext(int target, int sourceClient, const cha
 
 static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[] commandName, StringMap choices)
 {
-    if (target > 0 && Oblivion_ShouldHide(target, sourceClient)) return false;
+
     if (!commandName[0])
     {
         return false;
@@ -1140,7 +1137,7 @@ static bool Announcer_PlaySoundCommand(int target, int sourceClient, const char[
 void Announcer_MessageClient(int target, int author, const char[] message)
 {
     if (!IsHumanAnnouncerClient(target)) return;
-    if (Oblivion_ShouldHide(target, author)) return;
+
     if (IsValidAnnouncerClient(author) && IsClientInGame(author))
     {
         CPrintToChatEx(target, author, "%s", message);
@@ -1154,7 +1151,7 @@ void Announcer_MessageAll(int author, bool useChat, const char[] message)
 {
     for (int viewer = 1; viewer <= MaxClients; viewer++)
     {
-        if (!IsHumanAnnouncerClient(viewer) || Oblivion_ShouldHide(viewer, author)) continue;
+        if (!IsHumanAnnouncerClient(viewer)) continue;
         if (useChat) Announcer_MessageClient(viewer, author, message);
         else PrintCenterText(viewer, "%s", message);
     }

@@ -32,7 +32,7 @@ bool IsValidAnnouncerClient(int client) { return IsHumanAnnouncerClient(client);
 bool CanUsePurchaseAwareSoundSelection(int client) { return IsHumanAnnouncerClient(client); }
 bool ShouldResolveAnnouncerSoundPerListener(const char[] command) { return !SaySounds_IsCommandPaid(command); }
 ArrayList FindAnnouncerSoundCommandList(const char[] command) { return gCandidates; }
-bool Oblivion_ShouldHide(int target, int source) { return false; }
+
 FeatureStatus ProbeFeature(FeatureType type, const char[] name) { return FeatureStatus_Available; }
 void ProbeCenter(int client, const char[] text, any ...) { gCenterMessages++; }
 

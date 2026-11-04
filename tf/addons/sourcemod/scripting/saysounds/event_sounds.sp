@@ -28,7 +28,7 @@ static bool PlayDeathEventSaySoundToClient(DeathEventSaySound sound, int client)
     if (!sound.available || client <= 0)
         return false;
 
-    bool played = PlaySaySoundToTarget(client, sound.path, sound.groupName, false, sound.initiator);
+    bool played = PlaySaySoundToTarget(client, sound.path, sound.groupName, false);
     sound.played = sound.played || played;
     return played;
 }
@@ -52,8 +52,7 @@ static bool CanHearDeathEventSaySound(DeathEventSaySound sound, int client)
 {
     float emitVolume;
     return sound.available
-        && CanPlaySaySoundToClient(client, sound.groupName, emitVolume)
-        && !Oblivion_ShouldHide(client, sound.initiator);
+        && CanPlaySaySoundToClient(client, sound.groupName, emitVolume);
 }
 
 static void LogDeathEventSaySound(DeathEventSaySound sound, const char[] eventName, const char[] kind)

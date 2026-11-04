@@ -184,7 +184,7 @@ public void SQL_OnAutomaticBountyPlaced(Database db, DBResultSet results, const 
     GetCurrencyShortLabelForAmount(BOUNTY_AUTOMATIC_AMOUNT, currencyName, sizeof(currencyName));
     for (int recipient = 1; recipient <= MaxClients; recipient++)
     {
-        if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
+        if (Client_IsHumanInGame(recipient))
         {
             CPrintToChatEx(recipient, target > 0 ? target : recipient,
                 "%s Dominate %s to get %s%d %s{default}!",
@@ -215,4 +215,3 @@ void PrintBountyTargetInstructions(int target)
         g_BountyPrefix,
         (GetBountyPlaytimeLimitSeconds() + 59) / 60, g_CurrencyLongLabel);
 }
-

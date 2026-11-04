@@ -172,7 +172,7 @@ public void SQLTxn_OnBountyClaimed(Database db, any data, int numQueries, DBResu
     GetCurrencyShortLabelForAmount(amount, currencyName, sizeof(currencyName));
     for (int recipient = 1; recipient <= MaxClients; recipient++)
     {
-        if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, attackerSteamId) && Oblivion_SteamMessageVisible(recipient, victimSteamId))
+        if (Client_IsHumanInGame(recipient))
         {
             CPrintToChatEx(recipient, Client_IsHumanInGame(attacker) ? attacker : recipient,
                 "%s %s received %s%d %s{default} for dominating %s!",
@@ -197,4 +197,3 @@ public void SQLTxn_OnBountyClaimFailed(Database db, any data, int numQueries, co
     delete pack;
     LogError("[points_store] Bounty claim failed at query %d: %s", failIndex, error);
 }
-

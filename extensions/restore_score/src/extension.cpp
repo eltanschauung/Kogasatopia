@@ -48,7 +48,7 @@ void Dirty(int client = -1) {
         auto edict = gamehelpers->EdictOfIndex(id);
         if (!edict || edict->IsFree() || !IsResource(gamehelpers->ReferenceToEntity(id))) continue;
         // Invalidate the encoder cache even though the underlying score never
-        // changes. Include Oblivion's private player-resource copies.
+        // changes. Include all player-resource entities.
         gamehelpers->SetEdictStateChanged(edict, client > 0 ? scoreOffset + client * sizeof(int) : 0);
     }
 }

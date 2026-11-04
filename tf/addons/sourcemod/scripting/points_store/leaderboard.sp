@@ -318,7 +318,7 @@ static Action CurrencyLeaderboard_ShowCached(int client, int args, CurrencyLeade
             case CurrencyLeaderboard_GemsSent: strcopy(steamId, sizeof(steamId), g_GemsSentLeaderboardSteamIds[row]);
             case CurrencyLeaderboard_Lottery: LotteryLeaderboard_GetSteamId(row, steamId, sizeof(steamId));
         }
-        if (Oblivion_SteamMessageVisible(client, steamId)) visible[count++] = row;
+        visible[count++] = row;
     }
     int pages = (count + BP_LEADERBOARD_PAGE_SIZE - 1) / BP_LEADERBOARD_PAGE_SIZE;
     if (pages < 1) pages = 1;

@@ -15,87 +15,87 @@
 		{
 			case 1:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Strange!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Strange!", name);
 			}
 			case 10:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Unremarkable!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Unremarkable!", name);
 			}
 			case 25:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Scarcely Lethal!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Scarcely Lethal!", name);
 			}
 			case 45:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Mildly Menacing!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Mildly Menacing!", name);
 			}
 			case 70:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Somewhat Threatening!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Somewhat Threatening!", name);
 			}
 			case 100:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Uncharitable!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Uncharitable!", name);
 			}
 			case 135:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Notably Dangerous!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Notably Dangerous!", name);
 			}
 			case 175:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Sufficiently Lethal!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Sufficiently Lethal!", name);
 			}
 			case 225:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Truly Feared!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Truly Feared!", name);
 			}
 			case 275:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Spectacularly Lethal!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Spectacularly Lethal!", name);
 			}
 			case 350:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Gore-Spattered!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Gore-Spattered!", name);
 			}
 			case 500:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Wicked Nasty!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Wicked Nasty!", name);
 			}
 			case 750:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Positively Inhumane!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Positively Inhumane!", name);
 			}
 			case 999:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Totally Ordinary!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Totally Ordinary!", name);
 			}
 			case 1000:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Face-Melting!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Face-Melting!", name);
 			}
 			case 1500:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Rage-Inducing!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Rage-Inducing!", name);
 			}
 			case 2500:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Server-Clearing!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Server-Clearing!", name);
 			}
 			case 5000:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Epic!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Epic!", name);
 			}
 			case 7500:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Legendary!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Legendary!", name);
 			}
 			case 7616:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Australian!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Australian!", name);
 			}
 			case 8500:
 			{
-				Oblivion_ChatAllEx(client, "%s's rapes have reached a new rank: Hale's Own!", name);
+				PublicChat_AllEx(client, "%s's rapes have reached a new rank: Hale's Own!", name);
 			}
 		}
 

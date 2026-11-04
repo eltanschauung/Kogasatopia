@@ -351,8 +351,7 @@ public void SQL_OnPurchaseInserted(Database db, DBResultSet results, const char[
         client = GetClientFromSerial(serial);
         if (Client_IsHumanInGame(client))
         {
-            Oblivion_ChatAllEx(client, "%s[!shop]{default} %s bought {gold}%s{default} for %d %s%s{default}",
-                colorTag, displayName, itemName, price, colorTag, currencyShort);
+            PublicChat_AllEx(client, "%s[!shop]{default} %s bought {gold}%s{default} for %d %s%s{default}", colorTag, displayName, itemName, price, colorTag, currencyShort);
             PlayPurchaseSound(price);
             client = GetClientFromSerial(serial);
             if (Client_IsHumanInGame(client)) WelfareRobot_OnPurchased(client, itemKey);

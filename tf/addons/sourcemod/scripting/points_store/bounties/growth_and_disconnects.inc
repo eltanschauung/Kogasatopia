@@ -377,7 +377,7 @@ public void SQLTxn_OnDisconnectedBountiesRefunded(Database db, any data, int num
 
             for (int recipient = 1; recipient <= MaxClients; recipient++)
             {
-                if (Client_IsHumanInGame(recipient) && Oblivion_SteamMessageVisible(recipient, targetSteamId))
+                if (Client_IsHumanInGame(recipient))
                 {
                     CPrintToChatEx(recipient, sender > 0 ? sender : recipient,
                         "%s %s has been disconnected for {gold}%d minutes{default}; %s%d %s{default} has been refunded!",
@@ -408,4 +408,3 @@ public void SQLTxn_OnDisconnectedBountyRefundFailed(Database db, any data, int n
     g_BountyDisconnectRefundPending = false;
     LogError("[points_store] Disconnected bounty refund failed at query %d: %s", failIndex, error);
 }
-
