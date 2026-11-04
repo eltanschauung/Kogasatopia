@@ -46,6 +46,20 @@ int ClampPaintIndex(int paint)
 	return paint;
 }
 
+/**
+ * Number of entries in the paint list, including "No Paint" at index 0.  Shared with the custom
+ * weapon paint menu so both use the same paints and indices.
+ */
+int CustomHats_GetPaintCount()
+{
+	return sizeof(g_PaintNames);
+}
+
+void CustomHats_GetPaintName(int paint, char[] buffer, int maxlen)
+{
+	strcopy(buffer, maxlen, g_PaintNames[ClampPaintIndex(paint)]);
+}
+
 void ShowHatMenu(int client)
 {
 	Menu menu = new Menu(MenuHandler_HatSlots);

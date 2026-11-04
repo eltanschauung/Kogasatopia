@@ -237,6 +237,19 @@ void QueueClientModelUpdate(int client) {
 	RequestFrame(Frame_UpdateClientWeaponModel, GetClientUserId(client));
 }
 
+void WeaponsModels_ApplyWeaponPaint(int client, int weapon) {
+	if (!Weapons_IsValidClient(client) || weapon <= MaxClients || !IsValidEntity(weapon)
+			|| g_iAppliedWeaponRef[client] != EntIndexToEntRef(weapon)) return;
+	int wearables[3];
+	wearables[0] = EntRefToEntIndex(g_iLastViewmodelRef[client]);
+	wearables[1] = EntRefToEntIndex(g_iLastWorldModelRef[client]);
+	wearables[2] = EntRefToEntIndex(g_iLastOffHandViewmodelRef[client]);
+	for (int i; i < sizeof(wearables); i++) {
+		if (wearables[i] > MaxClients && IsValidEntity(wearables[i]))
+			WeaponsPaint_CopyToWearable(weapon, wearables[i]);
+	}
+}
+
 /**
  * Defers an equip / switch refresh by one frame and binds it to the exact weapon
  * that caused the callback.  This prevents callbacks from other loadout weapons
@@ -440,6 +453,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		if (IsValidEntity(weaponvm)) {
 			SetEntityModel(weaponvm, vm);
 			CopyKillstreakSheen(weapon, weaponvm);
+			WeaponsPaint_CopyToWearable(weapon, weaponvm);
 			EquipWeaponModelWearable(client, weaponvm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponvm, client, "viewmodel_wearable_vm", true, weapon);
 			
@@ -461,6 +475,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 		if (IsValidEntity(weaponwm)) {
 			SetEntityModel(weaponwm, wm);
 			CopyKillstreakSheen(weapon, weaponwm);
+			WeaponsPaint_CopyToWearable(weapon, weaponwm);
 			
 			EquipWeaponModelWearable(client, weaponwm, weapon);
 			Weapons_MarkValidatedAttachedEntity(weaponwm, client, "worldmodel_wearable", true, weapon);
@@ -623,6 +638,7 @@ void UpdateClientWeaponModel(int client, int expectedWeapon = INVALID_ENT_REFERE
 			if (IsValidEntity(weaponvm)) {
 				SetEntityModel(weaponvm, vm);
 				CopyKillstreakSheen(weapon, weaponvm);
+				WeaponsPaint_CopyToWearable(weapon, weaponvm);
 				EquipWeaponModelWearable(client, weaponvm, weapon);
 				Weapons_MarkValidatedAttachedEntity(weaponvm, client, "fallback_weapon_viewmodel", true, weapon);
 				

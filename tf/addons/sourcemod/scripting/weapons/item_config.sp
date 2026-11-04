@@ -25,6 +25,7 @@ enum struct CustomItemDefinition {
 	
 	bool bKeepStaticAttributes;
 	bool reskinOnly;
+	bool paintable;
 	
 	void Init() {
 		this.defindex = TF_ITEMDEF_DEFAULT;
@@ -211,6 +212,12 @@ bool CreateItemFromSection(KeyValues config) {
 	config.GetString("reskin_only", reskinOnly, sizeof(reskinOnly), "false");
 	item.reskinOnly = StrEqual(reskinOnly, "true", false) || StringToInt(reskinOnly) != 0;
 	
+	// allows players to pick a paint for the item from sm_cw; the item's materials have to
+	// support the ItemTintColor proxy for the paint to show
+	char paintable[8];
+	config.GetString("paintable", paintable, sizeof(paintable), "false");
+	item.paintable = StrEqual(paintable, "true", false) || StringToInt(paintable) != 0;
+	
 	// allows restricting access to the item
 	config.GetString("access", item.access, sizeof(item.access));
 	config.GetString("points_store_purchase",
@@ -356,6 +363,7 @@ int WeaponsProfiled_EquipCustomItem(int client, const CustomItemDefinition item)
 			!item.bKeepStaticAttributes);
 	
 	ApplyCustomItemNativeAttributes(itemEntity, item);
+	WeaponsPaint_ApplyToEntity(client, item, itemEntity);
 	
 	// add a stinky attribute that holds the item's uid
 	// this value is read with Weapons_GetItemUIDFromEntity
@@ -507,6 +515,10 @@ bool EnsureCustomItemRuntimeAttributes(int itemEntity,
 		}
 		delete currentAttributes;
 	}
+
+	// paint is a player choice rather than item state, so it is reapplied without counting
+	// as a repair
+	WeaponsPaint_ApplyToEntity(client, item, itemEntity);
 
 	if (restored) {
 		LogMessage("[Weapons][RuntimeRepair] context=%s client=%N entity=%d uid=%s",

@@ -112,6 +112,7 @@ int g_attrdef_AllowedInMedievalMode;
 #include "weapons/hat_visibility.sp"
 #include "weapons/item_export.sp"
 #include "weapons/loadout_entries.sp"
+#include "weapons/weapon_paints.sp"
 #include "weapons/loadout_radio_menu.sp"
 #include "weapons/sound_overrides.sp"
 #include "weapons/model_overrides.sp"
@@ -160,6 +161,7 @@ public void OnPluginStart()
     WeaponsMovement_OnPluginStart();
     CustomHats_OnPluginStart();
     WeaponsHatVisibility_OnPluginStart();
+    WeaponsPaint_OnPluginStart();
     LoadTranslations("weapons.phrases");
     LoadTranslations("common.phrases");
     LoadTranslations("core.phrases");
@@ -383,6 +385,7 @@ public void OnMapEnd()
     for (int client = 1; client <= MaxClients; client++)
     {
         Weapons_ResetLoadoutRequests(client);
+        WeaponsPaint_ClearPrompt(client);
     }
     WeaponsMovement_OnMapEnd();
     WeaponsSound_Clear();
@@ -415,11 +418,17 @@ public void OnClientDisconnect(int client)
     WeaponsView_OnDisconnect(client);
     CustomHats_OnClientDisconnect(client);
     WeaponsHatVisibility_OnClientDisconnect(client);
+    WeaponsPaint_OnClientDisconnect(client);
     WeaponsMovement_OnClientDisconnect(client);
     WeaponsWhitelist_OnClientDisconnect(client);
     WeaponsSound_ResetClient(client, true);
     WeaponsModels_OnClientDisconnect(client);
     WeaponsGameplay_OnClientDisconnect(client);
+}
+
+public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
+{
+    return WeaponsPaint_OnClientSayCommand(client, sArgs);
 }
 
 void Weapons_OnWeaponSwitchPost(int client, int weapon)
