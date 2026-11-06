@@ -2,6 +2,14 @@
 // Sorted from most to least popular. One playable map per line.
 // Included 394 maps; skipped 103 mapsdb rows without an installed .bsp or known workshop mapcycle entry.
 
+plr_alberta_b2
+cp_cunny_a2
+koth_mayohiga
+pl_brainblast_b3b
+cp_well_event_rc4
+koth_lakeside_event
+koth_touhvest_event_b1
+koth_lumberyard_event
 koth_product_rcx
 koth_dolls_playground_a7a
 htf_marshlands
@@ -195,7 +203,7 @@ cp_rokkenjima_b3
 koth_soot_final1
 cp_metalworks
 koth_lazarus
-cp_process_final
+cp_process_f12
 pl_deadwood
 cp_mann_mall_b3
 workshop/pl_blackmoose_b11.ugc3704524832
